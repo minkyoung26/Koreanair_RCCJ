@@ -1263,10 +1263,21 @@ else:
     act_ov_c = actual_cols['해외 APO']
     all_ov_6 = sorted([str(x) for x in df_6[act_ov_c].dropna().unique()]) if act_ov_c and act_ov_c in df_6.columns else []
 
+    # 📌 출발월 YoY 동시 필터링 지원 헬퍼 함수
+    def filter_month_yoy(df_target, selected_m_val):
+        if selected_m_val == ALL_OPTION or not month_col_6 or month_col_6 not in df_target.columns:
+            return pd.Series(True, index=df_target.index)
+        
+        # '2026-09' -> '09'월 파싱
+        if '-' in str(selected_m_val):
+            sub_m = str(selected_m_val).split('-')[-1]
+            return df_target[month_col_6].astype(str).str.endswith(sub_m) | (df_target[month_col_6].astype(str) == selected_m_val)
+        return df_target[month_col_6].astype(str) == selected_m_val
+
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        # 📌 [요청 반영] 1. 항공사/O&D별 발매 M/S (7개 전용 필터)
+        # 📌 1. 항공사/O&D별 발매 M/S (오탈자 수정: '1. 출발월')
         st.subheader("1. 항공사/O&D별 발매 M/S")
         with st.expander("🔍 **[1. 항공사/O&D별 발매 M/S] 전용 필터 설정**", expanded=True):
             f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
@@ -1281,8 +1292,7 @@ else:
             sel_1_ov_apo = render_slicer_box(f1_col7, "7. 해외공항 (해외 APO)", all_ov_6, "slicer1_ov")
 
         # 1번 테이블 전용 필터 마스크
-        mask_tab1 = pd.Series(True, index=df_6.index)
-        if month_col_6 and month_col_6 in df_6.columns and sel_1_month != ALL_OPTION: mask_tab1 &= (df_6[month_col_6].astype(str) == sel_1_month)
+        mask_tab1 = filter_month_yoy(df_6, sel_1_month)
         if act_dir_c and act_dir_c in df_6.columns and sel_1_dir != ALL_OPTION: mask_tab1 &= (df_6[act_dir_c].astype(str) == sel_1_dir)
         if act_stop_c and act_stop_c in df_6.columns and sel_1_stop != ALL_OPTION: mask_tab1 &= (df_6[act_stop_c].astype(str) == sel_1_stop)
         if act_onoff_c and act_onoff_c in df_6.columns and sel_1_onoff != ALL_OPTION: mask_tab1 &= (df_6[act_onoff_c].astype(str) == sel_1_onoff)
@@ -1307,10 +1317,10 @@ else:
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
             html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             
-            # 📌 KE 순위 표출 및 11개 항공사 표출
+            # 📌 [수정] ★ 별표 제거: KE (대한항공 - {ke_rank}위)
             for al_code in airline_rank_list:
                 if al_code == 'KE':
-                    html_table += f'<th class="ke-header" style="width:130px;">★ KE (대한항공 - {ke_rank}위)</th>'
+                    html_table += f'<th class="ke-header" style="width:130px;">KE (대한항공 - {ke_rank}위)</th>'
                 else:
                     rank_num = full_al_ranking.index(al_code) + 1 if al_code in full_al_ranking else "-"
                     html_table += f'<th class="carrier-header" style="width:110px;"><div style="font-size:10px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
@@ -1350,7 +1360,7 @@ else:
                 html_table += f'<td><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # ROW 4: YOY (M/S %p)
+            # ROW 4: YOY (M/S %p) - 📌 [수정] t_prev == 0일 시 하이픈(-)으로 안전 예외 처리
             html_table += '<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td>'
             html_table += f'<td>{"▲ 0%p" if t_prev>0 else "-"}</td>'
             for al_code in airline_rank_list:
@@ -1368,7 +1378,7 @@ else:
 
         st.markdown("---")
         
-        # 📌 [요청 반영] 2. 항공사별 상위 O&D (4개 전용 필터)
+        # 📌 2. 항공사별 상위 O&D
         st.subheader("2. 항공사별 상위 O&D")
         with st.expander("🔍 **[2. 항공사별 상위 O&D] 전용 필터 설정**", expanded=True):
             f2_col1, f2_col2, f2_col3 = st.columns(3)
@@ -1383,8 +1393,7 @@ else:
         display_carrier_label = selected_carrier if selected_carrier != ALL_OPTION else "전체 시장"
 
         # 2번 테이블 전용 필터 마스크
-        mask_tab2 = pd.Series(True, index=df_6.index)
-        if month_col_6 and month_col_6 in df_6.columns and sel_2_month != ALL_OPTION: mask_tab2 &= (df_6[month_col_6].astype(str) == sel_2_month)
+        mask_tab2 = filter_month_yoy(df_6, sel_2_month)
         if act_dir_c and act_dir_c in df_6.columns and sel_2_dir != ALL_OPTION: mask_tab2 &= (df_6[act_dir_c].astype(str) == sel_2_dir)
         if act_stop_c and act_stop_c in df_6.columns and sel_2_stop != ALL_OPTION: mask_tab2 &= (df_6[act_stop_c].astype(str) == sel_2_stop)
         if act_reg_c and act_reg_c in df_6.columns and sel_2_region != ALL_OPTION: mask_tab2 &= (df_6[act_reg_c].astype(str) == sel_2_region)
