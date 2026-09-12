@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (YoY 증가 파란색 #1d4ed8 적용)
+# 📌 고급 CSS 서식 (통합 아코디언 테이블 서식 추가)
 st.markdown("""
 <style>
     :root {
@@ -193,11 +193,34 @@ st.markdown("""
         color: #0f172a;
     }
     
-    /* 📌 RBD/대리점 맨 위 항공사 총계 행 (진한 회색 #475569 배경) */
-    .row-summary-top-dark, .row-summary-top-dark td {
+    /* 📌 RBD/대리점 통합 표 아코디언 전용 커스텀 스타일 */
+    details.rbd-details-group {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    details.rbd-details-group summary {
+        list-style: none;
+        cursor: pointer;
+        outline: none;
+    }
+    details.rbd-details-group summary::-webkit-details-marker {
+        display: none;
+    }
+    .row-summary-top-dark {
         background-color: #475569 !important;
         color: #ffffff !important;
         font-weight: 800 !important;
+    }
+    .row-summary-top-dark td {
+        background-color: #475569 !important;
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    .rbd-child-row td {
+        background-color: #f8fafc !important;
+        font-size: 12px;
     }
 
     /* 📌 [소계 배경] #efefef */
@@ -907,7 +930,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 맨 위 총계 진한 회색 #475569 적용)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 단일 표 구조 + 단일 아코디언 구현)
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -963,8 +986,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         with sub_tab_rbd:
             if not df_ag_filtered.empty and 'O&D RBKD' in df_ag_filtered.columns and week_col_a:
-                expand_all_rbd = st.toggle("📂 전체 세부 RBD 펼쳐보기", value=True, key="tog_rbd_exp")
-                
                 week_list = sorted([str(x) for x in df_ag_filtered[week_col_a].dropna().unique()], reverse=True)
                 ag_al_sum = df_ag_filtered.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
                 ag_al_list = [str(x) for x in ag_al_sum.index if ag_al_sum[x] > 0]
@@ -972,105 +993,110 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     ag_al_list.remove('KE')
                     ag_al_list = ['KE'] + ag_al_list
 
+                # 📌 [요청 반영] 단일 표 구조 내 항공사 총계 행 클릭 시 하위 RBD 접힘/펼침 구현
+                rbd_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
+                rbd_html += '<thead><tr><th class="header-main" style="width:180px; text-align:center;">항공사 / RBD 클래스</th>'
+                for wk in week_list:
+                    rbd_html += f'<th class="header-main">{wk}</th>'
+                rbd_html += '<th class="header-main">총합계</th></tr></thead><tbody>'
+
                 for al_code in ag_al_list:
                     al_sub = df_ag_filtered[df_ag_filtered['Dominant Marketing Airline'] == al_code]
                     al_tot_pax = al_sub['Value'].sum()
-                    
+
                     if al_tot_pax > 0:
-                        exp_title = f"✈️ 항공사: {al_code}  |  총 발매 실적: {al_tot_pax:,.0f}건"
-                        
-                        with st.expander(exp_title, expanded=expand_all_rbd):
-                            piv_rbd = al_sub.pivot_table(index='O&D RBKD', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
-                            piv_rbd['총합계'] = piv_rbd.sum(axis=1)
-                            piv_rbd = piv_rbd[piv_rbd['총합계'] > 0]
+                        piv_rbd = al_sub.pivot_table(index='O&D RBKD', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
+                        piv_rbd['총합계'] = piv_rbd.sum(axis=1)
+                        piv_rbd = piv_rbd[piv_rbd['총합계'] > 0]
 
-                            if al_code in RBD_HIERARCHY:
-                                hierarchy_order = RBD_HIERARCHY[al_code]
-                                existing_rbds = piv_rbd.index.tolist()
-                                sorted_rbds = [r for r in hierarchy_order if r in existing_rbds] + [r for r in existing_rbds if r not in hierarchy_order]
-                                piv_rbd = piv_rbd.loc[sorted_rbds]
-                            else:
-                                piv_rbd = piv_rbd.sort_values(by='총합계', ascending=False)
+                        if al_code in RBD_HIERARCHY:
+                            hierarchy_order = RBD_HIERARCHY[al_code]
+                            existing_rbds = piv_rbd.index.tolist()
+                            sorted_rbds = [r for r in hierarchy_order if r in existing_rbds] + [r for r in existing_rbds if r not in hierarchy_order]
+                            piv_rbd = piv_rbd.loc[sorted_rbds]
+                        else:
+                            piv_rbd = piv_rbd.sort_values(by='총합계', ascending=False)
 
-                            rbd_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
-                            rbd_html += '<thead><tr><th class="header-main" style="width:140px; text-align:center;">RBD 클래스</th>'
+                        # HTML <details>/<summary> 기반 클릭 펼침 구조 생성 (기본 open 처리)
+                        rbd_html += f'<tr><td colspan="{len(week_list)+2}" style="padding:0; border:none;">'
+                        rbd_html += f'<details class="rbd-details-group" open><summary>'
+                        rbd_html += f'<table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark">'
+                        rbd_html += f'<td style="width:180px; text-align:center;">▼ ★ {al_code} 총계</td>'
+                        for wk in week_list:
+                            wk_tot = al_sub[al_sub[week_col_a] == wk]['Value'].sum()
+                            rbd_html += f'<td style="text-align:center;">{wk_tot:,.0f}</td>'
+                        rbd_html += f'<td style="text-align:center;">{al_tot_pax:,.0f}</td>'
+                        rbd_html += '</tr></table></summary>'
+
+                        rbd_html += '<table style="width:100%; border-collapse:collapse;">'
+                        for rbd_code, rbd_row in piv_rbd.head(100).iterrows():
+                            rbd_html += '<tr class="rbd-child-row">'
+                            rbd_html += f'<td style="width:180px; text-align:center; font-weight:700;">{rbd_code}</td>'
                             for wk in week_list:
-                                rbd_html += f'<th class="header-main">{wk}</th>'
-                            rbd_html += '<th class="header-main">총합계</th></tr></thead><tbody>'
+                                v_num = rbd_row[wk] if wk in rbd_row else 0
+                                v_str = f"{v_num:,.0f}" if v_num > 0 else ""
+                                rbd_html += f'<td style="text-align:center;">{v_str}</td>'
+                            tot_v = rbd_row['총합계']
+                            rbd_html += f'<td style="text-align:center; font-weight:700;">{tot_v:,.0f}</td></tr>'
+                        rbd_html += '</table></details></td></tr>'
 
-                            # 맨 위 첫번째 행에 항공사 총계 표시 (진한 회색 #475569)
-                            rbd_html += '<tr class="row-summary-top-dark">'
-                            rbd_html += f'<td style="text-align:center;">★ {al_code} 총계</td>'
-                            for wk in week_list:
-                                wk_tot = al_sub[al_sub[week_col_a] == wk]['Value'].sum()
-                                rbd_html += f'<td style="text-align:center;">{wk_tot:,.0f}</td>'
-                            rbd_html += f'<td style="text-align:center;">{al_tot_pax:,.0f}</td></tr>'
-
-                            for rbd_code, rbd_row in piv_rbd.head(100).iterrows():
-                                rbd_html += f'<tr><td style="text-align:center; font-weight:700;">{rbd_code}</td>'
-                                for wk in week_list:
-                                    v_num = rbd_row[wk] if wk in rbd_row else 0
-                                    v_str = f"{v_num:,.0f}" if v_num > 0 else ""
-                                    rbd_html += f'<td style="text-align:center;">{v_str}</td>'
-                                tot_v = rbd_row['총합계']
-                                rbd_html += f'<td style="text-align:center; font-weight:700; background-color:#efefef;">{tot_v:,.0f}</td></tr>'
-
-                            rbd_html += '</tbody></table></div>'
-                            st.markdown(rbd_html, unsafe_allow_html=True)
+                rbd_html += '</tbody></table></div>'
+                st.markdown(rbd_html, unsafe_allow_html=True)
             else:
                 st.warning("선택된 조건의 RBD 데이터가 없습니다.")
 
         with sub_tab_agency:
             if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
-                expand_all_ag = st.toggle("📂 전체 세부 대리점 펼쳐보기", value=True, key="tog_ag_exp")
                 week_list_ag = sorted([str(x) for x in df_ag_filtered[week_col_a].dropna().unique()], reverse=True)
                 top_20_agencies = df_ag_filtered.groupby('Travel Agency Name', observed=False)['Value'].sum().sort_values(ascending=False).head(20).index.tolist()
+
+                ag_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
+                ag_html += '<thead><tr><th class="header-main" style="width:180px; text-align:center;">대리점 / 항공사</th>'
+                for wk in week_list_ag:
+                    ag_html += f'<th class="header-main">{wk}</th>'
+                ag_html += '<th class="header-main">총 판매량</th></tr></thead><tbody>'
 
                 for ag_name in top_20_agencies:
                     ag_sub = df_ag_filtered[df_ag_filtered['Travel Agency Name'] == ag_name]
                     ag_tot_val = ag_sub['Value'].sum()
 
                     if ag_tot_val > 0:
-                        exp_title_ag = f"🏢 대리점: {ag_name}  |  총 판매량: {ag_tot_val:,.0f}건"
-                        
-                        with st.expander(exp_title_ag, expanded=expand_all_ag):
-                            piv_ag_sub = ag_sub.pivot_table(index='Dominant Marketing Airline', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
-                            piv_ag_sub['총합계'] = piv_ag_sub.sum(axis=1)
-                            piv_ag_sub = piv_ag_sub[piv_ag_sub['총합계'] > 0]
+                        piv_ag_sub = ag_sub.pivot_table(index='Dominant Marketing Airline', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
+                        piv_ag_sub['총합계'] = piv_ag_sub.sum(axis=1)
+                        piv_ag_sub = piv_ag_sub[piv_ag_sub['총합계'] > 0]
 
-                            piv_ag_sub = piv_ag_sub.reset_index()
-                            piv_ag_sub['is_ke'] = (piv_ag_sub['Dominant Marketing Airline'] == 'KE')
-                            piv_ag_sub = piv_ag_sub.sort_values(by=['is_ke', '총합계'], ascending=[False, False]).drop(columns=['is_ke'])
-                            piv_ag_sub = piv_ag_sub.set_index('Dominant Marketing Airline')
+                        piv_ag_sub = piv_ag_sub.reset_index()
+                        piv_ag_sub['is_ke'] = (piv_ag_sub['Dominant Marketing Airline'] == 'KE')
+                        piv_ag_sub = piv_ag_sub.sort_values(by=['is_ke', '총합계'], ascending=[False, False]).drop(columns=['is_ke'])
+                        piv_ag_sub = piv_ag_sub.set_index('Dominant Marketing Airline')
 
-                            ag_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
-                            ag_html += '<thead><tr><th class="header-main" style="width:160px; text-align:center;">항공사</th>'
+                        ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;">'
+                        ag_html += f'<details class="rbd-details-group" open><summary>'
+                        ag_html += f'<table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark">'
+                        ag_html += f'<td style="width:180px; text-align:center;">▼ ★ {ag_name} 총계</td>'
+                        for wk in week_list_ag:
+                            wk_tot_ag = ag_sub[ag_sub[week_col_a] == wk]['Value'].sum()
+                            ag_html += f'<td style="text-align:center;">{wk_tot_ag:,.0f}</td>'
+                        ag_html += f'<td style="text-align:center;">{ag_tot_val:,.0f}</td>'
+                        ag_html += '</tr></table></summary>'
+
+                        ag_html += '<table style="width:100%; border-collapse:collapse;">'
+                        for al_code, al_row in piv_ag_sub.head(100).iterrows():
+                            is_ke_flag = (al_code == 'KE')
+                            cell_style = 'font-weight:700; color:#16a34a;' if is_ke_flag else 'color:#475569;'
+                            
+                            ag_html += '<tr class="rbd-child-row">'
+                            ag_html += f'<td style="width:180px; text-align:center; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
                             for wk in week_list_ag:
-                                ag_html += f'<th class="header-main">{wk}</th>'
-                            ag_html += '<th class="header-main">총 판매량</th></tr></thead><tbody>'
+                                v_num = al_row[wk] if wk in al_row else 0
+                                v_str = f"{v_num:,.0f}" if v_num > 0 else ""
+                                ag_html += f'<td style="text-align:center; {cell_style}">{v_str}</td>'
+                            tot_v = al_row['총합계']
+                            ag_html += f'<td style="text-align:center; font-weight:700; {cell_style}">{tot_v:,.0f}</td></tr>'
+                        ag_html += '</table></details></td></tr>'
 
-                            # 맨 위 첫번째 행에 대리점 총계 표시 (진한 회색 #475569)
-                            ag_html += '<tr class="row-summary-top-dark">'
-                            ag_html += f'<td style="text-align:center;">★ {ag_name} 총계</td>'
-                            for wk in week_list_ag:
-                                wk_tot_ag = ag_sub[ag_sub[week_col_a] == wk]['Value'].sum()
-                                ag_html += f'<td style="text-align:center;">{wk_tot_ag:,.0f}</td>'
-                            ag_html += f'<td style="text-align:center;">{ag_tot_val:,.0f}</td></tr>'
-
-                            for al_code, al_row in piv_ag_sub.head(100).iterrows():
-                                is_ke_flag = (al_code == 'KE')
-                                cell_style = 'font-weight:700; color:#16a34a;' if is_ke_flag else 'color:#475569;'
-                                
-                                ag_html += f'<tr><td style="text-align:center; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
-                                for wk in week_list_ag:
-                                    v_num = al_row[wk] if wk in al_row else 0
-                                    v_str = f"{v_num:,.0f}" if v_num > 0 else ""
-                                    ag_html += f'<td style="text-align:center; {cell_style}">{v_str}</td>'
-                                tot_v = al_row['총합계']
-                                ag_html += f'<td style="text-align:center; font-weight:700; background-color:#efefef; {cell_style}">{tot_v:,.0f}</td></tr>'
-
-                            ag_html += '</tbody></table></div>'
-                            st.markdown(ag_html, unsafe_allow_html=True)
+                ag_html += '</tbody></table></div>'
+                st.markdown(ag_html, unsafe_allow_html=True)
             else:
                 st.warning("선택된 조건의 대리점 데이터가 없습니다.")
 
@@ -1338,9 +1364,8 @@ else:
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        # 📌 1. 항공사/O&D별 발매 M/S (요청 반영 필터 위치 재배치)
+        # 📌 1. 항공사/O&D별 발매 M/S
         st.markdown('<div class="unified-sub-header">1. 항공사/O&D별 발매 M/S</div>', unsafe_allow_html=True)
-        
         f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
         sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer1_m")
         sel_1_region = render_slicer_box(f1_col2, "2. OD Region", all_reg_6, "slicer1_reg")
@@ -1352,7 +1377,6 @@ else:
         sel_1_jp_route = render_slicer_box(f1_col6, "6. 일본공항 (Sub-Route)", all_sub_6, "slicer1_sub")
         sel_1_ov_apo = render_slicer_box(f1_col7, "7. 해외공항 (해외 APO)", all_ov_6, "slicer1_ov")
 
-        # 📌 [1~7번 필터 적용 후 종속적으로 연동되는 8. Trip O&D Market 필터 옵션 산출]
         mask_base_1_to_7 = filter_month_yoy(df_6, sel_1_month)
         if act_reg_c and act_reg_c in df_6.columns and sel_1_region != ALL_OPTION: mask_base_1_to_7 &= (df_6[act_reg_c].astype(str) == sel_1_region)
         if act_dir_c and act_dir_c in df_6.columns and sel_1_dir != ALL_OPTION: mask_base_1_to_7 &= (df_6[act_dir_c].astype(str) == sel_1_dir)
@@ -1370,7 +1394,6 @@ else:
 
         sel_1_od_mkt = render_slicer_box(f1_col8, "8. Trip O&D Market", dependent_od_list, "slicer1_od_mkt")
 
-        # 1번 테이블 최종 마스크 (1~8번 조건)
         mask_tab1 = mask_base_1_to_7.copy()
         if od_col_6 and od_col_6 in df_6.columns and sel_1_od_mkt != ALL_OPTION: mask_tab1 &= (df_6[od_col_6].astype(str) == sel_1_od_mkt)
 
