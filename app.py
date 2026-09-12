@@ -417,9 +417,11 @@ def process_iss_merged(df_iss, df_wt):
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
+
+# 📌 [요청 반영] 메인 선택 라디오에 '🔗 W26 연결 네트워크' 옵션 추가
 selected_group = st.radio(
     "분석할 수송 영역을 선택하세요:",
-    options=["✈️ 3/4수송 대시보드", "🌐 6수송 대시보드"],
+    options=["✈️ 3/4수송 대시보드", "🌐 6수송 대시보드", "🔗 W26 연결 네트워크"],
     horizontal=True
 )
 
@@ -506,12 +508,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     st.markdown("---")
     
-    tab_34_1, tab_34_2, tab_34_3, tab_34_4, tab_34_ext = st.tabs([
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs([
         "🎟️ 발매 M/S", 
         "✈️ 공급 M/S", 
         "🏷️ 대리점,RBD별 발매현황", 
-        "👥 단체실적",
-        "🔗 연동 시스템"
+        "👥 단체실적"
     ])
 
     # -------------------------------------------------------------
@@ -786,13 +787,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 📌 3/4수송 외부 시스템 연동 탭 (최신 st.iframe 적용)
-    # -------------------------------------------------------------
-    with tab_34_ext:
-        st.markdown('<div class="unified-sub-header">🔗 대한항공 외부 시스템 연동 화면 (3/4수송)</div>', unsafe_allow_html=True)
-        st.iframe(EXT_WEB_APP_URL, height=800)
-
-    # -------------------------------------------------------------
     # 2. ✈️ 공급 M/S 탭
     # -------------------------------------------------------------
     with tab_34_2:
@@ -950,7 +944,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 단일 아코디언 + 토글 스위치 + 총계 #cccccc 적용)
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -1224,7 +1218,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 # ==========================================
 # GROUP 2: 🌐 6수송 대시보드
 # ==========================================
-else:
+elif selected_group == "🌐 6수송 대시보드":
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
     
     if df_6th_raw is None:
@@ -1380,11 +1374,9 @@ else:
             return df_target[month_col_6].astype(str).str.endswith(sub_m) | (df_target[month_col_6].astype(str) == selected_m_val)
         return df_target[month_col_6].astype(str) == selected_m_val
 
-    # 📌 6수송 외부 연동 탭 포함
-    tab6_1, tab6_2, tab6_ext = st.tabs([
+    tab6_1, tab6_2 = st.tabs([
         "📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", 
-        "📋 6수송 Raw Data View",
-        "🔗 연동 시스템"
+        "📋 6수송 Raw Data View"
     ])
 
     with tab6_1:
@@ -1678,7 +1670,9 @@ else:
         st.markdown("*(속도 최적화를 위해 상위 100건만 표출합니다)*")
         st.dataframe(df_6.head(100), width="stretch")
 
-    # 📌 6수송 외부 연동 탭 (최신 st.iframe 적용)
-    with tab6_ext:
-        st.markdown('<div class="unified-sub-header">🔗 대한항공 외부 시스템 연동 화면 (6수송)</div>', unsafe_allow_html=True)
-        st.iframe(EXT_WEB_APP_URL, height=800)
+# ==========================================
+# 📌 [요청 반영] 메인 대시보드 옵션 3: 🔗 W26 연결 네트워크 선택 시 전체 화면 표출
+# ==========================================
+else:
+    st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
+    st.iframe(EXT_WEB_APP_URL, height=850)
