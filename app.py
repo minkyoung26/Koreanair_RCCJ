@@ -790,7 +790,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
     # -------------------------------------------------------------
     with tab_34_ext:
         st.markdown('<div class="unified-sub-header">🔗 대한항공 외부 시스템 연동 화면 (3/4수송)</div>', unsafe_allow_html=True)
-        st.iframe(EXT_WEB_APP_URL, height=800, scrolling=True)
+        st.iframe(EXT_WEB_APP_URL, height=800)
 
     # -------------------------------------------------------------
     # 2. ✈️ 공급 M/S 탭
@@ -1380,7 +1380,7 @@ else:
             return df_target[month_col_6].astype(str).str.endswith(sub_m) | (df_target[month_col_6].astype(str) == selected_m_val)
         return df_target[month_col_6].astype(str) == selected_m_val
 
-    # 📌 6수송 연동 탭 포함
+    # 📌 6수송 외부 연동 탭 포함
     tab6_1, tab6_2, tab6_ext = st.tabs([
         "📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", 
         "📋 6수송 Raw Data View",
@@ -1678,7 +1678,7 @@ else:
         st.markdown("*(속도 최적화를 위해 상위 100건만 표출합니다)*")
         st.dataframe(df_6.head(100), width="stretch")
 
-    # 📌 6수송 외부 시스템 연동 탭 (최신 st.iframe 적용)
+    # 📌 6수송 외부 연동 탭 (최신 st.iframe 적용)
     with tab6_ext:
         st.markdown('<div class="unified-sub-header">🔗 대한항공 외부 시스템 연동 화면 (6수송)</div>', unsafe_allow_html=True)
-        st.iframe(EXT_WEB_APP_URL, height=800, scrolling=True)
+        st.iframe(EXT_WEB_APP_URL, height=800)
