@@ -617,48 +617,69 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
 
-                # 📌 3. 출발기간별 KE M/S 점유비 (Categorical 타입 예외 완벽 처리)
+   # 📌 3. 출발기간별 항공사 M/S 점유비 (KE 강조 + 타 항공사 점선 표출)
                 if month_col and month_col in merged_df.columns:
-                    st.markdown('<div class="unified-sub-header">3. 출발기간별 KE M/S 점유비</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="unified-sub-header">3. 출발기간별 주요 항공사 M/S 점유비 추이</div>', unsafe_allow_html=True)
                     
-                    mask_dep_ke = filter_mask.copy()
-                    if week_col and sel_week_str != ALL_OPTION: mask_dep_ke &= (merged_df[week_col].astype(str) == sel_week_str)
-                    if bound_col and sel_bound_str != ALL_OPTION: mask_dep_ke &= (merged_df[bound_col].astype(str) == sel_bound_str)
-                    if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION: mask_dep_ke &= (merged_df['Ticket Type'].astype(str) == sel_tt_str)
+                    mask_dep_al = filter_mask.copy()
+                    if week_col and sel_week_str != ALL_OPTION: mask_dep_al &= (merged_df[week_col].astype(str) == sel_week_str)
+                    if bound_col and sel_bound_str != ALL_OPTION: mask_dep_al &= (merged_df[bound_col].astype(str) == sel_bound_str)
+                    if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION: mask_dep_al &= (merged_df['Ticket Type'].astype(str) == sel_tt_str)
 
-                    df_dep_ke = merged_df[mask_dep_ke]
+                    df_dep_al = merged_df[mask_dep_al]
 
-                    if not df_dep_ke.empty:
-                        month_mkt_tot = df_dep_ke.groupby(month_col, observed=False)[val_col].sum().reset_index()
-                        df_ke_only_dep = df_dep_ke[df_dep_ke['Dominant Marketing Airline'] == 'KE']
-                        month_ke_tot = df_ke_only_dep.groupby(month_col, observed=False)[val_col].sum().reset_index()
+                    if not df_dep_al.empty:
+                        # 출발월 x 항공사별 합계 집계
+                        dep_al_grp = df_dep_al.groupby([month_col, 'Dominant Marketing Airline'], observed=False)[val_col].sum().reset_index()
+                        dep_mkt_tot = df_dep_al.groupby(month_col, observed=False)[val_col].sum().reset_index()
+                        
+                        # Categorical 병합 에러 방지
+                        dep_al_grp[month_col] = dep_al_grp[month_col].astype(str)
+                        dep_mkt_tot[month_col] = dep_mkt_tot[month_col].astype(str)
 
-                        # Categorical fillna TypeError 원천 차단
-                        month_mkt_tot[month_col] = month_mkt_tot[month_col].astype(str)
-                        month_ke_tot[month_col] = month_ke_tot[month_col].astype(str)
+                        dep_merged = pd.merge(dep_al_grp, dep_mkt_tot, on=month_col, suffixes=('', '_Mkt'))
+                        dep_merged['MS_Percent'] = np.where(dep_merged[f'{val_col}_Mkt'] > 0, (dep_merged[val_col] / dep_merged[f'{val_col}_Mkt']) * 100, 0)
 
-                        mkt_ke_merged = pd.merge(month_mkt_tot, month_ke_tot, on=month_col, how='left', suffixes=('_Mkt', '_KE'))
-                        mkt_ke_merged[f'{val_col}_KE'] = mkt_ke_merged[f'{val_col}_KE'].fillna(0)
+                        # 실적 상위 항공사 추출 (KE 포함 상위 6개사)
+                        top_al_in_dep = df_dep_al.groupby('Dominant Marketing Airline', observed=False)[val_col].sum().sort_values(ascending=False).index.tolist()
+                        top_al_display = ['KE'] + [al for al in top_al_in_dep if al != 'KE'][:5]
 
-                        mkt_ke_merged['KE_MS'] = np.where(mkt_ke_merged[f'{val_col}_Mkt'] > 0, (mkt_ke_merged[f'{val_col}_KE'] / mkt_ke_merged[f'{val_col}_Mkt']) * 100, 0)
-                        mkt_ke_merged['Text_Label'] = mkt_ke_merged['KE_MS'].map(lambda x: f"{x:.1f}%")
+                        dep_merged_top = dep_merged[dep_merged['Dominant Marketing Airline'].isin(top_al_display)].copy()
 
-                        fig_ke_dep = px.line(
-                            mkt_ke_merged, x=month_col, y='KE_MS', text='Text_Label',
-                            markers=True, category_orders={month_col: all_dep_months}
+                        fig_ke_dep = go.Figure()
+
+                        # 항공사별 선 표현 (KE: 두꺼운 실선, 타사: 얇은 점선)
+                        for al_code in top_al_display:
+                            al_data = dep_merged_top[dep_merged_top['Dominant Marketing Airline'] == al_code]
+                            if al_data.empty:
+                                continue
+
+                            is_ke = (al_code == 'KE')
+                            line_style = dict(color='#16a34a', width=3.5) if is_ke else dict(dash='dot', width=1.5)
+                            marker_style = dict(size=8, symbol='circle') if is_ke else dict(size=4)
+                            mode_setting = 'lines+markers+text' if is_ke else 'lines+markers'
+                            text_labels = [f"<b>{v:.1f}%</b>" for v in al_data['MS_Percent']] if is_ke else None
+
+                            fig_ke_dep.add_trace(go.Scatter(
+                                x=al_data[month_col],
+                                y=al_data['MS_Percent'],
+                                mode=mode_setting,
+                                name=f"★ KE (대한항공)" if is_ke else al_code,
+                                line=line_style,
+                                marker=marker_style,
+                                text=text_labels,
+                                textposition="top center",
+                                hovertemplate=f"<b>항공사: {al_code}</b><br>출발월: %{{x}}<br>점유율: %{{y:.1f}}%<extra></extra>"
+                            ))
+
+                        fig_ke_dep.update_layout(
+                            yaxis_title="Market Share (%)",
+                            xaxis=dict(categoryorder='array', categoryarray=all_dep_months),
+                            yaxis=dict(range=[0, max(dep_merged_top['MS_Percent'].max() * 1.2, 15)]),
+                            height=420
                         )
-                        fig_ke_dep.update_traces(
-                            line_color='#16a34a', line_width=3, marker_size=8,
-                            textposition='top center',
-                            hovertemplate="<b>출발월: %{x}</b><br>KE 점유율: %{y:.1f}%<extra></extra>"
-                        )
-                        fig_ke_dep.update_layout(yaxis_title="KE Market Share (%)", yaxis=dict(range=[0, max(mkt_ke_merged['KE_MS'].max() * 1.25, 10)]))
+                        apply_bottom_legend(fig_ke_dep)
                         st.plotly_chart(fig_ke_dep, width="stretch")
-
-                st.markdown("---")
-                c3, c4 = st.columns(2)
-                
-                ke_only_df = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']
                 
                 with c3:
                     if bound_col:
