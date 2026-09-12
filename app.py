@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식
+# 📌 고급 CSS 서식 (헤더 파스텔 색상, 데이터 셀 흰색 지정)
 st.markdown("""
 <style>
     :root {
@@ -146,7 +146,7 @@ st.markdown("""
         white-space: nowrap;
     }
 
-    /* 📌 KE 컬럼 헤더 파스텔 초록색 서식 */
+    /* 📌 KE 컬럼 제목(헤더) 필드만 파스텔 초록색 지정 */
     .yoy-table th.ke-header {
         background-color: #dcfce7 !important;
         color: #15803d !important;
@@ -158,20 +158,13 @@ st.markdown("""
         white-space: nowrap;
     }
 
-    /* 📌 [셀 기본 배경] 투명/기본 */
-    .custom-piv-table td, .yoy-table td {
+    /* 📌 [요청 반영] 모든 데이터 셀 배경색 흰색(#ffffff)으로 통일 */
+    .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell {
         padding: 6px 10px;
         border: 1px solid #cbd5e1 !important;
         color: #334155 !important;
-        background-color: transparent !important;
+        background-color: #ffffff !important;
         text-align: center !important;
-    }
-
-    /* 📌 KE 데이터 셀 파스텔 연초록 서식 */
-    .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell {
-        background-color: #f0fdf4 !important;
-        font-weight: 800 !important;
-        color: #15803d !important;
     }
     
     .yoy-table tr:hover {
@@ -184,13 +177,10 @@ st.markdown("""
     }
     
     /* 📌 [소계 배경] #efefef */
-    .custom-piv-table tr.row-group-header, .yoy-table tr.row-summary {
+    .custom-piv-table tr.row-group-header, .yoy-table tr.row-summary, .yoy-table tr.row-summary td {
         background-color: #efefef !important;
         font-weight: bold;
         color: #0f172a;
-    }
-    .custom-piv-table tr.row-group-header td, .yoy-table tr.row-summary td {
-        background-color: #efefef !important;
     }
 
     /* 📌 [전체 시장 총합 배경] #cccccc */
@@ -1288,37 +1278,7 @@ else:
 
     filtered_6 = df_6[mask_6_base].copy()
 
-    csv_6th = filtered_6.to_csv(index=False).encode('utf-8-sig')
-    st.download_button(
-        label="📥 필터링된 6수송 Raw Data (CSV) 전체 다운로드",
-        data=csv_6th,
-        file_name=f"6th_Freedom_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
-        mime="text/csv"
-    )
-
-    c6_1, c6_2, c6_3 = st.columns(3)
-    tot_6_val = filtered_6['Val_num'].sum()
-    tot_6_py = filtered_6['Val_PY_num'].sum()
-    tot_yoy_pct = ((tot_6_val - tot_6_py) / tot_6_py * 100) if tot_6_py > 0 else 0
-
-    ke_6_val = filtered_6[filtered_6[al_col_6] == 'KE']['Val_num'].sum() if (al_col_6 in filtered_6.columns and not filtered_6.empty) else 0
-    ke_6_py = filtered_6[filtered_6[al_col_6] == 'KE']['Val_PY_num'].sum() if (al_col_6 in filtered_6.columns and not filtered_6.empty) else 0
-    
-    ke_6_ms = (ke_6_val / tot_6_val * 100) if tot_6_val > 0 else 0
-    ke_6_py_ms = (ke_6_py / tot_6_py * 100) if tot_6_py > 0 else 0
-    ke_ms_yoy_p = ke_6_ms - ke_6_py_ms
-
-    with c6_1:
-        yoy_str = f"▲ {tot_yoy_pct:.1f}%" if tot_yoy_pct >= 0 else f"▼ {abs(tot_yoy_pct):.1f}%"
-        st.markdown(f'<div class="metric-card"><div class="metric-title">6수송 총 발매량 (26년 / YoY)</div><div class="metric-value">{tot_6_val:,.0f} <span style="font-size:13px;" class="{"yoy-up" if tot_yoy_pct>=0 else "yoy-down"}">({yoy_str})</span></div></div>', unsafe_allow_html=True)
-    with c6_2:
-        ke_yoy_pct = ((ke_6_val - ke_6_py) / ke_6_py * 100) if ke_6_py > 0 else 0
-        ke_yoy_str = f"▲ {ke_yoy_pct:.1f}%" if ke_yoy_pct >= 0 else f"▼ {abs(ke_yoy_pct):.1f}%"
-        st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#16a34a; font-weight:bold;">✈️ KE (대한항공) 6수송 발매량</div><div class="metric-value" style="color:#16a34a;">{ke_6_val:,.0f} <span style="font-size:13px;" class="{"yoy-up" if ke_yoy_pct>=0 else "yoy-down"}">({ke_yoy_str})</span></div></div>', unsafe_allow_html=True)
-    with c6_3:
-        ms_p_str = f"▲ {ke_ms_yoy_p:.1f}%p" if ke_ms_yoy_p >= 0 else f"▼ {abs(ke_ms_yoy_p):.1f}%p"
-        st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#16a34a; font-weight:bold;">✈️ KE 6수송 M/S (YoY)</div><div class="metric-value" style="color:#16a34a;">{ke_6_ms:.1f}% <span style="font-size:13px;" class="{"yoy-up" if ke_ms_yoy_p>=0 else "yoy-down"}">({ms_p_str})</span></div></div>', unsafe_allow_html=True)
-
+    # 📌 [요청 반영] 상단 3개 메트릭 카드 박스 완전 삭제 처리
     st.markdown("<br>", unsafe_allow_html=True)
 
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
@@ -1339,6 +1299,7 @@ else:
                 
             airline_rank_list = airline_rank_list[:5]
 
+            # 📌 [요청 반영] KE(대한항공) 필드는 헤더만 파스텔 초록, 데이터 셀은 흰색(#ffffff)
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
             html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             
@@ -1359,8 +1320,7 @@ else:
             html_table += f'<td><b>{t_curr:,.0f}</b></td>'
             for al_code in airline_rank_list:
                 row_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
-                cell_class = ' class="ke-cell"' if al_code == 'KE' else ''
-                html_table += f'<td{cell_class}><b>{row_val:,.0f}</b></td>'
+                html_table += f'<td><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
             # ROW 2: YOY (발매)
@@ -1373,8 +1333,7 @@ else:
                 
                 indiv_yoy = ((c_val - p_val) / p_val * 100) if p_val > 0 else 0
                 icon_str = f'<span class="yoy-up">▲ {indiv_yoy:.0f}%</span>' if indiv_yoy >= 0 else f'<span class="yoy-down">▼ {abs(indiv_yoy):.0f}%</span>'
-                cell_class = ' class="ke-cell"' if al_code == 'KE' else ''
-                html_table += f'<td{cell_class}>{icon_str}</td>'
+                html_table += f'<td>{icon_str}</td>'
             html_table += '</tr>'
 
             # ROW 3: 전체 M/S
@@ -1383,8 +1342,7 @@ else:
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
                 ms_val = (c_val / t_curr * 100) if t_curr > 0 else 0
-                cell_class = ' class="ke-cell"' if al_code == 'KE' else ''
-                html_table += f'<td{cell_class}><b>{ms_val:.0f}%</b></td>'
+                html_table += f'<td><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
             # ROW 4: YOY (M/S %p)
@@ -1397,8 +1355,7 @@ else:
                 ms_p = (p_val / t_prev * 100) if t_prev > 0 else 0
                 diff_p = ms_c - ms_p
                 icon_p = f'<span class="yoy-up">▲ {diff_p:.0f}%p</span>' if diff_p >= 0 else f'<span class="yoy-down">▼ {abs(diff_p):.0f}%p</span>'
-                cell_class = ' class="ke-cell"' if al_code == 'KE' else ''
-                html_table += f'<td{cell_class}>{icon_p}</td>'
+                html_table += f'<td>{icon_p}</td>'
             html_table += '</tr>'
 
             html_table += '</tbody></table></div>'
@@ -1406,20 +1363,27 @@ else:
 
         st.markdown("---")
         
-        # 📌 항공사 필터를 Carrier별 M/S 테이블 상단에 독립 배치
+        # 📌 항공사 필터 및 동적 노선 선출
         st.markdown("##### ■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
         
         c_filter_col, _ = st.columns([2, 2])
         selected_carrier = render_slicer_box(c_filter_col, "✈️ 항공사 (Carrier) 선택", sorted_6th_airlines, "carrier_table_al_filter")
         display_carrier_label = selected_carrier if selected_carrier != ALL_OPTION else "전체 시장"
 
-        # 📌 [핵심 버그 수정] 항공사 필터를 제외하고 1~7번 필터만 적용된 '순수 전체 시장 데이터' 생성
         df_mkt_full = filtered_6.copy()
 
         if not df_mkt_full.empty and od_col_6 and od_col_6 in df_mkt_full.columns and al_col_6 and al_col_6 in df_mkt_full.columns:
 
-            # 1~7번 필터 조건 전체 시장 기준 TOP 30 O&D Market 추출
-            od_totals = df_mkt_full.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
+            # 📌 [요청 반영] 선택한 항공사의 실적 기준 TOP 30 O&D Market 노선 선출
+            if selected_carrier != ALL_OPTION:
+                carrier_df_for_top = df_mkt_full[df_mkt_full[al_col_6].astype(str) == selected_carrier]
+                if not carrier_df_for_top.empty:
+                    od_totals = carrier_df_for_top.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
+                else:
+                    od_totals = df_mkt_full.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
+            else:
+                od_totals = df_mkt_full.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
+
             od_totals = od_totals.sort_values(by='Val_num', ascending=False).head(30)
             top_od_list = [str(x) for x in od_totals[od_col_6].tolist() if pd.notnull(x)]
 
@@ -1489,8 +1453,8 @@ else:
                     carrier_html += f'<td style="text-align:center;">{c_cy:,.0f}</td><td style="text-align:center;">{c_yoy_str}</td>'
                     carrier_html += f'<td style="text-align:center;"><b>{c_ms_cy:.0f}%</b></td><td style="text-align:center;">{c_ms_diff_str}</td>'
                     k_cy_display = f"{k_cy:,.0f}" if k_cy > 0 else "-"
-                    carrier_html += f'<td class="ke-cell" style="text-align:center;">{k_cy_display}</td><td class="ke-cell" style="text-align:center;">{k_yoy_str if k_cy>0 or k_py>0 else "-"}</td>'
-                    carrier_html += f'<td class="ke-cell" style="text-align:center;"><b>{k_ms_cy:.1f}%</b></td><td class="ke-cell" style="text-align:center;">{k_ms_diff_str}</td>'
+                    carrier_html += f'<td style="text-align:center;">{k_cy_display}</td><td style="text-align:center;">{k_yoy_str if k_cy>0 or k_py>0 else "-"}</td>'
+                    carrier_html += f'<td style="text-align:center;"><b>{k_ms_cy:.1f}%</b></td><td style="text-align:center;">{k_ms_diff_str}</td>'
                     carrier_html += '</tr>'
 
                 # TOP 30 요약행 (#efefef)
@@ -1523,8 +1487,8 @@ else:
                 carrier_html += f'<td style="text-align:center;">{tot_m_cy:,.0f}</td><td style="text-align:center;">{"▲" if tot_m_yoy>=0 else "▼"} {abs(tot_m_yoy):.0f}%</td>'
                 carrier_html += f'<td style="text-align:center;">{tot_c_cy:,.0f}</td><td style="text-align:center;">{"▲" if tot_c_yoy>=0 else "▼"} {abs(tot_c_yoy):.0f}%</td>'
                 carrier_html += f'<td style="text-align:center;">{tot_c_ms_cy:.0f}%</td><td style="text-align:center;">{"▲" if tot_c_ms_diff>=0 else "▼"} {abs(tot_c_ms_diff):.0f}%p</td>'
-                carrier_html += f'<td class="ke-cell" style="text-align:center;">{tot_k_cy:,.0f}</td><td class="ke-cell" style="text-align:center;">{"▲" if tot_k_yoy>=0 else "▼"} {abs(tot_k_yoy):.0f}%</td>'
-                carrier_html += f'<td class="ke-cell" style="text-align:center;">{tot_k_ms_cy:.1f}%</td><td class="ke-cell" style="text-align:center;">{"▲" if tot_k_ms_diff>=0 else "▼"} {abs(tot_k_ms_diff):.1f}%p</td>'
+                carrier_html += f'<td style="text-align:center;">{tot_k_cy:,.0f}</td><td style="text-align:center;">{"▲" if tot_k_yoy>=0 else "▼"} {abs(tot_k_yoy):.0f}%</td>'
+                carrier_html += f'<td style="text-align:center;">{tot_k_ms_cy:.1f}%</td><td style="text-align:center;">{"▲" if tot_k_ms_diff>=0 else "▼"} {abs(tot_k_ms_diff):.1f}%p</td>'
                 carrier_html += '</tr>'
 
                 # 📌 전체 시장 총합 (Market Total) 요약행 배경색 #cccccc 적용
@@ -1557,8 +1521,8 @@ else:
                 carrier_html += f'<td style="text-align:center;"><b>{mkt_all_cy:,.0f}</b></td><td style="text-align:center;">{"▲" if mkt_all_yoy>=0 else "▼"} {abs(mkt_all_yoy):.0f}%</td>'
                 carrier_html += f'<td style="text-align:center;"><b>{mkt_c_cy:,.0f}</b></td><td style="text-align:center;">{"▲" if mkt_c_yoy>=0 else "▼"} {abs(mkt_c_yoy):.0f}%</td>'
                 carrier_html += f'<td style="text-align:center;"><b>{mkt_c_ms_cy:.0f}%</b></td><td style="text-align:center;">{"▲" if mkt_c_ms_diff>=0 else "▼"} {abs(mkt_c_ms_diff):.0f}%p</td>'
-                carrier_html += f'<td class="ke-cell" style="text-align:center;"><b>{mkt_k_cy:,.0f}</b></td><td class="ke-cell" style="text-align:center;">{"▲" if mkt_k_yoy>=0 else "▼"} {abs(mkt_k_yoy):.0f}%</td>'
-                carrier_html += f'<td class="ke-cell" style="text-align:center;"><b>{mkt_k_ms_cy:.1f}%</b></td><td class="ke-cell" style="text-align:center;">{"▲" if mkt_k_ms_diff>=0 else "▼"} {abs(mkt_k_ms_diff):.1f}%p</td>'
+                carrier_html += f'<td style="text-align:center;"><b>{mkt_k_cy:,.0f}</b></td><td style="text-align:center;">{"▲" if mkt_k_yoy>=0 else "▼"} {abs(mkt_k_yoy):.0f}%</td>'
+                carrier_html += f'<td style="text-align:center;"><b>{mkt_k_ms_cy:.1f}%</b></td><td style="text-align:center;">{"▲" if mkt_k_ms_diff>=0 else "▼"} {abs(mkt_k_ms_diff):.1f}%p</td>'
                 carrier_html += '</tr>'
 
                 carrier_html += '</tbody></table></div>'
