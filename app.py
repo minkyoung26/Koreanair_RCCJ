@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Dynamic Date Logic (2026년 기준)
+# Dynamic Date Logic (2026년 기본값)
 today = datetime.date.today()
 current_monday = today - datetime.timedelta(days=today.weekday())
 issue_start_date = current_monday - datetime.timedelta(weeks=5)
@@ -357,13 +357,6 @@ def process_iss_merged(df_iss, df_wt):
 
 # 메인 타이틀
 st.title("✈️ 일본노선 발매/공급 Market Share")
-st.markdown(f"""
-<div class="source-header-box">
-    <b>📌 출처: DDS & OAG 데이터</b> &nbsp;|&nbsp; 
-    <b>🗓️ 발매일:</b> {issue_range_str} &nbsp;|&nbsp; 
-    <b>✈️ 출발일:</b> {dep_range_str}
-</div>
-""", unsafe_allow_html=True)
 
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
 selected_group = st.radio(
@@ -419,10 +412,44 @@ def render_slicer_box(container, label, full_list, key_name, default_idx=0):
     selected = container.selectbox(label, options=opts, index=default_idx, key=key_name, label_visibility="collapsed")
     return selected
 
+# 📌 3/4수송 데이터 기반 동적 날짜 계산 헬퍼 함수
+def get_dynamic_date_ranges_34(df_iss):
+    if df_iss is None or df_iss.empty:
+        return issue_range_str, dep_range_str
+
+    # 1. 출발기간 (Trip Month)
+    m_col = '출발월' if '출발월' in df_iss.columns else ('출발 월' if '출발 월' in df_iss.columns else ('Trip Month' if 'Trip Month' in df_iss.columns else None))
+    if m_col and m_col in df_iss.columns:
+        valid_months = sorted([str(x).strip() for x in df_iss[m_col].dropna().unique() if str(x).strip() != 'nan'])
+        dep_str = f"{valid_months[0]} ~ {valid_months[-1]}" if valid_months else dep_range_str
+    else:
+        dep_str = dep_range_str
+
+    # 2. 발매기간 (Purchase Month / Issue Date)
+    w_col = '발매주차_일자' if '발매주차_일자' in df_iss.columns else ('발매 주차' if '발매 주차' in df_iss.columns else ('Purchase Month' if 'Purchase Month' in df_iss.columns else None))
+    if w_col and w_col in df_iss.columns:
+        valid_weeks = sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])
+        iss_str = f"{valid_weeks[0]} ~ {valid_weeks[-1]}" if valid_weeks else issue_range_str
+    else:
+        iss_str = issue_range_str
+
+    return iss_str, dep_str
+
+
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
 if selected_group == "✈️ 3/4수송 대시보드":
+    # 📌 3/4수송 데이터 기반 동적 헤더 표출
+    dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_raw)
+    st.markdown(f"""
+    <div class="source-header-box">
+        <b>📌 출처: DDS & OAG 데이터 (3/4수송)</b> &nbsp;|&nbsp; 
+        <b>🗓️ 발매기간 (Purchase Month):</b> {dynamic_iss_str_34} &nbsp;|&nbsp; 
+        <b>✈️ 출발기간 (Trip Month):</b> {dynamic_dep_str_34}
+    </div>
+    """, unsafe_allow_html=True)
+
     st.markdown("---")
     
     tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs([
@@ -1268,7 +1295,7 @@ else:
         if selected_m_val == ALL_OPTION or not month_col_6 or month_col_6 not in df_target.columns:
             return pd.Series(True, index=df_target.index)
         
-        # '2026-09' -> '09'월 파싱
+        # '2026-09' -> '09'월 파싱하여 2026년과 2025년 동월 데이터를 모두 집계 범위에 유지
         if '-' in str(selected_m_val):
             sub_m = str(selected_m_val).split('-')[-1]
             return df_target[month_col_6].astype(str).str.endswith(sub_m) | (df_target[month_col_6].astype(str) == selected_m_val)
@@ -1277,7 +1304,7 @@ else:
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        # 📌 1. 항공사/O&D별 발매 M/S (오탈자 수정: '1. 출발월')
+        # 📌 1. 항공사/O&D별 발매 M/S (7개 전용 필터)
         st.subheader("1. 항공사/O&D별 발매 M/S")
         with st.expander("🔍 **[1. 항공사/O&D별 발매 M/S] 전용 필터 설정**", expanded=True):
             f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
@@ -1317,7 +1344,7 @@ else:
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
             html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             
-            # 📌 [수정] ★ 별표 제거: KE (대한항공 - {ke_rank}위)
+            # KE 순위 표출 및 11개 항공사 표출 (별표 ★ 제거)
             for al_code in airline_rank_list:
                 if al_code == 'KE':
                     html_table += f'<th class="ke-header" style="width:130px;">KE (대한항공 - {ke_rank}위)</th>'
@@ -1360,7 +1387,7 @@ else:
                 html_table += f'<td><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # ROW 4: YOY (M/S %p) - 📌 [수정] t_prev == 0일 시 하이픈(-)으로 안전 예외 처리
+            # ROW 4: YOY (M/S %p)
             html_table += '<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td>'
             html_table += f'<td>{"▲ 0%p" if t_prev>0 else "-"}</td>'
             for al_code in airline_rank_list:
