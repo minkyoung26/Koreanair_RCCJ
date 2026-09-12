@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (메인 타이틀 크기 축소 & 섹션 제목 폰트 크기 통일)
+# 📌 고급 CSS 서식 (YoY 증가 파란색 #1d4ed8 적용)
 st.markdown("""
 <style>
     :root {
@@ -65,7 +65,7 @@ st.markdown("""
         margin-bottom: 12px;
     }
 
-    /* 모든 서브 세クション 제목 폰트 크기 일합 통일 (16px) */
+    /* 모든 서브 섹션 제목 폰트 크기 일관 통일 (16px) */
     .unified-sub-header {
         font-size: 16px !important;
         font-weight: 700 !important;
@@ -378,7 +378,7 @@ def process_iss_merged(df_iss, df_wt):
 
     return optimize_df(merged_df)
 
-# 📌 축소된 메인 타이틀
+# 메인 타이틀
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
@@ -617,7 +617,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
 
-                # 📌 3. 출발기간별 KE M/S 점유비 (요청 반영 추가 그래프)
+                # 📌 3. 출발기간별 KE M/S 점유비 (Categorical 타입 예외 완벽 처리)
                 if month_col and month_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">3. 출발기간별 KE M/S 점유비</div>', unsafe_allow_html=True)
                     
@@ -633,7 +633,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         df_ke_only_dep = df_dep_ke[df_dep_ke['Dominant Marketing Airline'] == 'KE']
                         month_ke_tot = df_ke_only_dep.groupby(month_col, observed=False)[val_col].sum().reset_index()
 
-                        mkt_ke_merged = pd.merge(month_mkt_tot, month_ke_tot, on=month_col, how='left', suffixes=('_Mkt', '_KE')).fillna(0)
+                        # Categorical fillna TypeError 원천 차단
+                        month_mkt_tot[month_col] = month_mkt_tot[month_col].astype(str)
+                        month_ke_tot[month_col] = month_ke_tot[month_col].astype(str)
+
+                        mkt_ke_merged = pd.merge(month_mkt_tot, month_ke_tot, on=month_col, how='left', suffixes=('_Mkt', '_KE'))
+                        mkt_ke_merged[f'{val_col}_KE'] = mkt_ke_merged[f'{val_col}_KE'].fillna(0)
+
                         mkt_ke_merged['KE_MS'] = np.where(mkt_ke_merged[f'{val_col}_Mkt'] > 0, (mkt_ke_merged[f'{val_col}_KE'] / mkt_ke_merged[f'{val_col}_Mkt']) * 100, 0)
                         mkt_ke_merged['Text_Label'] = mkt_ke_merged['KE_MS'].map(lambda x: f"{x:.1f}%")
 
@@ -651,6 +657,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 c3, c4 = st.columns(2)
+                
+                ke_only_df = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']
                 
                 with c3:
                     if bound_col:
@@ -718,7 +726,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (📌 피벗 슬라이서 접이식 삭제 및 폰트 통일)
+    # 2. ✈️ 공급 M/S 탭
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -751,7 +759,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
         sup_color_map = build_airline_color_map(sup_airlines)
 
-        # 📌 [수정] 접이식 상자 제거하고 직접 표시
         st.markdown('<div class="unified-sub-header">🔍 공급 대시보드 필터 설정 (KE 취항노선 전용)</div>', unsafe_allow_html=True)
         metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
         
@@ -799,7 +806,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             
             cs1, cs2 = st.columns([1, 1.2])
             with cs1:
-                # 📌 폰트 크기 통일
                 st.markdown(f'<div class="unified-sub-header">1. 항공사별 전체 공급 M/S 점유비 ({metric_mode})</div>', unsafe_allow_html=True)
                 pie_sup_al = filtered_sup.groupby('Airline', observed=False)[target_val].sum().reset_index()
                 fig_s1 = px.pie(
@@ -812,7 +818,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.plotly_chart(fig_s1, width="stretch")
 
             with cs2:
-                # 📌 폰트 크기 통일
                 st.markdown(f'<div class="unified-sub-header">2. 항공사별 공급 실적 및 M/S 요약</div>', unsafe_allow_html=True)
                 pie_sup_al['공급 M/S (%)'] = (pie_sup_al[target_val] / pie_sup_al[target_val].sum()) * 100
                 pie_sup_al = pie_sup_al.sort_values(by=target_val, ascending=False).reset_index(drop=True).head(100)
@@ -969,7 +974,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                 rbd_html += f'<th class="header-main">{wk}</th>'
                             rbd_html += '<th class="header-main">총합계</th></tr></thead><tbody>'
 
-                            # 📌 [요청 반영] 맨 위 첫번째 행에 항공사 총계 표시 (진한 회색 #475569)
+                            # 맨 위 첫번째 행에 항공사 총계 표시 (진한 회색 #475569)
                             rbd_html += '<tr class="row-summary-top-dark">'
                             rbd_html += f'<td style="text-align:center;">★ {al_code} 총계</td>'
                             for wk in week_list:
@@ -1020,7 +1025,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                 ag_html += f'<th class="header-main">{wk}</th>'
                             ag_html += '<th class="header-main">총 판매량</th></tr></thead><tbody>'
 
-                            # 📌 [요청 반영] 맨 위 첫번째 행에 대리점 총계 표시 (진한 회색 #475569)
+                            # 맨 위 첫번째 행에 대리점 총계 표시 (진한 회색 #475569)
                             ag_html += '<tr class="row-summary-top-dark">'
                             ag_html += f'<td style="text-align:center;">★ {ag_name} 총계</td>'
                             for wk in week_list_ag:
@@ -1146,7 +1151,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (📌 접이식 상자 expender 전면 삭제)
+# GROUP 2: 🌐 6수송 대시보드
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
