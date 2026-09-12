@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 [수정 반영] 컬럼 배경색 유지 + 하단 셀 배경 제거 + 회색 테두리 통일 CSS
+# 📌 고급 CSS 서식
 st.markdown("""
 <style>
     :root {
@@ -135,8 +135,8 @@ st.markdown("""
         text-align: center !important;
     }
     
-    /* 📌 [컬럼 헤더 색상] #cfe2f3 적용 */
-    .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header, .yoy-table th.ke-header {
+    /* 📌 [컬럼 헤더 기본 색상] #cfe2f3 적용 */
+    .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header {
         background-color: #cfe2f3 !important;
         color: #0f172a !important;
         padding: 8px 6px;
@@ -145,14 +145,33 @@ st.markdown("""
         text-align: center !important;
         white-space: nowrap;
     }
-    
-    /* 📌 [셀 배경 흰색/색상 제거] 일반 투명 셀로 통일 */
-    .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row {
+
+    /* 📌 KE 컬럼 헤더 파스텔 초록색 서식 */
+    .yoy-table th.ke-header {
+        background-color: #dcfce7 !important;
+        color: #15803d !important;
+        padding: 8px 6px;
+        border: 1px solid #cbd5e1 !important;
+        font-size: 13px !important;
+        font-weight: 800 !important;
+        text-align: center !important;
+        white-space: nowrap;
+    }
+
+    /* 📌 [셀 기본 배경] 투명/기본 */
+    .custom-piv-table td, .yoy-table td {
         padding: 6px 10px;
         border: 1px solid #cbd5e1 !important;
         color: #334155 !important;
         background-color: transparent !important;
         text-align: center !important;
+    }
+
+    /* 📌 KE 데이터 셀 파스텔 연초록 서식 */
+    .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell {
+        background-color: #f0fdf4 !important;
+        font-weight: 800 !important;
+        color: #15803d !important;
     }
     
     .yoy-table tr:hover {
@@ -658,7 +677,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (📌 [수정] KE 취항 노선 우선 필터링)
+    # 2. ✈️ 공급 M/S 탭
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -1224,7 +1243,7 @@ else:
 
     all_raw_m = sorted([str(x) for x in df_6[df_6['Val_num'] > 0][month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
 
-    # 📌 8개 핵심 필터 구성
+    # 📌 상단 슬라이서 7개 배치
     with st.expander("🔍 **6수송 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
         st.markdown("##### 📌 주요 분석 선택 피벗 슬라이서 (2026년 기준)")
         r_col1, r_col2, r_col3, r_col4 = st.columns(4)
@@ -1244,7 +1263,7 @@ else:
         sel_6_onoff = render_slicer_box(r_col4, "4. On/Off 여부", all_onoff_6, "slicer_onoff_6")
 
         st.markdown("---")
-        c6_d1, c6_d2, c6_d3, c6_d4 = st.columns(4)
+        c6_d1, c6_d2, c6_d3 = st.columns(3)
         
         act_reg_c = actual_cols['4.OD RGN']
         all_reg_6 = sorted([str(x) for x in df_6[act_reg_c].dropna().unique()]) if act_reg_c and act_reg_c in df_6.columns else []
@@ -1257,8 +1276,7 @@ else:
         all_od_mkt_6 = sorted([str(x) for x in df_6[od_col_6].dropna().unique()]) if od_col_6 and od_col_6 in df_6.columns else []
         sel_6_od_mkt = render_slicer_box(c6_d3, "7. Trip O&D Market", all_od_mkt_6, "slicer_od_mkt_6")
 
-        sel_6_al = render_slicer_box(c6_d4, "8. 항공사", sorted_6th_airlines, "slicer_al_6")
-
+    # 상단 1~7번 필터 마스크
     mask_6_base = pd.Series(True, index=df_6.index)
     if month_col_6 and month_col_6 in df_6.columns and sel_6_month != ALL_OPTION: mask_6_base &= (df_6[month_col_6].astype(str) == sel_6_month)
     if actual_cols['DIRECTION'] and actual_cols['DIRECTION'] in df_6.columns and sel_6_dir != ALL_OPTION: mask_6_base &= (df_6[actual_cols['DIRECTION']].astype(str) == sel_6_dir)
@@ -1267,7 +1285,6 @@ else:
     if actual_cols['4.OD RGN'] and actual_cols['4.OD RGN'] in df_6.columns and sel_6_region != ALL_OPTION: mask_6_base &= (df_6[actual_cols['4.OD RGN']].astype(str) == sel_6_region)
     if actual_cols['Sub-Route'] and actual_cols['Sub-Route'] in df_6.columns and sel_6_jp_route != ALL_OPTION: mask_6_base &= (df_6[actual_cols['Sub-Route']].astype(str) == sel_6_jp_route)
     if od_col_6 and od_col_6 in df_6.columns and sel_6_od_mkt != ALL_OPTION: mask_6_base &= (df_6[od_col_6].astype(str) == sel_6_od_mkt)
-    if al_col_6 in df_6.columns and sel_6_al != ALL_OPTION: mask_6_base &= (df_6[al_col_6].astype(str) == sel_6_al)
 
     filtered_6 = df_6[mask_6_base].copy()
 
@@ -1322,7 +1339,6 @@ else:
                 
             airline_rank_list = airline_rank_list[:5]
 
-            # 📌 [수정 반영] 각 항공사 컬럼 너비를 110px 고정 적용하여 균형감 확보
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
             html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             
@@ -1390,21 +1406,26 @@ else:
 
         st.markdown("---")
         
-        selected_carrier = sel_6_al
+        # 📌 항공사 필터를 Carrier별 M/S 테이블 상단에 독립 배치
+        st.markdown("##### ■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
+        
+        c_filter_col, _ = st.columns([2, 2])
+        selected_carrier = render_slicer_box(c_filter_col, "✈️ 항공사 (Carrier) 선택", sorted_6th_airlines, "carrier_table_al_filter")
         display_carrier_label = selected_carrier if selected_carrier != ALL_OPTION else "전체 시장"
 
-        st.subheader(f"■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교 - 선택 항공사: {display_carrier_label})")
-        if not filtered_6.empty and od_col_6 and od_col_6 in filtered_6.columns and al_col_6 and al_col_6 in filtered_6.columns:
+        # 📌 [핵심 버그 수정] 항공사 필터를 제외하고 1~7번 필터만 적용된 '순수 전체 시장 데이터' 생성
+        df_mkt_full = filtered_6.copy()
 
-            # TOP O&D Market 노선 구간명 기반 그룹핑
-            od_totals = filtered_6.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
+        if not df_mkt_full.empty and od_col_6 and od_col_6 in df_mkt_full.columns and al_col_6 and al_col_6 in df_mkt_full.columns:
+
+            # 1~7번 필터 조건 전체 시장 기준 TOP 30 O&D Market 추출
+            od_totals = df_mkt_full.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
             od_totals = od_totals.sort_values(by='Val_num', ascending=False).head(30)
             top_od_list = [str(x) for x in od_totals[od_col_6].tolist() if pd.notnull(x)]
 
-            df_top = filtered_6[filtered_6[od_col_6].astype(str).isin(top_od_list)].copy()
+            df_top = df_mkt_full[df_mkt_full[od_col_6].astype(str).isin(top_od_list)].copy()
 
             if not df_top.empty and top_od_list:
-                # 📌 [수정 반영] 별표(★) 제거된 KE 발매량 및 KE M/S 헤더 지정
                 carrier_html = '<div class="yoy-table-container"><table class="yoy-table">'
                 carrier_html += '<thead><tr>'
                 carrier_html += '<th class="mkt-header" style="width:50px; text-align:center;" rowspan="2">순위</th>'
@@ -1427,11 +1448,13 @@ else:
                 for idx, od_name in enumerate(top_od_list, start=1):
                     od_sub = df_top[df_top[od_col_6].astype(str) == od_name]
                     
+                    # 1) 시장 전체 진짜 수치
                     m_cy = od_sub['Val_num'].sum()
                     m_py = od_sub['Val_PY_num'].sum()
                     m_yoy = ((m_cy - m_py) / m_py * 100) if m_py > 0 else 0
                     m_yoy_str = f'<span class="yoy-up">▲ {m_yoy:.0f}%</span>' if m_yoy >= 0 else f'<span class="yoy-down">▼ {abs(m_yoy):.0f}%</span>'
 
+                    # 2) 선택 항공사 수치
                     if selected_carrier == ALL_OPTION:
                         c_sub = od_sub
                     else:
@@ -1447,6 +1470,7 @@ else:
                     c_ms_diff = c_ms_cy - c_ms_py
                     c_ms_diff_str = f'<span class="yoy-up">▲ {c_ms_diff:.0f}%p</span>' if c_ms_diff >= 0 else f'<span class="yoy-down">▼ {abs(c_ms_diff):.0f}%p</span>'
 
+                    # 3) KE 전용 수치
                     k_sub = od_sub[od_sub[al_col_6].astype(str) == 'KE']
                     k_cy = k_sub['Val_num'].sum()
                     k_py = k_sub['Val_PY_num'].sum()
