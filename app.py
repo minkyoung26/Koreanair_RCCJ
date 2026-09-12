@@ -1240,7 +1240,7 @@ else:
 
     all_raw_m = sorted([str(x) for x in df_6[df_6['Val_num'] > 0][month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
 
-    # 📌 공통 추출 옵션 리스트
+    # 공통 추출 옵션 리스트
     act_dir_c = actual_cols['DIRECTION']
     all_dir_6 = sorted([str(x) for x in df_6[act_dir_c].dropna().unique()]) if act_dir_c and act_dir_c in df_6.columns else []
 
@@ -1266,7 +1266,7 @@ else:
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        # 📌 [요청 반영] 첫 번째 그래프 전용 독립 필터 및 제목 개편
+        # 📌 [요청 반영] 1. 항공사/O&D별 발매 M/S (7개 전용 필터)
         st.subheader("1. 항공사/O&D별 발매 M/S")
         with st.expander("🔍 **[1. 항공사/O&D별 발매 M/S] 전용 필터 설정**", expanded=True):
             f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
@@ -1307,7 +1307,7 @@ else:
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
             html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             
-            # 📌 [요청 반영] KE 순위 포함 11개 항공사 표시
+            # 📌 KE 순위 표출 및 11개 항공사 표출
             for al_code in airline_rank_list:
                 if al_code == 'KE':
                     html_table += f'<th class="ke-header" style="width:130px;">★ KE (대한항공 - {ke_rank}위)</th>'
@@ -1352,7 +1352,7 @@ else:
 
             # ROW 4: YOY (M/S %p)
             html_table += '<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td>'
-            html_table += '<td><span class="yoy-up">▲ 0%p</span></td>'
+            html_table += f'<td>{"▲ 0%p" if t_prev>0 else "-"}</td>'
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
                 p_val = al_agg[al_agg[al_col_6] == al_code]['Val_PY_num'].sum()
@@ -1368,7 +1368,7 @@ else:
 
         st.markdown("---")
         
-        # 📌 [요청 반영] 두 번째 그래프 전용 독립 필터 및 제목 개편
+        # 📌 [요청 반영] 2. 항공사별 상위 O&D (4개 전용 필터)
         st.subheader("2. 항공사별 상위 O&D")
         with st.expander("🔍 **[2. 항공사별 상위 O&D] 전용 필터 설정**", expanded=True):
             f2_col1, f2_col2, f2_col3 = st.columns(3)
