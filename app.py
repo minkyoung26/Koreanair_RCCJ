@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (통합 아코디언 테이블 서식 추가)
+# 📌 고급 CSS 서식
 st.markdown("""
 <style>
     :root {
@@ -207,19 +207,21 @@ st.markdown("""
     details.rbd-details-group summary::-webkit-details-marker {
         display: none;
     }
+    
+    /* 📌 [요청 반영] 총계 배경색 #cccccc 적용 */
     .row-summary-top-dark {
-        background-color: #475569 !important;
-        color: #ffffff !important;
+        background-color: #cccccc !important;
+        color: #0f172a !important;
         font-weight: 800 !important;
     }
     .row-summary-top-dark td {
-        background-color: #475569 !important;
-        color: #ffffff !important;
+        background-color: #cccccc !important;
+        color: #0f172a !important;
         font-weight: 800 !important;
         border: 1px solid #cbd5e1 !important;
     }
     .rbd-child-row td {
-        background-color: #f8fafc !important;
+        background-color: #ffffff !important;
         font-size: 12px;
     }
 
@@ -228,6 +230,13 @@ st.markdown("""
         background-color: #efefef !important;
         font-weight: bold;
         color: #0f172a;
+    }
+
+    /* 📌 [요청 반영] 단체실적 총계 행 배경색 #cccccc */
+    .row-group-header-custom, .row-group-header-custom td {
+        background-color: #cccccc !important;
+        color: #0f172a !important;
+        font-weight: 800 !important;
     }
 
     /* 📌 [전체 시장 총합 배경] #cccccc */
@@ -640,7 +649,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
 
-                # 📌 3. 출발기간별 주요 항공사 M/S 점유비 추이 (KE 강조 + 타사 점선)
+                # 📌 3. 출발기간별 주요 항공사 M/S 점유비 추이
                 if month_col and month_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">3. 출발기간별 주요 항공사 M/S 점유비 추이</div>', unsafe_allow_html=True)
                     
@@ -703,7 +712,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 📌 4 및 5번 차트 컬럼 레이아웃 선언
+                # 📌 4 및 5번 차트 컬럼 레이아웃
                 c3, c4 = st.columns(2)
                 ke_only_df = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']
                 
@@ -930,7 +939,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 단일 표 구조 + 단일 아코디언 구현)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 단일 아코디언 + 토글 스위치 + 총계 #cccccc 적용)
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -982,6 +991,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
             mime="text/csv"
         )
 
+        # 📌 [요청 반영] 전체 열기 / 전체 닫기 스위치 토글 추가
+        expand_toggle_all = st.toggle("📂 전체 항목 펼쳐보기 (열기/닫기)", value=True, key="expand_toggle_all_key")
+        open_attr = "open" if expand_toggle_all else ""
+
         sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매현황", "🏢 대리점별 판매현황 (상위 20개 대리점)"])
 
         with sub_tab_rbd:
@@ -993,7 +1006,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     ag_al_list.remove('KE')
                     ag_al_list = ['KE'] + ag_al_list
 
-                # 📌 [요청 반영] 단일 표 구조 내 항공사 총계 행 클릭 시 하위 RBD 접힘/펼침 구현
                 rbd_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
                 rbd_html += '<thead><tr><th class="header-main" style="width:180px; text-align:center;">항공사 / RBD 클래스</th>'
                 for wk in week_list:
@@ -1017,9 +1029,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         else:
                             piv_rbd = piv_rbd.sort_values(by='총합계', ascending=False)
 
-                        # HTML <details>/<summary> 기반 클릭 펼침 구조 생성 (기본 open 처리)
                         rbd_html += f'<tr><td colspan="{len(week_list)+2}" style="padding:0; border:none;">'
-                        rbd_html += f'<details class="rbd-details-group" open><summary>'
+                        rbd_html += f'<details class="rbd-details-group" {open_attr}><summary>'
                         rbd_html += f'<table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark">'
                         rbd_html += f'<td style="width:180px; text-align:center;">▼ ★ {al_code} 총계</td>'
                         for wk in week_list:
@@ -1071,7 +1082,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         piv_ag_sub = piv_ag_sub.set_index('Dominant Marketing Airline')
 
                         ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;">'
-                        ag_html += f'<details class="rbd-details-group" open><summary>'
+                        ag_html += f'<details class="rbd-details-group" {open_attr}><summary>'
                         ag_html += f'<table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark">'
                         ag_html += f'<td style="width:180px; text-align:center;">▼ ★ {ag_name} 총계</td>'
                         for wk in week_list_ag:
@@ -1183,10 +1194,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         g_html += '<th class="header-main" style="width:200px; text-align:center;">단체 예약 실적 (석)</th>'
                         g_html += '</tr></thead><tbody>'
 
-                        g_html += '<tr class="row-group-header">'
+                        # 📌 [요청 반영] 단체 실적 총계 행 배경색 #cccccc 적용
+                        g_html += '<tr class="row-group-header-custom">'
                         g_html += f'<td style="text-align:center;">-</td>'
                         g_html += f'<td style="text-align:center; font-weight:800;">★ {al_code} 전체 총합계</td>'
-                        g_html += f'<td style="text-align:center; background-color:#efefef;"><b>{al_tot_val:,.0f}</b></td></tr>'
+                        g_html += f'<td style="text-align:center;"><b>{al_tot_val:,.0f}</b></td></tr>'
 
                         for r_idx, ag_row in top_ag_sub.iterrows():
                             ag_name = ag_row['Travel Agency Name']
