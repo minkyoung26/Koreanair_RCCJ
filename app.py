@@ -1185,16 +1185,24 @@ else:
         month_col_6 = actual_cols['TRIP MONTH']
         year_type_col = actual_cols['금전구분']
 
+        # 📌 [수정] '금/전' 필드 및 'Travel Month' 연도(2026/2025) 통합 판단 로직
+        is_cy_mask = pd.Series(False, index=df_6_raw.index)
+        is_py_mask = pd.Series(False, index=df_6_raw.index)
+
+        # 1. '금/전' 필드로 판단
         if year_type_col and year_type_col in df_6_raw.columns:
-            is_cy_mask = df_6_raw[year_type_col].astype(str).str.contains('금년|CY|2026', na=False)
-            is_py_mask = df_6_raw[year_type_col].astype(str).str.contains('전년|PY|2025', na=False)
-        elif month_col_6 and month_col_6 in df_6_raw.columns:
-            month_str = df_6_raw[month_col_6].astype(str).str.strip()
-            is_cy_mask = month_str.str.endswith('26') | month_str.str.contains('2026|26월|26.', na=False)
-            is_py_mask = month_str.str.endswith('25') | month_str.str.contains('2025|25월|25.', na=False)
-        else:
+            is_cy_mask |= df_6_raw[year_type_col].astype(str).str.contains('금년|CY|2026', na=False)
+            is_py_mask |= df_6_raw[year_type_col].astype(str).str.contains('전년|PY|2025', na=False)
+
+        # 2. 'Travel Month' / 'TRIP MONTH' 필드로 판단 (예: 2026-09, 2025-09)
+        if month_col_6 and month_col_6 in df_6_raw.columns:
+            m_str = df_6_raw[month_col_6].astype(str).str.strip()
+            is_cy_mask |= m_str.str.startswith('2026') | m_str.str.contains('2026|26년|26.', na=False)
+            is_py_mask |= m_str.str.startswith('2025') | m_str.str.contains('2025|25년|25.', na=False)
+
+        # 둘 다 조건에 해당하지 않을 경우 기본 처리
+        if not is_cy_mask.any() and not is_py_mask.any():
             is_cy_mask = pd.Series(True, index=df_6_raw.index)
-            is_py_mask = pd.Series(False, index=df_6_raw.index)
 
         df_cy = df_6_raw[is_cy_mask].copy()
         df_cy['Val_num'] = df_cy['Val_raw']
@@ -1389,7 +1397,6 @@ else:
         selected_carrier = render_slicer_box(c_filter_col, "✈️ 항공사 (Carrier) 선택", sorted_6th_airlines, "carrier_table_al_filter")
         display_carrier_label = selected_carrier if selected_carrier != ALL_OPTION else "전체 시장"
 
-        # 📌 1~8번 필터만 적용된 '순수 전체 시장 데이터'
         df_mkt_full = filtered_6.copy()
 
         if not df_mkt_full.empty and od_col_6 and od_col_6 in df_mkt_full.columns and al_col_6 and al_col_6 in df_mkt_full.columns:
