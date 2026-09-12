@@ -1185,22 +1185,19 @@ else:
         month_col_6 = actual_cols['TRIP MONTH']
         year_type_col = actual_cols['금전구분']
 
-        # 📌 [수정] '금/전' 필드 및 'Travel Month' 연도(2026/2025) 통합 판단 로직
+        # '금/전' 필드 및 'Travel Month' 연도(2026/2025) 통합 판단
         is_cy_mask = pd.Series(False, index=df_6_raw.index)
         is_py_mask = pd.Series(False, index=df_6_raw.index)
 
-        # 1. '금/전' 필드로 판단
         if year_type_col and year_type_col in df_6_raw.columns:
             is_cy_mask |= df_6_raw[year_type_col].astype(str).str.contains('금년|CY|2026', na=False)
             is_py_mask |= df_6_raw[year_type_col].astype(str).str.contains('전년|PY|2025', na=False)
 
-        # 2. 'Travel Month' / 'TRIP MONTH' 필드로 판단 (예: 2026-09, 2025-09)
         if month_col_6 and month_col_6 in df_6_raw.columns:
             m_str = df_6_raw[month_col_6].astype(str).str.strip()
             is_cy_mask |= m_str.str.startswith('2026') | m_str.str.contains('2026|26년|26.', na=False)
             is_py_mask |= m_str.str.startswith('2025') | m_str.str.contains('2025|25년|25.', na=False)
 
-        # 둘 다 조건에 해당하지 않을 경우 기본 처리
         if not is_cy_mask.any() and not is_py_mask.any():
             is_cy_mask = pd.Series(True, index=df_6_raw.index)
 
@@ -1243,98 +1240,79 @@ else:
 
     all_raw_m = sorted([str(x) for x in df_6[df_6['Val_num'] > 0][month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
 
-    # 📌 6수송 슬라이서 피벗 구성 (8개 항목)
-    with st.expander("🔍 **6수송 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
-        st.markdown("##### 📌 주요 분석 선택 피벗 슬라이서 (2026년 기준)")
-        r_col1, r_col2, r_col3, r_col4 = st.columns(4)
-        
-        sel_6_month = render_slicer_box(r_col1, "1. 출발월 (TRIP MONTH)", all_raw_m, "slicer_m_6")
+    # 📌 공통 추출 옵션 리스트
+    act_dir_c = actual_cols['DIRECTION']
+    all_dir_6 = sorted([str(x) for x in df_6[act_dir_c].dropna().unique()]) if act_dir_c and act_dir_c in df_6.columns else []
 
-        act_dir_c = actual_cols['DIRECTION']
-        all_dir_6 = sorted([str(x) for x in df_6[act_dir_c].dropna().unique()]) if act_dir_c and act_dir_c in df_6.columns else []
-        sel_6_dir = render_slicer_box(r_col2, "2. Direction", all_dir_6, "slicer_dir_6")
+    act_stop_c = actual_cols['STOP OVER']
+    all_stop_6 = sorted([str(x) for x in df_6[act_stop_c].dropna().unique()]) if act_stop_c and act_stop_c in df_6.columns else []
 
-        act_stop_c = actual_cols['STOP OVER']
-        all_stop_6 = sorted([str(x) for x in df_6[act_stop_c].dropna().unique()]) if act_stop_c and act_stop_c in df_6.columns else []
-        sel_6_stop = render_slicer_box(r_col3, "3. Stopover", all_stop_6, "slicer_stop_6")
+    act_onoff_c = actual_cols['ON/OFF 여부']
+    all_onoff_6 = sorted([str(x) for x in df_6[act_onoff_c].dropna().unique()]) if act_onoff_c and act_onoff_c in df_6.columns else []
 
-        act_onoff_c = actual_cols['ON/OFF 여부']
-        all_onoff_6 = sorted([str(x) for x in df_6[act_onoff_c].dropna().unique()]) if act_onoff_c and act_onoff_c in df_6.columns else []
-        sel_6_onoff = render_slicer_box(r_col4, "4. On/Off 여부", all_onoff_6, "slicer_onoff_6")
+    act_reg_c = actual_cols['4.OD RGN']
+    all_reg_6 = sorted([str(x) for x in df_6[act_reg_c].dropna().unique()]) if act_reg_c and act_reg_c in df_6.columns else []
 
-        st.markdown("---")
-        c6_d1, c6_d2, c6_d3, c6_d4 = st.columns(4)
-        
-        act_reg_c = actual_cols['4.OD RGN']
-        all_reg_6 = sorted([str(x) for x in df_6[act_reg_c].dropna().unique()]) if act_reg_c and act_reg_c in df_6.columns else []
-        sel_6_region = render_slicer_box(c6_d1, "5. OD Region", all_reg_6, "slicer_reg_6")
+    act_sub_c = actual_cols['Sub-Route']
+    if act_sub_c and act_sub_c in df_6.columns:
+        sub_sum = df_6.groupby(act_sub_c, observed=False)['Val_num'].sum().sort_values(ascending=False)
+        all_sub_6 = [str(x) for x in sub_sum.index if pd.notnull(x)]
+    else:
+        all_sub_6 = []
 
-        # Sub-Route(일본노선) 2026년 발매량 내림차순 정렬
-        act_sub_c = actual_cols['Sub-Route']
-        if act_sub_c and act_sub_c in df_6.columns:
-            sub_sum = df_6.groupby(act_sub_c, observed=False)['Val_num'].sum().sort_values(ascending=False)
-            all_sub_6 = [str(x) for x in sub_sum.index if pd.notnull(x)]
-        else:
-            all_sub_6 = []
-            
-        sel_6_jp_route = render_slicer_box(c6_d2, "6. 일본노선 (Sub-Route)", all_sub_6, "slicer_sub_6")
-
-        all_od_mkt_6 = sorted([str(x) for x in df_6[od_col_6].dropna().unique()]) if od_col_6 and od_col_6 in df_6.columns else []
-        sel_6_od_mkt = render_slicer_box(c6_d3, "7. Trip O&D Market", all_od_mkt_6, "slicer_od_mkt_6")
-
-        act_ov_c = actual_cols['해외 APO']
-        all_ov_6 = sorted([str(x) for x in df_6[act_ov_c].dropna().unique()]) if act_ov_c and act_ov_c in df_6.columns else []
-        sel_6_ov_apo = render_slicer_box(c6_d4, "8. 해외공항 (해외 APO)", all_ov_6, "slicer_ov_apo_6")
-
-    # 상단 필터 마스크 (1~8번 조건)
-    mask_6_base = pd.Series(True, index=df_6.index)
-    if month_col_6 and month_col_6 in df_6.columns and sel_6_month != ALL_OPTION: mask_6_base &= (df_6[month_col_6].astype(str) == sel_6_month)
-    if actual_cols['DIRECTION'] and actual_cols['DIRECTION'] in df_6.columns and sel_6_dir != ALL_OPTION: mask_6_base &= (df_6[actual_cols['DIRECTION']].astype(str) == sel_6_dir)
-    if actual_cols['STOP OVER'] and actual_cols['STOP OVER'] in df_6.columns and sel_6_stop != ALL_OPTION: mask_6_base &= (df_6[actual_cols['STOP OVER']].astype(str) == sel_6_stop)
-    if actual_cols['ON/OFF 여부'] and actual_cols['ON/OFF 여부'] in df_6.columns and sel_6_onoff != ALL_OPTION: mask_6_base &= (df_6[actual_cols['ON/OFF 여부']].astype(str) == sel_6_onoff)
-    if actual_cols['4.OD RGN'] and actual_cols['4.OD RGN'] in df_6.columns and sel_6_region != ALL_OPTION: mask_6_base &= (df_6[actual_cols['4.OD RGN']].astype(str) == sel_6_region)
-    if actual_cols['Sub-Route'] and actual_cols['Sub-Route'] in df_6.columns and sel_6_jp_route != ALL_OPTION: mask_6_base &= (df_6[actual_cols['Sub-Route']].astype(str) == sel_6_jp_route)
-    if od_col_6 and od_col_6 in df_6.columns and sel_6_od_mkt != ALL_OPTION: mask_6_base &= (df_6[od_col_6].astype(str) == sel_6_od_mkt)
-    if actual_cols['해외 APO'] and actual_cols['해외 APO'] in df_6.columns and sel_6_ov_apo != ALL_OPTION: mask_6_base &= (df_6[actual_cols['해외 APO']].astype(str) == sel_6_ov_apo)
-
-    filtered_6 = df_6[mask_6_base].copy()
-
-    csv_6th = filtered_6.to_csv(index=False).encode('utf-8-sig')
-    st.download_button(
-        label="📥 필터링된 6수송 Raw Data (CSV) 전체 다운로드",
-        data=csv_6th,
-        file_name=f"6th_Freedom_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
-        mime="text/csv"
-    )
-
-    st.markdown("<br>", unsafe_allow_html=True)
+    act_ov_c = actual_cols['해외 APO']
+    all_ov_6 = sorted([str(x) for x in df_6[act_ov_c].dropna().unique()]) if act_ov_c and act_ov_c in df_6.columns else []
 
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        st.subheader("■ O&D별 항공사 발매량 및 M/S (상위 10개 항공사)")
-        
-        if not filtered_6.empty and al_col_6 in filtered_6.columns:
-            al_agg = filtered_6.groupby(al_col_6, observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
-            al_agg = al_agg.sort_values(by='Val_num', ascending=False)
+        # 📌 [요청 반영] 첫 번째 그래프 전용 독립 필터 및 제목 개편
+        st.subheader("1. 항공사/O&D별 발매 M/S")
+        with st.expander("🔍 **[1. 항공사/O&D별 발매 M/S] 전용 필터 설정**", expanded=True):
+            f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
+            sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer1_m")
+            sel_1_dir = render_slicer_box(f1_col2, "2. 일본발/일본행 (Direction)", all_dir_6, "slicer1_dir")
+            sel_1_stop = render_slicer_box(f1_col3, "3. 경유/직항 (Stop Over)", all_stop_6, "slicer1_stop")
+            sel_1_onoff = render_slicer_box(f1_col4, "4. Online/Offline", all_onoff_6, "slicer1_onoff")
+
+            f1_col5, f1_col6, f1_col7 = st.columns(3)
+            sel_1_region = render_slicer_box(f1_col5, "5. OD Region", all_reg_6, "slicer1_reg")
+            sel_1_jp_route = render_slicer_box(f1_col6, "6. 일본공항 (Sub-Route)", all_sub_6, "slicer1_sub")
+            sel_1_ov_apo = render_slicer_box(f1_col7, "7. 해외공항 (해외 APO)", all_ov_6, "slicer1_ov")
+
+        # 1번 테이블 전용 필터 마스크
+        mask_tab1 = pd.Series(True, index=df_6.index)
+        if month_col_6 and month_col_6 in df_6.columns and sel_1_month != ALL_OPTION: mask_tab1 &= (df_6[month_col_6].astype(str) == sel_1_month)
+        if act_dir_c and act_dir_c in df_6.columns and sel_1_dir != ALL_OPTION: mask_tab1 &= (df_6[act_dir_c].astype(str) == sel_1_dir)
+        if act_stop_c and act_stop_c in df_6.columns and sel_1_stop != ALL_OPTION: mask_tab1 &= (df_6[act_stop_c].astype(str) == sel_1_stop)
+        if act_onoff_c and act_onoff_c in df_6.columns and sel_1_onoff != ALL_OPTION: mask_tab1 &= (df_6[act_onoff_c].astype(str) == sel_1_onoff)
+        if act_reg_c and act_reg_c in df_6.columns and sel_1_region != ALL_OPTION: mask_tab1 &= (df_6[act_reg_c].astype(str) == sel_1_region)
+        if act_sub_c and act_sub_c in df_6.columns and sel_1_jp_route != ALL_OPTION: mask_tab1 &= (df_6[act_sub_c].astype(str) == sel_1_jp_route)
+        if act_ov_c and act_ov_c in df_6.columns and sel_1_ov_apo != ALL_OPTION: mask_tab1 &= (df_6[act_ov_c].astype(str) == sel_1_ov_apo)
+
+        filtered_tab1 = df_6[mask_tab1].copy()
+
+        if not filtered_tab1.empty and al_col_6 in filtered_tab1.columns:
+            al_agg = filtered_tab1.groupby(al_col_6, observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
+            al_agg = al_agg.sort_values(by='Val_num', ascending=False).reset_index(drop=True)
             
-            top_airlines = [str(x) for x in al_agg[al_col_6].tolist()]
-            if 'KE' in top_airlines:
-                top_airlines.remove('KE')
-                airline_rank_list = ['KE'] + top_airlines
-            else:
-                airline_rank_list = ['KE'] + top_airlines
-                
-            airline_rank_list = airline_rank_list[:10]
+            # 전체 순위 구하기 (KE 순위 파악용)
+            full_al_ranking = [str(x) for x in al_agg[al_col_6].tolist()]
+            ke_rank = (full_al_ranking.index('KE') + 1) if 'KE' in full_al_ranking else "-"
+
+            # 상위 10개 항공사 (KE 제외) + KE 포함하여 총 11개 구성
+            top_10_no_ke = [x for x in full_al_ranking if x != 'KE'][:10]
+            airline_rank_list = ['KE'] + top_10_no_ke
 
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
             html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             
-            for idx, al_code in enumerate(airline_rank_list):
+            # 📌 [요청 반영] KE 순위 포함 11개 항공사 표시
+            for al_code in airline_rank_list:
                 if al_code == 'KE':
-                    html_table += f'<th class="ke-header" style="width:110px;">KE (대한항공)</th>'
+                    html_table += f'<th class="ke-header" style="width:130px;">★ KE (대한항공 - {ke_rank}위)</th>'
                 else:
-                    rank_num = idx if 'KE' in airline_rank_list and airline_rank_list.index('KE') < idx else idx + 1
+                    rank_num = full_al_ranking.index(al_code) + 1 if al_code in full_al_ranking else "-"
                     html_table += f'<th class="carrier-header" style="width:110px;"><div style="font-size:10px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
             html_table += '</tr></thead><tbody>'
 
@@ -1390,31 +1368,44 @@ else:
 
         st.markdown("---")
         
-        # 📌 Carrier별 M/S 섹션
-        st.markdown("##### ■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
-        
-        c_filter_col, _ = st.columns([2, 2])
-        selected_carrier = render_slicer_box(c_filter_col, "✈️ 항공사 (Carrier) 선택", sorted_6th_airlines, "carrier_table_al_filter")
+        # 📌 [요청 반영] 두 번째 그래프 전용 독립 필터 및 제목 개편
+        st.subheader("2. 항공사별 상위 O&D")
+        with st.expander("🔍 **[2. 항공사별 상위 O&D] 전용 필터 설정**", expanded=True):
+            f2_col1, f2_col2, f2_col3 = st.columns(3)
+            sel_2_month = render_slicer_box(f2_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer2_m")
+            sel_2_dir = render_slicer_box(f2_col2, "2. 일본발/일본행 (Direction)", all_dir_6, "slicer2_dir")
+            sel_2_stop = render_slicer_box(f2_col3, "3. 경유/직항 (Stop Over)", all_stop_6, "slicer2_stop")
+
+            f2_col4, f2_col5 = st.columns(2)
+            sel_2_region = render_slicer_box(f2_col4, "5. OD Region", all_reg_6, "slicer2_reg")
+            selected_carrier = render_slicer_box(f2_col5, "✈️ 항공사 (Carrier) 선택", sorted_6th_airlines, "slicer2_carrier")
+
         display_carrier_label = selected_carrier if selected_carrier != ALL_OPTION else "전체 시장"
 
-        df_mkt_full = filtered_6.copy()
+        # 2번 테이블 전용 필터 마스크
+        mask_tab2 = pd.Series(True, index=df_6.index)
+        if month_col_6 and month_col_6 in df_6.columns and sel_2_month != ALL_OPTION: mask_tab2 &= (df_6[month_col_6].astype(str) == sel_2_month)
+        if act_dir_c and act_dir_c in df_6.columns and sel_2_dir != ALL_OPTION: mask_tab2 &= (df_6[act_dir_c].astype(str) == sel_2_dir)
+        if act_stop_c and act_stop_c in df_6.columns and sel_2_stop != ALL_OPTION: mask_tab2 &= (df_6[act_stop_c].astype(str) == sel_2_stop)
+        if act_reg_c and act_reg_c in df_6.columns and sel_2_region != ALL_OPTION: mask_tab2 &= (df_6[act_reg_c].astype(str) == sel_2_region)
 
-        if not df_mkt_full.empty and od_col_6 and od_col_6 in df_mkt_full.columns and al_col_6 and al_col_6 in df_mkt_full.columns:
+        df_mkt_full_2 = df_6[mask_tab2].copy()
 
-            # 선택한 항공사의 실적 기준 TOP 30 O&D Market 노선 선출
+        if not df_mkt_full_2.empty and od_col_6 and od_col_6 in df_mkt_full_2.columns and al_col_6 and al_col_6 in df_mkt_full_2.columns:
+
             if selected_carrier != ALL_OPTION:
-                carrier_df_for_top = df_mkt_full[df_mkt_full[al_col_6].astype(str) == selected_carrier]
+                carrier_df_for_top = df_mkt_full_2[df_mkt_full_2[al_col_6].astype(str) == selected_carrier]
                 if not carrier_df_for_top.empty:
                     od_totals = carrier_df_for_top.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
                 else:
-                    od_totals = df_mkt_full.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
+                    od_totals = df_mkt_full_2.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
             else:
-                od_totals = df_mkt_full.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
+                od_totals = df_mkt_full_2.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
 
             od_totals = od_totals.sort_values(by='Val_num', ascending=False).head(30)
             top_od_list = [str(x) for x in od_totals[od_col_6].tolist() if pd.notnull(x)]
 
-            df_top = df_mkt_full[df_mkt_full[od_col_6].astype(str).isin(top_od_list)].copy()
+            df_top = df_mkt_full_2[df_mkt_full_2[od_col_6].astype(str).isin(top_od_list)].copy()
 
             if not df_top.empty and top_od_list:
                 carrier_html = '<div class="yoy-table-container"><table class="yoy-table">'
@@ -1519,14 +1510,14 @@ else:
                 carrier_html += '</tr>'
 
                 # 전체 시장 총합 (Market Total) 요약행 (#cccccc)
-                mkt_all_cy = filtered_6['Val_num'].sum()
-                mkt_all_py = filtered_6['Val_PY_num'].sum()
+                mkt_all_cy = df_mkt_full_2['Val_num'].sum()
+                mkt_all_py = df_mkt_full_2['Val_PY_num'].sum()
                 mkt_all_yoy = ((mkt_all_cy - mkt_all_py) / mkt_all_py * 100) if mkt_all_py > 0 else 0
 
                 if selected_carrier == ALL_OPTION:
-                    mkt_c_sub = filtered_6
+                    mkt_c_sub = df_mkt_full_2
                 else:
-                    mkt_c_sub = filtered_6[filtered_6[al_col_6].astype(str) == selected_carrier]
+                    mkt_c_sub = df_mkt_full_2[df_mkt_full_2[al_col_6].astype(str) == selected_carrier]
 
                 mkt_c_cy = mkt_c_sub['Val_num'].sum()
                 mkt_c_py = mkt_c_sub['Val_PY_num'].sum()
@@ -1535,7 +1526,7 @@ else:
                 mkt_c_ms_py = (mkt_c_py / mkt_all_py * 100) if mkt_all_py > 0 else 0
                 mkt_c_ms_diff = mkt_c_ms_cy - mkt_c_ms_py
 
-                mkt_k_sub = filtered_6[filtered_6[al_col_6].astype(str) == 'KE']
+                mkt_k_sub = df_mkt_full_2[df_mkt_full_2[al_col_6].astype(str) == 'KE']
                 mkt_k_cy = mkt_k_sub['Val_num'].sum()
                 mkt_k_py = mkt_k_sub['Val_PY_num'].sum()
                 mkt_k_yoy = ((mkt_k_cy - mkt_k_py) / mkt_k_py * 100) if mkt_k_py > 0 else 0
@@ -1561,4 +1552,4 @@ else:
 
     with tab6_2:
         st.markdown("*(속도 최적화를 위해 상위 100건만 표출합니다)*")
-        st.dataframe(filtered_6.head(100), width="stretch")
+        st.dataframe(df_6.head(100), width="stretch")
