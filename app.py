@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -14,6 +15,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# 외부 구글 앱스 스크립트 웹앱 URL
+EXT_WEB_APP_URL = "https://script.google.com/a/macros/koreanair.com/s/AKfycbxt3IfN0gB4n344U4gL1kt5i4RVjn7_uuG5PtKY-pPgNejpDCsjp2PEbopEexw5NLUjDQ/exec"
 
 # Dynamic Date Logic (2026년 기준)
 today = datetime.date.today()
@@ -208,7 +212,7 @@ st.markdown("""
         display: none;
     }
     
-    /* 📌 [요청 반영] 총계 배경색 #cccccc 적용 */
+    /* 📌 총계 배경색 #cccccc 적용 */
     .row-summary-top-dark {
         background-color: #cccccc !important;
         color: #0f172a !important;
@@ -232,7 +236,7 @@ st.markdown("""
         color: #0f172a;
     }
 
-    /* 📌 [요청 반영] 단체실적 총계 행 배경색 #cccccc */
+    /* 📌 단체실적 총계 행 배경색 #cccccc */
     .row-group-header-custom, .row-group-header-custom td {
         background-color: #cccccc !important;
         color: #0f172a !important;
@@ -503,11 +507,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     st.markdown("---")
     
-    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs([
+    # 📌 [방법 1 적용] 외부 연동 웹 앱 탭 추가
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4, tab_34_ext = st.tabs([
         "🎟️ 발매 M/S", 
         "✈️ 공급 M/S", 
         "🏷️ 대리점,RBD별 발매현황", 
-        "👥 단체실적"
+        "👥 단체실적",
+        "🔗 연동 시스템"
     ])
 
     # -------------------------------------------------------------
@@ -782,6 +788,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # -------------------------------------------------------------
+    # 📌 [신규 추가] 3/4수송 외부 시스템 연동 탭
+    # -------------------------------------------------------------
+    with tab_34_ext:
+        st.markdown('<div class="unified-sub-header">🔗 대한항공 외부 시스템 연동 화면 (3/4수송)</div>', unsafe_allow_html=True)
+        components.iframe(EXT_WEB_APP_URL, height=800, scrolling=True)
+
+    # -------------------------------------------------------------
     # 2. ✈️ 공급 M/S 탭
     # -------------------------------------------------------------
     with tab_34_2:
@@ -991,7 +1004,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             mime="text/csv"
         )
 
-        # 📌 [요청 반영] 전체 열기 / 전체 닫기 스위치 토글 추가
         expand_toggle_all = st.toggle("📂 전체 항목 펼쳐보기 (열기/닫기)", value=True, key="expand_toggle_all_key")
         open_attr = "open" if expand_toggle_all else ""
 
@@ -1194,7 +1206,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         g_html += '<th class="header-main" style="width:200px; text-align:center;">단체 예약 실적 (석)</th>'
                         g_html += '</tr></thead><tbody>'
 
-                        # 📌 [요청 반영] 단체 실적 총계 행 배경색 #cccccc 적용
+                        # 📌 단체 실적 총계 행 배경색 #cccccc 적용
                         g_html += '<tr class="row-group-header-custom">'
                         g_html += f'<td style="text-align:center;">-</td>'
                         g_html += f'<td style="text-align:center; font-weight:800;">★ {al_code} 전체 총합계</td>'
@@ -1286,7 +1298,6 @@ else:
         month_col_6 = actual_cols['TRIP MONTH']
         year_type_col = actual_cols['금전구분']
 
-        # '금/전' 필드 및 'Travel Month' 연도(2026/2025) 통합 판단
         is_cy_mask = pd.Series(False, index=df_6_raw.index)
         is_py_mask = pd.Series(False, index=df_6_raw.index)
 
@@ -1341,7 +1352,6 @@ else:
 
     all_raw_m = sorted([str(x) for x in df_6[df_6['Val_num'] > 0][month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
 
-    # 공통 추출 옵션 리스트
     act_dir_c = actual_cols['DIRECTION']
     all_dir_6 = sorted([str(x) for x in df_6[act_dir_c].dropna().unique()]) if act_dir_c and act_dir_c in df_6.columns else []
 
@@ -1373,10 +1383,14 @@ else:
             return df_target[month_col_6].astype(str).str.endswith(sub_m) | (df_target[month_col_6].astype(str) == selected_m_val)
         return df_target[month_col_6].astype(str) == selected_m_val
 
-    tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
+    # 📌 6수송 대시보드 탭 구상 (방법 1 연동 탭 포함)
+    tab6_1, tab6_2, tab6_ext = st.tabs([
+        "📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", 
+        "📋 6수송 Raw Data View",
+        "🔗 연동 시스템"
+    ])
 
     with tab6_1:
-        # 📌 1. 항공사/O&D별 발매 M/S
         st.markdown('<div class="unified-sub-header">1. 항공사/O&D별 발매 M/S</div>', unsafe_allow_html=True)
         f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
         sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer1_m")
@@ -1665,3 +1679,10 @@ else:
     with tab6_2:
         st.markdown("*(속도 최적화를 위해 상위 100건만 표출합니다)*")
         st.dataframe(df_6.head(100), width="stretch")
+
+    # -------------------------------------------------------------
+    # 📌 [신규 추가] 6수송 외부 시스템 연동 탭 (방법 1 적용)
+    # -------------------------------------------------------------
+    with tab6_ext:
+        st.markdown('<div class="unified-sub-header">🔗 대한항공 외부 시스템 연동 화면 (6수송)</div>', unsafe_allow_html=True)
+        components.iframe(EXT_WEB_APP_URL, height=800, scrolling=True)
