@@ -617,7 +617,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
 
-   # 📌 3. 출발기간별 항공사 M/S 점유비 (KE 강조 + 타 항공사 점선 표출)
+                # 📌 3. 출발기간별 주요 항공사 M/S 점유비 추이 (KE 강조 + 타사 점선)
                 if month_col and month_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">3. 출발기간별 주요 항공사 M/S 점유비 추이</div>', unsafe_allow_html=True)
                     
@@ -629,18 +629,16 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     df_dep_al = merged_df[mask_dep_al]
 
                     if not df_dep_al.empty:
-                        # 출발월 x 항공사별 합계 집계
                         dep_al_grp = df_dep_al.groupby([month_col, 'Dominant Marketing Airline'], observed=False)[val_col].sum().reset_index()
                         dep_mkt_tot = df_dep_al.groupby(month_col, observed=False)[val_col].sum().reset_index()
                         
-                        # Categorical 병합 에러 방지
                         dep_al_grp[month_col] = dep_al_grp[month_col].astype(str)
                         dep_mkt_tot[month_col] = dep_mkt_tot[month_col].astype(str)
 
                         dep_merged = pd.merge(dep_al_grp, dep_mkt_tot, on=month_col, suffixes=('', '_Mkt'))
+                        dep_merged[val_col] = dep_merged[val_col].fillna(0)
                         dep_merged['MS_Percent'] = np.where(dep_merged[f'{val_col}_Mkt'] > 0, (dep_merged[val_col] / dep_merged[f'{val_col}_Mkt']) * 100, 0)
 
-                        # 실적 상위 항공사 추출 (KE 포함 상위 6개사)
                         top_al_in_dep = df_dep_al.groupby('Dominant Marketing Airline', observed=False)[val_col].sum().sort_values(ascending=False).index.tolist()
                         top_al_display = ['KE'] + [al for al in top_al_in_dep if al != 'KE'][:5]
 
@@ -648,7 +646,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                         fig_ke_dep = go.Figure()
 
-                        # 항공사별 선 표현 (KE: 두꺼운 실선, 타사: 얇은 점선)
                         for al_code in top_al_display:
                             al_data = dep_merged_top[dep_merged_top['Dominant Marketing Airline'] == al_code]
                             if al_data.empty:
@@ -675,11 +672,17 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig_ke_dep.update_layout(
                             yaxis_title="Market Share (%)",
                             xaxis=dict(categoryorder='array', categoryarray=all_dep_months),
-                            yaxis=dict(range=[0, max(dep_merged_top['MS_Percent'].max() * 1.2, 15)]),
+                            yaxis=dict(range=[0, max(dep_merged_top['MS_Percent'].max() * 1.25, 15)]),
                             height=420
                         )
                         apply_bottom_legend(fig_ke_dep)
                         st.plotly_chart(fig_ke_dep, width="stretch")
+
+                st.markdown("---")
+                
+                # 📌 4 및 5번 차트 컬럼 레이아웃 선언
+                c3, c4 = st.columns(2)
+                ke_only_df = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']
                 
                 with c3:
                     if bound_col:
@@ -1335,26 +1338,41 @@ else:
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        # 📌 1. 항공사/O&D별 발매 M/S (접이식 상자 제거, 직접 표출)
+        # 📌 1. 항공사/O&D별 발매 M/S (요청 반영 필터 위치 재배치)
         st.markdown('<div class="unified-sub-header">1. 항공사/O&D별 발매 M/S</div>', unsafe_allow_html=True)
+        
         f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
         sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer1_m")
-        sel_1_dir = render_slicer_box(f1_col2, "2. 일본발/일본행 (Direction)", all_dir_6, "slicer1_dir")
-        sel_1_stop = render_slicer_box(f1_col3, "3. 경유/직항 (Stop Over)", all_stop_6, "slicer1_stop")
-        sel_1_onoff = render_slicer_box(f1_col4, "4. Online/Offline", all_onoff_6, "slicer1_onoff")
+        sel_1_region = render_slicer_box(f1_col2, "2. OD Region", all_reg_6, "slicer1_reg")
+        sel_1_dir = render_slicer_box(f1_col3, "3. 일본발/일본행 (Direction)", all_dir_6, "slicer1_dir")
+        sel_1_stop = render_slicer_box(f1_col4, "4. 경유/직항 (Stopover)", all_stop_6, "slicer1_stop")
 
-        f1_col5, f1_col6, f1_col7 = st.columns(3)
-        sel_1_region = render_slicer_box(f1_col5, "5. OD Region", all_reg_6, "slicer1_reg")
+        f1_col5, f1_col6, f1_col7, f1_col8 = st.columns(4)
+        sel_1_onoff = render_slicer_box(f1_col5, "5. Online/Offline", all_onoff_6, "slicer1_onoff")
         sel_1_jp_route = render_slicer_box(f1_col6, "6. 일본공항 (Sub-Route)", all_sub_6, "slicer1_sub")
         sel_1_ov_apo = render_slicer_box(f1_col7, "7. 해외공항 (해외 APO)", all_ov_6, "slicer1_ov")
 
-        mask_tab1 = filter_month_yoy(df_6, sel_1_month)
-        if act_dir_c and act_dir_c in df_6.columns and sel_1_dir != ALL_OPTION: mask_tab1 &= (df_6[act_dir_c].astype(str) == sel_1_dir)
-        if act_stop_c and act_stop_c in df_6.columns and sel_1_stop != ALL_OPTION: mask_tab1 &= (df_6[act_stop_c].astype(str) == sel_1_stop)
-        if act_onoff_c and act_onoff_c in df_6.columns and sel_1_onoff != ALL_OPTION: mask_tab1 &= (df_6[act_onoff_c].astype(str) == sel_1_onoff)
-        if act_reg_c and act_reg_c in df_6.columns and sel_1_region != ALL_OPTION: mask_tab1 &= (df_6[act_reg_c].astype(str) == sel_1_region)
-        if act_sub_c and act_sub_c in df_6.columns and sel_1_jp_route != ALL_OPTION: mask_tab1 &= (df_6[act_sub_c].astype(str) == sel_1_jp_route)
-        if act_ov_c and act_ov_c in df_6.columns and sel_1_ov_apo != ALL_OPTION: mask_tab1 &= (df_6[act_ov_c].astype(str) == sel_1_ov_apo)
+        # 📌 [1~7번 필터 적용 후 종속적으로 연동되는 8. Trip O&D Market 필터 옵션 산출]
+        mask_base_1_to_7 = filter_month_yoy(df_6, sel_1_month)
+        if act_reg_c and act_reg_c in df_6.columns and sel_1_region != ALL_OPTION: mask_base_1_to_7 &= (df_6[act_reg_c].astype(str) == sel_1_region)
+        if act_dir_c and act_dir_c in df_6.columns and sel_1_dir != ALL_OPTION: mask_base_1_to_7 &= (df_6[act_dir_c].astype(str) == sel_1_dir)
+        if act_stop_c and act_stop_c in df_6.columns and sel_1_stop != ALL_OPTION: mask_base_1_to_7 &= (df_6[act_stop_c].astype(str) == sel_1_stop)
+        if act_onoff_c and act_onoff_c in df_6.columns and sel_1_onoff != ALL_OPTION: mask_base_1_to_7 &= (df_6[act_onoff_c].astype(str) == sel_1_onoff)
+        if act_sub_c and act_sub_c in df_6.columns and sel_1_jp_route != ALL_OPTION: mask_base_1_to_7 &= (df_6[act_sub_c].astype(str) == sel_1_jp_route)
+        if act_ov_c and act_ov_c in df_6.columns and sel_1_ov_apo != ALL_OPTION: mask_base_1_to_7 &= (df_6[act_ov_c].astype(str) == sel_1_ov_apo)
+
+        df_dep_for_od = df_6[mask_base_1_to_7]
+        if od_col_6 and od_col_6 in df_dep_for_od.columns and not df_dep_for_od.empty:
+            od_sum_dep = df_dep_for_od.groupby(od_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False)
+            dependent_od_list = [str(x) for x in od_sum_dep.index if pd.notnull(x)]
+        else:
+            dependent_od_list = sorted([str(x) for x in df_6[od_col_6].dropna().unique()]) if od_col_6 and od_col_6 in df_6.columns else []
+
+        sel_1_od_mkt = render_slicer_box(f1_col8, "8. Trip O&D Market", dependent_od_list, "slicer1_od_mkt")
+
+        # 1번 테이블 최종 마스크 (1~8번 조건)
+        mask_tab1 = mask_base_1_to_7.copy()
+        if od_col_6 and od_col_6 in df_6.columns and sel_1_od_mkt != ALL_OPTION: mask_tab1 &= (df_6[od_col_6].astype(str) == sel_1_od_mkt)
 
         filtered_tab1 = df_6[mask_tab1].copy()
 
@@ -1430,23 +1448,23 @@ else:
 
         st.markdown("---")
         
-        # 📌 2. 항공사별 상위 O&D (접이식 상자 제거, 직접 표출)
+        # 📌 2. 항공사별 상위 O&D
         st.markdown('<div class="unified-sub-header">2. 항공사별 상위 O&D</div>', unsafe_allow_html=True)
         f2_col1, f2_col2, f2_col3 = st.columns(3)
         sel_2_month = render_slicer_box(f2_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer2_m")
-        sel_2_dir = render_slicer_box(f2_col2, "2. 일본발/일본행 (Direction)", all_dir_6, "slicer2_dir")
-        sel_2_stop = render_slicer_box(f2_col3, "3. 경유/직항 (Stop Over)", all_stop_6, "slicer2_stop")
+        sel_2_region = render_slicer_box(f2_col2, "2. OD Region", all_reg_6, "slicer2_reg")
+        sel_2_dir = render_slicer_box(f2_col3, "3. 일본발/일본행 (Direction)", all_dir_6, "slicer2_dir")
 
         f2_col4, f2_col5 = st.columns(2)
-        sel_2_region = render_slicer_box(f2_col4, "5. OD Region", all_reg_6, "slicer2_reg")
-        selected_carrier = render_slicer_box(f2_col5, "✈️ 항공사 (Carrier) 선택", sorted_6th_airlines, "slicer2_carrier")
+        sel_2_stop = render_slicer_box(f2_col4, "4. 경유/직항 (Stopover)", all_stop_6, "slicer2_stop")
+        selected_carrier = render_slicer_box(f2_col5, "5. 항공사 (Carrier) 선택", sorted_6th_airlines, "slicer2_carrier")
 
         display_carrier_label = selected_carrier if selected_carrier != ALL_OPTION else "전체 시장"
 
         mask_tab2 = filter_month_yoy(df_6, sel_2_month)
+        if act_reg_c and act_reg_c in df_6.columns and sel_2_region != ALL_OPTION: mask_tab2 &= (df_6[act_reg_c].astype(str) == sel_2_region)
         if act_dir_c and act_dir_c in df_6.columns and sel_2_dir != ALL_OPTION: mask_tab2 &= (df_6[act_dir_c].astype(str) == sel_2_dir)
         if act_stop_c and act_stop_c in df_6.columns and sel_2_stop != ALL_OPTION: mask_tab2 &= (df_6[act_stop_c].astype(str) == sel_2_stop)
-        if act_reg_c and act_reg_c in df_6.columns and sel_2_region != ALL_OPTION: mask_tab2 &= (df_6[act_reg_c].astype(str) == sel_2_region)
 
         df_mkt_full_2 = df_6[mask_tab2].copy()
 
