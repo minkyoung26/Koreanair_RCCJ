@@ -116,7 +116,6 @@ def clean_transport_column(df):
         df['수송'] = df['수송'].replace({'nan': 'OTHERS', '': 'OTHERS', 'None': 'OTHERS', 'NaN': 'OTHERS'})
     return df
 
-# 📌 캐시 메모리 락(Lock)을 걸어 끊김 현상 완전 제거
 @st.cache_data(max_entries=5, show_spinner=False)
 def load_fast_parquet_data_file():
     if os.path.exists('cache_34_data.parquet'):
@@ -125,6 +124,7 @@ def load_fast_parquet_data_file():
 
 @st.cache_data(max_entries=5, show_spinner=False)
 def load_uploaded_parquet(file_obj):
+    file_obj.seek(0)
     if file_obj.name.endswith('.parquet'):
         return optimize_df(clean_transport_column(pd.read_parquet(file_obj)))
     else:
@@ -143,14 +143,35 @@ def load_aux_files():
 
 disk_sup, disk_6th = load_aux_files()
 
-# 📌 로드된 메인 데이터 세션
+# 📌 1. 3/4수송 데이터 업로드/폴더 로드
 if uploaded_iss is not None:
     df_iss_merged = load_uploaded_parquet(uploaded_iss)
 else:
     df_iss_merged = load_fast_parquet_data_file()
 
-df_sup_raw = disk_sup
-df_6th_raw = disk_6th
+# 📌 2. 공급 데이터 업로드/폴더 로드
+df_sup_raw = None
+if uploaded_sup is not None:
+    try:
+        uploaded_sup.seek(0)
+        if uploaded_sup.name.endswith('.parquet'):
+            df_sup_raw = optimize_df(pd.read_parquet(uploaded_sup))
+        else:
+            df_sup_raw = optimize_df(pd.read_csv(uploaded_sup, low_memory=False))
+    except: pass
+if df_sup_raw is None: df_sup_raw = disk_sup
+
+# 📌 3. 6수송 데이터 업로드/폴더 로드 (seek(0) 추가)
+df_6th_raw = None
+if uploaded_6th is not None:
+    try:
+        uploaded_6th.seek(0)
+        if uploaded_6th.name.endswith('.parquet'):
+            df_6th_raw = optimize_df(pd.read_parquet(uploaded_6th))
+        else:
+            df_6th_raw = optimize_df(pd.read_csv(uploaded_6th, low_memory=False))
+    except: pass
+if df_6th_raw is None: df_6th_raw = disk_6th
 
 # 메인 타이틀
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
@@ -265,7 +286,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_iss")
             sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_iss")
 
-        # 📌 빠른 인덱스 필터링으로 딜레이 완전히 제거
         filter_conditions = []
         if sel_route_str != ALL_OPTION: filter_conditions.append(merged_df['노선'].astype(str) == sel_route_str)
         if sel_al_str != ALL_OPTION: filter_conditions.append(merged_df['Dominant Marketing Airline'].astype(str) == sel_al_str)
