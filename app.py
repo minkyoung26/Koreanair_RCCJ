@@ -126,13 +126,17 @@ def load_fast_parquet_data():
 @st.cache_data(ttl=3600)
 def load_aux_files():
     df_sup, df_6th = None, None
-    if os.path.exists('공급_9월1주차_CSV.csv'): df_sup = pd.read_csv('공급_9월1주차_CSV.csv', low_memory=False)
-    if os.path.exists('6TRF TEST.csv'): df_6th = pd.read_csv('6TRF TEST.csv', low_memory=False)
+    if os.path.exists('공급_9월2주차.csv'): df_sup = pd.read_csv('공급_9월2주차.csv', low_memory=False)
+    elif os.path.exists('공급_9월1주차_CSV.csv'): df_sup = pd.read_csv('공급_9월1주차_CSV.csv', low_memory=False)
+
+    if os.path.exists('6수송_9월2주차.csv'): df_6th = pd.read_csv('6수송_9월2주차.csv', low_memory=False)
+    elif os.path.exists('6TRF TEST.csv'): df_6th = pd.read_csv('6TRF TEST.csv', low_memory=False)
+
     return optimize_df(df_sup), optimize_df(df_6th)
 
 disk_sup, disk_6th = load_aux_files()
 
-# 📌 사이드바 파일 수동 업로드 우선 처리 + 수송(3TF/4TF/OTHERS) 자동 정제
+# 📌 1. 3/4수송 데이터 업로드/폴더 로드 및 정제
 if uploaded_iss is not None:
     if uploaded_iss.name.endswith('.parquet'):
         df_iss_merged = optimize_df(pd.read_parquet(uploaded_iss))
@@ -142,8 +146,23 @@ if uploaded_iss is not None:
 else:
     df_iss_merged = clean_transport_column(load_fast_parquet_data())
 
-df_sup_raw = disk_sup
-df_6th_raw = disk_6th
+# 📌 2. 공급 데이터 업로드/폴더 로드
+if uploaded_sup is not None:
+    if uploaded_sup.name.endswith('.parquet'):
+        df_sup_raw = optimize_df(pd.read_parquet(uploaded_sup))
+    else:
+        df_sup_raw = optimize_df(pd.read_csv(uploaded_sup, low_memory=False))
+else:
+    df_sup_raw = disk_sup
+
+# 📌 3. 6수송 데이터 업로드/폴더 로드
+if uploaded_6th is not None:
+    if uploaded_6th.name.endswith('.parquet'):
+        df_6th_raw = optimize_df(pd.read_parquet(uploaded_6th))
+    else:
+        df_6th_raw = optimize_df(pd.read_csv(uploaded_6th, low_memory=False))
+else:
+    df_6th_raw = disk_6th
 
 # 메인 타이틀
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
@@ -476,7 +495,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
     # 2. ✈️ 공급 M/S 탭
     with tab_34_2:
         if df_sup_raw is None:
-            st.info("👈 좌측 사이드바에서 [공급_9월1주차_CSV.csv] 파일을 업로드해주세요.")
+            st.info("👈 좌측 사이드바 2번 위치에서 [공급_9월2주차.csv] 파일을 업로드해 주세요.")
             st.stop()
 
         df_sup = df_sup_raw.copy()
@@ -754,9 +773,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
 # GROUP 2: 🌐 6수송 대시보드
 # ==========================================
 elif selected_group == "🌐 6수송 대시보드":
-    st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
-    if df_6th_raw is not None:
+    st.markdown('<div class="unified-sub-header">🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드</div>', unsafe_allow_html=True)
+    
+    if df_6th_raw is not None and not df_6th_raw.empty:
+        st.success(f"✅ 6수송 데이터 로드 완료 (총 {len(df_6th_raw):,}행)")
         st.dataframe(df_6th_raw.head(100), use_container_width=True)
+    else:
+        st.warning("⚠️ 6수송 데이터가 로드되지 않았습니다. 좌측 사이드바 3번 위치에 '6수송_9월2주차.csv' 파일이 잘 올려져 있는지 확인해 주세요.")
 
 # ==========================================
 # GROUP 3: 🔗 W26 연결 네트워크 (외부 연동)
