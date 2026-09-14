@@ -109,7 +109,14 @@ def optimize_df(df_in):
         elif df_in[col].dtype == 'float64': df_in[col] = df_in[col].astype('float32')
     return df_in
 
-# pre-computed parquet 초고속 로딩
+def clean_transport_column(df):
+    if df is None: return df
+    b_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
+    if b_col:
+        df['수송'] = df[b_col].astype(str).str.strip()
+        df['수송'] = df['수송'].replace({'nan': 'OTHERS', '': 'OTHERS', 'None': 'OTHERS', 'NaN': 'OTHERS'})
+    return df
+
 @st.cache_data(ttl=3600)
 def load_fast_parquet_data():
     if os.path.exists('cache_34_data.parquet'):
@@ -124,7 +131,17 @@ def load_aux_files():
     return optimize_df(df_sup), optimize_df(df_6th)
 
 disk_sup, disk_6th = load_aux_files()
-df_iss_merged = load_fast_parquet_data()
+
+# 📌 사이드바 파일 수동 업로드 우선 처리 + 수송(3TF/4TF/OTHERS) 자동 정제
+if uploaded_iss is not None:
+    if uploaded_iss.name.endswith('.parquet'):
+        df_iss_merged = optimize_df(pd.read_parquet(uploaded_iss))
+    else:
+        df_iss_merged = optimize_df(pd.read_csv(uploaded_iss, low_memory=False))
+    df_iss_merged = clean_transport_column(df_iss_merged)
+else:
+    df_iss_merged = clean_transport_column(load_fast_parquet_data())
+
 df_sup_raw = disk_sup
 df_6th_raw = disk_6th
 
@@ -216,7 +233,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         month_col = '출발월' if '출발월' in merged_df.columns else ('출발 월' if '출발 월' in merged_df.columns else None)
         all_dep_months = sorted([str(x) for x in merged_df[month_col].dropna().unique()]) if month_col else []
         
-        # 📌 3TF, 4TF, OTHERS 인식하도록 Bound/수송 컬럼 처리
+        # 📌 3TF, 4TF, OTHERS 인식 수송 컬럼
         bound_col = '수송' if '수송' in merged_df.columns else ('Bound' if 'Bound' in merged_df.columns else None)
         all_bounds = sorted([str(x) for x in merged_df[bound_col].dropna().unique()]) if bound_col else []
 
@@ -230,7 +247,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
-            val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
+            val_col = 'Weighted_Value' if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else 'Value'
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_iss")
@@ -266,7 +283,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             top_ms = (al_sum.max() / total_pax) * 100
 
         top_route = str(filtered_df.groupby('노선', observed=False)[val_col].sum().idxmax()) if not filtered_df.empty and total_pax > 0 else "-"
-        status_wt_label = " (가중치)" if apply_weight_toggle else " (Raw)"
+        status_wt_label = " (가중치)" if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else " (Raw)"
 
         tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "🔒 Raw Data View (관리자 전용)"])
         with tab1:
@@ -328,7 +345,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         top_bar_labels = [f"<b>{week_totals_dict.get(w, 0):,.0f}</b><br><span style='color:#16a34a;'>(★KE {(ke_week_grp.get(w, 0)/week_totals_dict.get(w,0)*100) if week_totals_dict.get(w,0)>0 else 0:.1f}%)</span>" for w in valid_weeks]
 
                         fig_week.add_trace(go.Scatter(x=valid_weeks, y=[week_totals_dict[w] for w in valid_weeks], mode='text', text=top_bar_labels, textposition='top center', showlegend=False, hoverinfo='skip'))
-                        fig_week.update_layout(yaxis_title=f"발매 실적{' (가중치)' if apply_weight_toggle else ''}")
+                        fig_week.update_layout(yaxis_title=f"발매 실적{status_wt_label}")
                         apply_bottom_legend(fig_week)
                         st.plotly_chart(fig_week, use_container_width=True)
 
@@ -606,7 +623,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 ac1, ac2, ac3 = st.columns(3)
                 sel_route_ag_str = render_slicer_box(ac1, "1. 노선", all_routes_a, "slicer_route_ag")
                 sel_month_ag_str = render_slicer_box(ac2, "2. 출발 월", all_months_a, "slicer_month_ag") if month_col_a else ALL_OPTION
-                sel_bound_ag_str = render_slicer_box(ac3, "3. BOUND (수송)", all_bounds_a, "slicer_bound_ag") if bound_col_a else ALL_OPTION
+                sel_bound_ag_str = render_slicer_box(ac3, "3. 수송 구분 (3TF/4TF/OTHERS)", all_bounds_a, "slicer_bound_ag") if bound_col_a else ALL_OPTION
 
                 ac4, ac5, ac6 = st.columns(3)
                 sel_tt_ag_str = render_slicer_box(ac4, "4. TRIP TYPE", all_tt_a, "slicer_tt_ag") if 'Ticket Type' in df_agency.columns else ALL_OPTION
