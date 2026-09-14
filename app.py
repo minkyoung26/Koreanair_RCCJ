@@ -161,7 +161,7 @@ if uploaded_sup is not None:
     except: pass
 if df_sup_raw is None: df_sup_raw = disk_sup
 
-# 📌 3. 6수송 데이터 업로드/폴더 로드 (seek(0) 추가)
+# 📌 3. 6수송 데이터 업로드/폴더 로드
 df_6th_raw = None
 if uploaded_6th is not None:
     try:
@@ -758,14 +758,87 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             st.markdown(g_html, unsafe_allow_html=True)
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드
+# GROUP 2: 🌐 6수송 대시보드 (복원 및 고도화)
 # ==========================================
 elif selected_group == "🌐 6수송 대시보드":
     st.markdown('<div class="unified-sub-header">🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드</div>', unsafe_allow_html=True)
     
     if df_6th_raw is not None and not df_6th_raw.empty:
-        st.success(f"✅ 6수송 데이터 로드 완료 (총 {len(df_6th_raw):,}행)")
-        st.dataframe(df_6th_raw.head(100), width='stretch')
+        df6 = df_6th_raw.copy()
+        df6.columns = [str(c).strip() for c in df6.columns]
+
+        # 필수 수량 컬럼 파싱
+        val_col_6 = 'Pax' if 'Pax' in df6.columns else ('Value' if 'Value' in df6.columns else df6.columns[-1])
+        df6['Pax_num'] = pd.to_numeric(df6[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+
+        # 컬럼 표준화
+        year_col_6 = '금/전' if '금/전' in df6.columns else 'Year'
+        month_col_6 = 'Travel Month' if 'Travel Month' in df6.columns else ('출발월' if '출발월' in df6.columns else None)
+        mkt_col_6 = 'Trip O&D Market' if 'Trip O&D Market' in df6.columns else ('O&D Market' if 'O&D Market' in df6.columns else None)
+        al_col_6 = '항공사' if '항공사' in df6.columns else ('Carrier' if 'Carrier' in df6.columns else 'Dominant Marketing Airline')
+
+        all_mkts = sorted([str(x) for x in df6[mkt_col_6].dropna().unique()]) if mkt_col_6 else []
+        all_months_6 = sorted([str(x) for x in df6[month_col_6].dropna().unique()]) if month_col_6 else []
+        all_als_6 = sorted([str(x) for x in df6[al_col_6].dropna().unique()]) if al_col_6 else []
+
+        with st.expander("🔍 **6수송 OD 분석 피벗 슬라이서 필터 설정**", expanded=True):
+            f6_1, f6_2, f6_3 = st.columns(3)
+            sel_mkt_6 = render_slicer_box(f6_1, "1. Trip O&D Market", all_mkts, "slicer_mkt_6") if mkt_col_6 else ALL_OPTION
+            sel_m_6 = render_slicer_box(f6_2, "2. Travel Month (출발월)", all_months_6, "slicer_m_6") if month_col_6 else ALL_OPTION
+            sel_al_6 = render_slicer_box(f6_3, "3. 항공사", all_als_6, "slicer_al_6") if al_col_6 else ALL_OPTION
+
+        # 필터링
+        mask6 = pd.Series(True, index=df6.index)
+        if mkt_col_6 and sel_mkt_6 != ALL_OPTION: mask6 &= (df6[mkt_col_6].astype(str) == sel_mkt_6)
+        if month_col_6 and sel_m_6 != ALL_OPTION: mask6 &= (df6[month_col_6].astype(str) == sel_m_6)
+        if al_col_6 and sel_al_6 != ALL_OPTION: mask6 &= (df6[al_col_6].astype(str) == sel_al_6)
+
+        df6_filt = df6[mask6]
+
+        if not df6_filt.empty:
+            tab6_1, tab6_2, tab6_3 = st.tabs(["📊 금년 vs 전년(YoY) 비교 피벗", "📈 항공사별 M/S 점유비", "🔒 Raw Data View"])
+
+            with tab6_1:
+                st.markdown("##### 📌 OD Market 및 항공사별 금년 vs 전년(YoY) 실적 집계표")
+                if mkt_col_6 and year_col_6 and al_col_6:
+                    piv_yoy = df6_filt.pivot_table(
+                        index=[mkt_col_6, al_col_6],
+                        columns=year_col_6,
+                        values='Pax_num',
+                        aggfunc='sum',
+                        fill_value=0,
+                        observed=False
+                    ).reset_index()
+
+                    # YoY 증감 및 증감률 계산
+                    cur_col = '금년' if '금년' in piv_yoy.columns else piv_yoy.columns[-1]
+                    prev_col = '전년' if '전년' in piv_yoy.columns else piv_yoy.columns[-2]
+
+                    piv_yoy['증감'] = piv_yoy[cur_col] - piv_yoy[prev_col]
+                    piv_yoy['증감률(%)'] = np.where(piv_yoy[prev_col] > 0, (piv_yoy['증감'] / piv_yoy[prev_col]) * 100, 0)
+
+                    # 서식 적용 후 표출
+                    piv_yoy_disp = piv_yoy.copy()
+                    piv_yoy_disp[cur_col] = piv_yoy_disp[cur_col].map(lambda x: f"{x:,.0f}")
+                    piv_yoy_disp[prev_col] = piv_yoy_disp[prev_col].map(lambda x: f"{x:,.0f}")
+                    piv_yoy_disp['증감'] = piv_yoy_disp['증감'].map(lambda x: f"{x:+,.0f}")
+                    piv_yoy_disp['증감률(%)'] = piv_yoy_disp['증감률(%)'].map(lambda x: f"{x:+.1f}%")
+
+                    st.dataframe(piv_yoy_disp, width='stretch')
+
+            with tab6_2:
+                st.markdown("##### 📈 주요 항공사별 6수송 M/S 점유율")
+                if al_col_6:
+                    chart_df6 = df6_filt.groupby(al_col_6, observed=False)['Pax_num'].sum().reset_index()
+                    fig6 = px.pie(chart_df6, values='Pax_num', names=al_col_6, hole=0.4, title="6수송 항공사별 실적 비중")
+                    fig6.update_traces(textposition='inside', textinfo='percent+label')
+                    apply_bottom_legend(fig6)
+                    st.plotly_chart(fig6, width='stretch')
+
+            with tab6_3:
+                st.dataframe(df6_filt.head(100), width='stretch')
+        else:
+            st.info("💡 선택하신 필터 조건에 해당하는 6수송 데이터가 없습니다.")
     else:
         st.warning("⚠️ 6수송 데이터가 로드되지 않았습니다. 좌측 사이드바 3번 위치에 '6수송_9월2주차.csv' 파일이 잘 올려져 있는지 확인해 주세요.")
 
