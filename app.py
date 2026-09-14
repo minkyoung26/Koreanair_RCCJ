@@ -320,7 +320,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     )
                     fig1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                     apply_bottom_legend(fig1)
-                    st.plotly_chart(fig1, use_container_width=True)
+                    st.plotly_chart(fig1, width='stretch')
 
                 with c2:
                     st.markdown("##### 📌 발매 실적 핵심 요약 (Summary)")
@@ -366,7 +366,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig_week.add_trace(go.Scatter(x=valid_weeks, y=[week_totals_dict[w] for w in valid_weeks], mode='text', text=top_bar_labels, textposition='top center', showlegend=False, hoverinfo='skip'))
                         fig_week.update_layout(yaxis_title=f"발매 실적{status_wt_label}")
                         apply_bottom_legend(fig_week)
-                        st.plotly_chart(fig_week, use_container_width=True)
+                        st.plotly_chart(fig_week, width='stretch')
 
                 st.markdown("---")
 
@@ -423,7 +423,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             height=420
                         )
                         apply_bottom_legend(fig_ke_dep)
-                        st.plotly_chart(fig_ke_dep, use_container_width=True)
+                        st.plotly_chart(fig_ke_dep, width='stretch')
 
                 st.markdown("---")
                 
@@ -443,7 +443,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig3 = px.pie(bound_pie_df, values=val_col, names=bound_col, hole=0.4)
                         fig3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>구분: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig3)
-                        st.plotly_chart(fig3, use_container_width=True)
+                        st.plotly_chart(fig3, width='stretch')
 
                 with c4:
                     if 'Ticket Type' in merged_df.columns:
@@ -458,7 +458,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig4 = px.pie(tt_pie_df, values=val_col, names='Ticket Type', hole=0.4)
                         fig4.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>Trip Type: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig4)
-                        st.plotly_chart(fig4, use_container_width=True)
+                        st.plotly_chart(fig4, width='stretch')
 
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
@@ -468,12 +468,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     piv_w = filtered_df.pivot_table(index='Dominant Marketing Airline', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
                     piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
                     al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
-                    st.dataframe(piv_w_ms.loc[al_sorted].head(100).map(lambda x: f"{x:.1f}%"), use_container_width=True)
+                    st.dataframe(piv_w_ms.loc[al_sorted].head(100).map(lambda x: f"{x:.1f}%"), width='stretch')
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선', columns='Dominant Marketing Airline', values=val_col, aggfunc='sum', fill_value=0, observed=False)
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
                 piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
-                st.dataframe(piv_r_ms.head(100).map(lambda x: f"{x:.1f}%"), use_container_width=True)
+                st.dataframe(piv_r_ms.head(100).map(lambda x: f"{x:.1f}%"), width='stretch')
 
         with tab3:
             st.subheader("🔒 관리자 전용 Raw Data 조회 및 다운로드")
@@ -487,7 +487,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     file_name=f"Ticketing_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
                 )
-                st.dataframe(filtered_df.head(100), use_container_width=True)
+                st.dataframe(filtered_df.head(100), width='stretch')
             else:
                 if admin_pw: st.error("❌ 비밀번호가 올바르지 않습니다.")
                 else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
@@ -564,7 +564,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 fig_s1 = px.pie(pie_sup_al, values=target_val, names='Airline', hole=0.4, category_orders={'Airline': sup_al_order}, color='Airline', color_discrete_map=sup_color_map)
                 fig_s1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>공급량: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                 apply_bottom_legend(fig_s1)
-                st.plotly_chart(fig_s1, use_container_width=True)
+                st.plotly_chart(fig_s1, width='stretch')
 
             with cs2:
                 st.markdown(f'<div class="unified-sub-header">2. 항공사별 공급 실적 및 M/S 요약</div>', unsafe_allow_html=True)
@@ -618,7 +618,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     fig_timeline.update_traces(textposition='inside', hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{x}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>", customdata=df_schedule[['Seats_num']])
                     fig_timeline.update_layout(height=400, showlegend=True)
                     apply_bottom_legend(fig_timeline)
-                    st.plotly_chart(fig_timeline, use_container_width=True)
+                    st.plotly_chart(fig_timeline, width='stretch')
 
     # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 단일 아코디언 + #cccccc 배경 적용)
     with tab_34_3:
@@ -777,7 +777,7 @@ elif selected_group == "🌐 6수송 대시보드":
     
     if df_6th_raw is not None and not df_6th_raw.empty:
         st.success(f"✅ 6수송 데이터 로드 완료 (총 {len(df_6th_raw):,}행)")
-        st.dataframe(df_6th_raw.head(100), use_container_width=True)
+        st.dataframe(df_6th_raw.head(100), width='stretch')
     else:
         st.warning("⚠️ 6수송 데이터가 로드되지 않았습니다. 좌측 사이드바 3번 위치에 '6수송_9월2주차.csv' 파일이 잘 올려져 있는지 확인해 주세요.")
 
