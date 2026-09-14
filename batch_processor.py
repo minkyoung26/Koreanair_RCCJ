@@ -4,9 +4,9 @@ import numpy as np
 import os
 
 def run_34_data_pipeline():
-    print("⏳ [1/2] 3/4수송 데이터 읽기 및 엑셀 수식 동일 가중치 연산 수행 중...")
+    print("⏳ [1/2] 3/4수송 데이터 읽기, 수송 구분 정제 및 엑셀 수식 동일 가중치 연산 수행 중...")
     
-    # 1. 파일 로드 (파일명 자동 매칭)
+    # 1. 파일 로드
     df_iss = None
     if os.path.exists('34수송_9월2주차.csv'):
         df_iss = pd.read_csv('34수송_9월2주차.csv', low_memory=False)
@@ -25,6 +25,12 @@ def run_34_data_pipeline():
     # 컬럼명 공백 제거
     df.columns = [str(c).strip() for c in df.columns]
     df_wt_c.columns = [str(c).strip() for c in df_wt_c.columns]
+
+    # 📌 3TF, 4TF, OTHERS 수송 필드 정제
+    bound_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
+    if bound_col:
+        df['수송'] = df[bound_col].astype(str).str.strip()
+        df['수송'] = df['수송'].replace({'nan': 'OTHERS', '': 'OTHERS', 'None': 'OTHERS'})
 
     # KE취항여부 필터링 ('취항' 노선만 필터)
     ke_service_col = 'KE취항여부' if 'KE취항여부' in df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df.columns else None)
@@ -65,14 +71,13 @@ def run_34_data_pipeline():
     )
 
     # 4. 엑셀 수식 100% 매칭: IFERROR(1/VLOOKUP(...), 1) 처리
-    # 매칭되지 않거나 값이 비어있거나 0 이하인 경우 비율 1.0(100%)로 보정
     merged_df['Weight_ratio'] = pd.to_numeric(merged_df['Weight_ratio'], errors='coerce')
     
     def convert_excel_weight(ratio):
         try:
             if pd.isna(ratio) or ratio <= 0:
-                return 1.0  # 엑셀 IFERROR 기본값 1
-            return 1.0 / ratio  # 엑셀 1 / VLOOKUP(...) 역산 수식
+                return 1.0
+            return 1.0 / ratio
         except:
             return 1.0
 
@@ -82,17 +87,17 @@ def run_34_data_pipeline():
     merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
     merged_df['Raw_Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
 
-    # 6. 엑셀 SUMPRODUCT 노선별 분모 계산: 노선별 SUMPRODUCT(J$10:J$20, $G$25:$G$35)
+    # 6. 엑셀 SUMPRODUCT 노선별 분모 계산
     route_sumproduct = merged_df.groupby('노선', observed=False)['Raw_Weighted_Value'].transform('sum')
     route_raw_sum = merged_df.groupby('노선', observed=False)['Value'].transform('sum')
 
-    # 7. 최종 가중치 실적 산출: = J10 * $G25 / SUMPRODUCT(...)
+    # 7. 최종 가중치 실적 산출
     merged_df['Weighted_Ratio'] = np.where(route_sumproduct > 0, merged_df['Raw_Weighted_Value'] / route_sumproduct, 0)
     merged_df['Weighted_Value'] = merged_df['Weighted_Ratio'] * route_raw_sum
 
     # 8. 초경량 `.parquet` 캐시 파일로 저장
     merged_df.to_parquet('cache_34_data.parquet', index=False)
-    print("✨ [2/2] 'cache_34_data.parquet' 파일로 엑셀 수식과 100% 동일한 집계 캐시 파일 저장 성공!")
+    print("✨ [2/2] 'cache_34_data.parquet' 파일로 3TF/4TF/OTHERS 수송 필드가 포함된 초고속 캐시 저장 성공!")
 
 if __name__ == '__main__':
     run_34_data_pipeline()

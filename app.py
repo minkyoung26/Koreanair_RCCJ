@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -52,7 +53,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (원본 동일)
+# 📌 고급 CSS 서식
 st.markdown("""
 <style>
     :root {
@@ -108,7 +109,7 @@ def optimize_df(df_in):
         elif df_in[col].dtype == 'float64': df_in[col] = df_in[col].astype('float32')
     return df_in
 
-# 📌 [1번 방식 핵심] pre-computed parquet 초고속 로딩 (0.01초)
+# pre-computed parquet 초고속 로딩
 @st.cache_data(ttl=3600)
 def load_fast_parquet_data():
     if os.path.exists('cache_34_data.parquet'):
@@ -123,7 +124,6 @@ def load_aux_files():
     return optimize_df(df_sup), optimize_df(df_6th)
 
 disk_sup, disk_6th = load_aux_files()
-
 df_iss_merged = load_fast_parquet_data()
 df_sup_raw = disk_sup
 df_6th_raw = disk_6th
@@ -216,6 +216,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         month_col = '출발월' if '출발월' in merged_df.columns else ('출발 월' if '출발 월' in merged_df.columns else None)
         all_dep_months = sorted([str(x) for x in merged_df[month_col].dropna().unique()]) if month_col else []
         
+        # 📌 3TF, 4TF, OTHERS 인식하도록 Bound/수송 컬럼 처리
         bound_col = '수송' if '수송' in merged_df.columns else ('Bound' if 'Bound' in merged_df.columns else None)
         all_bounds = sorted([str(x) for x in merged_df[bound_col].dropna().unique()]) if bound_col else []
 
@@ -235,7 +236,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_iss")
             sel_week_str = render_slicer_box(f_col2, "2. 발매 주차 및 일자", all_issue_weeks, "slicer_week_iss") if week_col else ALL_OPTION
             sel_month_str = render_slicer_box(f_col3, "3. 출발 월", all_dep_months, "slicer_month_iss") if month_col else ALL_OPTION
-            sel_bound_str = render_slicer_box(f_col4, "4. Bound", all_bounds, "slicer_bound_iss") if bound_col else ALL_OPTION
+            sel_bound_str = render_slicer_box(f_col4, "4. 수송 구분 (3TF/4TF/OTHERS)", all_bounds, "slicer_bound_iss") if bound_col else ALL_OPTION
 
             f_col5, f_col6, _, _ = st.columns(4)
             sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_iss")
@@ -333,7 +334,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
 
-                # 📌 3. 출발기간별 주요 항공사 M/S 점유비 추이 (KE 강조 + 타사 점선)
+                # 📌 3. 출발기간별 주요 항공사 M/S 점유비 추이
                 if month_col and month_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">3. 출발기간별 주요 항공사 M/S 점유비 추이</div>', unsafe_allow_html=True)
                     mask_dep_al = filter_mask.copy()
@@ -395,7 +396,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 
                 with c3:
                     if bound_col:
-                        st.markdown('<div class="unified-sub-header">4. Bound별 점유비 (KE 한정)</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="unified-sub-header">4. 수송 구분별 점유비 (KE 한정)</div>', unsafe_allow_html=True)
                         mask_ke_bound = filter_mask.copy()
                         if week_col and sel_week_str != ALL_OPTION: mask_ke_bound &= (merged_df[week_col].astype(str) == sel_week_str)
                         if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION: mask_ke_bound &= (merged_df['Ticket Type'].astype(str) == sel_tt_str)
@@ -404,7 +405,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         bound_pie_df = df_ke_bound.groupby(bound_col, observed=False)[val_col].sum().reset_index()
                         
                         fig3 = px.pie(bound_pie_df, values=val_col, names=bound_col, hole=0.4)
-                        fig3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>Bound: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                        fig3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>구분: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig3)
                         st.plotly_chart(fig3, use_container_width=True)
 
@@ -583,7 +584,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_timeline)
                     st.plotly_chart(fig_timeline, use_container_width=True)
 
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 단일 아코디언 + #cccccc 배경)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 단일 아코디언 + #cccccc 배경 적용)
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
