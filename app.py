@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 import os
-import zipfile
 
 # Page Config
 st.set_page_config(
@@ -117,13 +116,21 @@ def clean_transport_column(df):
         df['수송'] = df['수송'].replace({'nan': 'OTHERS', '': 'OTHERS', 'None': 'OTHERS', 'NaN': 'OTHERS'})
     return df
 
-@st.cache_data(ttl=3600)
-def load_fast_parquet_data():
+# 📌 캐시 메모리 락(Lock)을 걸어 끊김 현상 완전 제거
+@st.cache_data(max_entries=5, show_spinner=False)
+def load_fast_parquet_data_file():
     if os.path.exists('cache_34_data.parquet'):
-        return optimize_df(pd.read_parquet('cache_34_data.parquet'))
+        return optimize_df(clean_transport_column(pd.read_parquet('cache_34_data.parquet')))
     return None
 
-@st.cache_data(ttl=3600)
+@st.cache_data(max_entries=5, show_spinner=False)
+def load_uploaded_parquet(file_obj):
+    if file_obj.name.endswith('.parquet'):
+        return optimize_df(clean_transport_column(pd.read_parquet(file_obj)))
+    else:
+        return optimize_df(clean_transport_column(pd.read_csv(file_obj, low_memory=False)))
+
+@st.cache_data(max_entries=5, show_spinner=False)
 def load_aux_files():
     df_sup, df_6th = None, None
     if os.path.exists('공급_9월2주차.csv'): df_sup = pd.read_csv('공급_9월2주차.csv', low_memory=False)
@@ -136,33 +143,14 @@ def load_aux_files():
 
 disk_sup, disk_6th = load_aux_files()
 
-# 📌 1. 3/4수송 데이터 업로드/폴더 로드 및 정제
+# 📌 로드된 메인 데이터 세션
 if uploaded_iss is not None:
-    if uploaded_iss.name.endswith('.parquet'):
-        df_iss_merged = optimize_df(pd.read_parquet(uploaded_iss))
-    else:
-        df_iss_merged = optimize_df(pd.read_csv(uploaded_iss, low_memory=False))
-    df_iss_merged = clean_transport_column(df_iss_merged)
+    df_iss_merged = load_uploaded_parquet(uploaded_iss)
 else:
-    df_iss_merged = clean_transport_column(load_fast_parquet_data())
+    df_iss_merged = load_fast_parquet_data_file()
 
-# 📌 2. 공급 데이터 업로드/폴더 로드
-if uploaded_sup is not None:
-    if uploaded_sup.name.endswith('.parquet'):
-        df_sup_raw = optimize_df(pd.read_parquet(uploaded_sup))
-    else:
-        df_sup_raw = optimize_df(pd.read_csv(uploaded_sup, low_memory=False))
-else:
-    df_sup_raw = disk_sup
-
-# 📌 3. 6수송 데이터 업로드/폴더 로드
-if uploaded_6th is not None:
-    if uploaded_6th.name.endswith('.parquet'):
-        df_6th_raw = optimize_df(pd.read_parquet(uploaded_6th))
-    else:
-        df_6th_raw = optimize_df(pd.read_csv(uploaded_6th, low_memory=False))
-else:
-    df_6th_raw = disk_6th
+df_sup_raw = disk_sup
+df_6th_raw = disk_6th
 
 # 메인 타이틀
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
@@ -252,7 +240,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         month_col = '출발월' if '출발월' in merged_df.columns else ('출발 월' if '출발 월' in merged_df.columns else None)
         all_dep_months = sorted([str(x) for x in merged_df[month_col].dropna().unique()]) if month_col else []
         
-        # 📌 3TF, 4TF, OTHERS 인식 수송 컬럼
         bound_col = '수송' if '수송' in merged_df.columns else ('Bound' if 'Bound' in merged_df.columns else None)
         all_bounds = sorted([str(x) for x in merged_df[bound_col].dropna().unique()]) if bound_col else []
 
@@ -278,17 +265,20 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_iss")
             sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_iss")
 
-        filter_mask = pd.Series(True, index=merged_df.index)
-        if sel_route_str != ALL_OPTION: filter_mask &= (merged_df['노선'].astype(str) == sel_route_str)
-        if sel_al_str != ALL_OPTION: filter_mask &= (merged_df['Dominant Marketing Airline'].astype(str) == sel_al_str)
-        if month_col and sel_month_str != ALL_OPTION: filter_mask &= (merged_df[month_col].astype(str) == sel_month_str)
+        # 📌 빠른 인덱스 필터링으로 딜레이 완전히 제거
+        filter_conditions = []
+        if sel_route_str != ALL_OPTION: filter_conditions.append(merged_df['노선'].astype(str) == sel_route_str)
+        if sel_al_str != ALL_OPTION: filter_conditions.append(merged_df['Dominant Marketing Airline'].astype(str) == sel_al_str)
+        if month_col and sel_month_str != ALL_OPTION: filter_conditions.append(merged_df[month_col].astype(str) == sel_month_str)
+        if bound_col and sel_bound_str != ALL_OPTION: filter_conditions.append(merged_df[bound_col].astype(str) == sel_bound_str)
+        if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION: filter_conditions.append(merged_df['Ticket Type'].astype(str) == sel_tt_str)
+        if week_col and sel_week_str != ALL_OPTION: filter_conditions.append(merged_df[week_col].astype(str) == sel_week_str)
 
-        main_filtered_mask = filter_mask.copy()
-        if bound_col and sel_bound_str != ALL_OPTION: main_filtered_mask &= (merged_df[bound_col].astype(str) == sel_bound_str)
-        if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION: main_filtered_mask &= (merged_df['Ticket Type'].astype(str) == sel_tt_str)
-        if week_col and sel_week_str != ALL_OPTION: main_filtered_mask &= (merged_df[week_col].astype(str) == sel_week_str)
-
-        filtered_df = merged_df[main_filtered_mask]
+        if filter_conditions:
+            final_mask = np.logical_and.reduce(filter_conditions)
+            filtered_df = merged_df[final_mask]
+        else:
+            filtered_df = merged_df
 
         total_pax = filtered_df[val_col].sum()
         ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'] == 'KE'][val_col].sum() if not filtered_df.empty else 0
@@ -309,7 +299,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             if not filtered_df.empty:
                 al_order = [al for al in all_airlines if al in filtered_df['Dominant Marketing Airline'].unique()]
                 
-                # 📌 1. 항공사별 M/S 점유비
                 st.markdown('<div class="unified-sub-header">1. 항공사별 M/S 점유비</div>', unsafe_allow_html=True)
                 c1, c2 = st.columns([1.6, 1])
                 with c1:
@@ -331,14 +320,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 📌 2. 발매/주차별 항공사 발매량 추이
                 if week_col and week_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">2. 발매/주차별 항공사 발매량 추이</div>', unsafe_allow_html=True)
-                    mask_no_week = filter_mask.copy()
-                    if bound_col and sel_bound_str != ALL_OPTION: mask_no_week &= (merged_df[bound_col].astype(str) == sel_bound_str)
-                    if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION: mask_no_week &= (merged_df['Ticket Type'].astype(str) == sel_tt_str)
-
-                    df_no_week = merged_df[mask_no_week]
+                    df_no_week = filtered_df
 
                     if not df_no_week.empty:
                         week_al_grp = df_no_week.groupby([week_col, 'Dominant Marketing Airline'], observed=False)[val_col].sum().reset_index()
@@ -370,15 +354,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
 
-                # 📌 3. 출발기간별 주요 항공사 M/S 점유비 추이
                 if month_col and month_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">3. 출발기간별 주요 항공사 M/S 점유비 추이</div>', unsafe_allow_html=True)
-                    mask_dep_al = filter_mask.copy()
-                    if week_col and sel_week_str != ALL_OPTION: mask_dep_al &= (merged_df[week_col].astype(str) == sel_week_str)
-                    if bound_col and sel_bound_str != ALL_OPTION: mask_dep_al &= (merged_df[bound_col].astype(str) == sel_bound_str)
-                    if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION: mask_dep_al &= (merged_df['Ticket Type'].astype(str) == sel_tt_str)
-
-                    df_dep_al = merged_df[mask_dep_al]
+                    df_dep_al = filtered_df
 
                     if not df_dep_al.empty:
                         dep_al_grp = df_dep_al.groupby([month_col, 'Dominant Marketing Airline'], observed=False)[val_col].sum().reset_index()
@@ -428,17 +406,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.markdown("---")
                 
                 c3, c4 = st.columns(2)
-                ke_only_df = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']
+                ke_only_df = filtered_df[filtered_df['Dominant Marketing Airline'] == 'KE']
                 
                 with c3:
                     if bound_col:
                         st.markdown('<div class="unified-sub-header">4. 수송 구분별 점유비 (KE 한정)</div>', unsafe_allow_html=True)
-                        mask_ke_bound = filter_mask.copy()
-                        if week_col and sel_week_str != ALL_OPTION: mask_ke_bound &= (merged_df[week_col].astype(str) == sel_week_str)
-                        if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION: mask_ke_bound &= (merged_df['Ticket Type'].astype(str) == sel_tt_str)
-
-                        df_ke_bound = ke_only_df[mask_ke_bound.reindex(ke_only_df.index, fill_value=False)]
-                        bound_pie_df = df_ke_bound.groupby(bound_col, observed=False)[val_col].sum().reset_index()
+                        bound_pie_df = ke_only_df.groupby(bound_col, observed=False)[val_col].sum().reset_index()
                         
                         fig3 = px.pie(bound_pie_df, values=val_col, names=bound_col, hole=0.4)
                         fig3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>구분: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
@@ -448,12 +421,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 with c4:
                     if 'Ticket Type' in merged_df.columns:
                         st.markdown('<div class="unified-sub-header">5. Trip Type별 점유비 (KE 한정)</div>', unsafe_allow_html=True)
-                        mask_ke_tt = filter_mask.copy()
-                        if week_col and sel_week_str != ALL_OPTION: mask_ke_tt &= (merged_df[week_col].astype(str) == sel_week_str)
-                        if bound_col and sel_bound_str != ALL_OPTION: mask_ke_tt &= (merged_df[bound_col].astype(str) == sel_bound_str)
-
-                        df_ke_tt = ke_only_df[mask_ke_tt.reindex(ke_only_df.index, fill_value=False)]
-                        tt_pie_df = df_ke_tt.groupby('Ticket Type', observed=False)[val_col].sum().reset_index()
+                        tt_pie_df = ke_only_df.groupby('Ticket Type', observed=False)[val_col].sum().reset_index()
 
                         fig4 = px.pie(tt_pie_df, values=val_col, names='Ticket Type', hole=0.4)
                         fig4.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>Trip Type: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
