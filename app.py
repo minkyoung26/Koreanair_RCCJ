@@ -136,7 +136,8 @@ def load_aux_files():
     if os.path.exists('공급_9월2주차.csv'): df_sup = pd.read_csv('공급_9월2주차.csv', low_memory=False)
     elif os.path.exists('공급_9월1주차_CSV.csv'): df_sup = pd.read_csv('공급_9월1주차_CSV.csv', low_memory=False)
 
-    if os.path.exists('6수송_9월2주차.csv'): df_6th = pd.read_csv('6수송_9월2주차.csv', low_memory=False)
+    if os.path.exists('cache_6th_data.parquet'): df_6th = pd.read_parquet('cache_6th_data.parquet')
+    elif os.path.exists('6수송_9월2주차.csv'): df_6th = pd.read_csv('6수송_9월2주차.csv', low_memory=False)
     elif os.path.exists('6TRF TEST.csv'): df_6th = pd.read_csv('6TRF TEST.csv', low_memory=False)
 
     return optimize_df(df_sup), optimize_df(df_6th)
@@ -728,18 +729,47 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     ag_html += '</tbody></table></div>'
                     st.markdown(ag_html, unsafe_allow_html=True)
 
-    # 4. 👥 단체실적 탭 (📌 0인 항목 전면 필터링)
+    # 4. 👥 단체실적 탭 (📌 필터 6종 확장 및 실적 0 숨김 처리)
     with tab_34_4:
         st.subheader("👥 발매 - 항공사별/대리점별 단체 발매 현황")
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
             dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else ('출발일자' if '출발일자' in df_grp_raw.columns else None)
-            if dep_date_col:
-                df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw[dep_date_col].astype(str), errors='coerce')
-                df_grp_raw = df_grp_raw[(df_grp_raw['Date_Obj'] >= pd.to_datetime(today)) & (df_grp_raw['Date_Obj'] <= pd.to_datetime(future_10_days))]
+            
+            # 6종 필터 옵션 구성
+            g_routes = sorted([str(x) for x in df_grp_raw['노선'].dropna().unique()]) if '노선' in df_grp_raw.columns else []
+            g_m_col = '출발월' if '출발월' in df_grp_raw.columns else ('출발 월' if '출발 월' in df_grp_raw.columns else None)
+            g_months = sorted([str(x) for x in df_grp_raw[g_m_col].dropna().unique()]) if g_m_col else []
+            g_b_col = '수송' if '수송' in df_grp_raw.columns else ('Bound' if 'Bound' in df_grp_raw.columns else None)
+            g_bounds = sorted([str(x) for x in df_grp_raw[g_b_col].dropna().unique()]) if g_b_col else []
+            g_tts = sorted([str(x) for x in df_grp_raw['Ticket Type'].dropna().unique()]) if 'Ticket Type' in df_grp_raw.columns else []
+            g_t_col = '출발시간대' if '출발시간대' in df_grp_raw.columns else None
+            g_times = sorted([str(x) for x in df_grp_raw[g_t_col].dropna().unique()]) if g_t_col else []
+            g_als = sorted([str(x) for x in df_grp_raw['Dominant Marketing Airline'].dropna().unique()]) if 'Dominant Marketing Airline' in df_grp_raw.columns else []
 
+            with st.expander("🔍 **단체 실적 분석 피벗 슬라이서 필터 설정**", expanded=True):
+                gc1, gc2, gc3 = st.columns(3)
+                sel_g_route = render_slicer_box(gc1, "1. 노선", g_routes, "slicer_g_route")
+                sel_g_month = render_slicer_box(gc2, "2. 출발 월", g_months, "slicer_g_month") if g_m_col else ALL_OPTION
+                sel_g_bound = render_slicer_box(gc3, "3. 수송 구분 (3TF/4TF/OTHERS)", g_bounds, "slicer_g_bound") if g_b_col else ALL_OPTION
+
+                gc4, gc5, gc6 = st.columns(3)
+                sel_g_tt = render_slicer_box(gc4, "4. TRIP TYPE", g_tts, "slicer_g_tt")
+                sel_g_time = render_slicer_box(gc5, "5. 출발 시간대", g_times, "slicer_g_time") if g_t_col else ALL_OPTION
+                sel_g_al = render_slicer_box(gc6, "6. 항공사", g_als, "slicer_g_al")
+
+            # 단체 필터 마스크 연산
+            mask_grp = pd.Series(True, index=df_grp_raw.index)
+            if sel_g_route != ALL_OPTION: mask_grp &= (df_grp_raw['노선'].astype(str) == sel_g_route)
+            if g_m_col and sel_g_month != ALL_OPTION: mask_grp &= (df_grp_raw[g_m_col].astype(str) == sel_g_month)
+            if g_b_col and sel_g_bound != ALL_OPTION: mask_grp &= (df_grp_raw[g_b_col].astype(str) == sel_g_bound)
+            if 'Ticket Type' in df_grp_raw.columns and sel_g_tt != ALL_OPTION: mask_grp &= (df_grp_raw['Ticket Type'].astype(str) == sel_g_tt)
+            if g_t_col and sel_g_time != ALL_OPTION: mask_grp &= (df_grp_raw[g_t_col].astype(str) == sel_g_time)
+            if 'Dominant Marketing Airline' in df_grp_raw.columns and sel_g_al != ALL_OPTION: mask_grp &= (df_grp_raw['Dominant Marketing Airline'].astype(str) == sel_g_al)
+
+            # 단체 예약 클래스 조건 (7C: V, 타사: G)
             is_grp_cond = (((df_grp_raw['Dominant Marketing Airline'] == '7C') & (df_grp_raw['O&D RBKD'] == 'V')) | ((df_grp_raw['Dominant Marketing Airline'] != '7C') & (df_grp_raw['O&D RBKD'] == 'G')))
-            df_grp_filtered = df_grp_raw[is_grp_cond].copy()
+            df_grp_filtered = df_grp_raw[mask_grp & is_grp_cond].copy()
 
             if not df_grp_filtered.empty and 'Travel Agency Name' in df_grp_filtered.columns:
                 ag_sum_df = df_grp_filtered.groupby(['Dominant Marketing Airline', 'Travel Agency Name'], observed=False)['Value'].sum().reset_index()
@@ -766,11 +796,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                 st.markdown(g_html, unsafe_allow_html=True)
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (요청 데이터 파이프라인 완전 복원)
+# GROUP 2: 🌐 6수송 대시보드
 # ==========================================
 elif selected_group == "🌐 6수송 대시보드":
-    st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
-    
     if df_6th_raw is None:
         st.warning("👈 좌측 사이드바 3번 위치에서 [6수송_9월2주차.csv] 파일을 업로드해 주세요.")
         st.stop()
@@ -876,6 +904,18 @@ elif selected_group == "🌐 6수송 대시보드":
     od_col_6 = actual_cols['OD ON/OFF']
     month_col_6 = actual_cols['TRIP MONTH']
 
+    # 📌 6수송 출처 및 동적 기간 상자 추가
+    m_list_6 = sorted([str(x).strip() for x in df_6[month_col_6].dropna().unique() if str(x).strip() != 'nan']) if month_col_6 and month_col_6 in df_6.columns else []
+    dynamic_dep_6th = f"{m_list_6[0]} ~ {m_list_6[-1]}" if m_list_6 else dep_range_str
+
+    st.markdown(f"""
+    <div class="source-header-box">
+        <b>📌 출처: DDS & OAG 데이터 (6수송 대시보드)</b> &nbsp;|&nbsp; 
+        <b>🗓️ 발매기간 (Purchase Month):</b> {issue_range_str} &nbsp;|&nbsp; 
+        <b>✈️ 출발기간 (Trip Month):</b> {dynamic_dep_6th}
+    </div>
+    """, unsafe_allow_html=True)
+
     if al_col_6 and al_col_6 in df_6.columns:
         al_order_6th = df_6.groupby(al_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False).index.astype(str).tolist()
         if 'KE' in al_order_6th:
@@ -925,7 +965,6 @@ elif selected_group == "🌐 6수송 대시보드":
     ])
 
     with tab6_1:
-        # 📌 1. 항공사/O&D별 발매 M/S
         st.markdown('<div class="unified-sub-header">1. 항공사/O&D별 발매 M/S</div>', unsafe_allow_html=True)
         f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
         sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer1_m")
@@ -1091,13 +1130,11 @@ elif selected_group == "🌐 6수송 대시보드":
                 for idx, od_name in enumerate(top_od_list, start=1):
                     od_sub = df_top[df_top[od_col_6].astype(str) == od_name]
                     
-                    # 1) 시장 전체 수치
                     m_cy = od_sub['Val_num'].sum()
                     m_py = od_sub['Val_PY_num'].sum()
                     m_yoy = ((m_cy - m_py) / m_py * 100) if m_py > 0 else 0
                     m_yoy_str = f'<span class="yoy-up">▲ {m_yoy:.0f}%</span>' if m_yoy >= 0 else f'<span class="yoy-down">▼ {abs(m_yoy):.0f}%</span>'
 
-                    # 2) 선택 항공사 수치
                     if selected_carrier == ALL_OPTION:
                         c_sub = od_sub
                     else:
@@ -1113,7 +1150,6 @@ elif selected_group == "🌐 6수송 대시보드":
                     c_ms_diff = c_ms_cy - c_ms_py
                     c_ms_diff_str = f'<span class="yoy-up">▲ {c_ms_diff:.0f}%p</span>' if c_ms_diff >= 0 else f'<span class="yoy-down">▼ {abs(c_ms_diff):.0f}%p</span>'
 
-                    # 3) KE 전용 수치
                     k_sub = od_sub[od_sub[al_col_6].astype(str) == 'KE']
                     k_cy = k_sub['Val_num'].sum()
                     k_py = k_sub['Val_PY_num'].sum()
