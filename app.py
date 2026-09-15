@@ -15,8 +15,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# 외부 구글 앱스 스크립트 웹앱 URL
 EXT_WEB_APP_URL = "https://script.google.com/a/macros/koreanair.com/s/AKfycbxt3IfN0gB4n344U4gL1kt5i4RVjn7_uuG5PtKY-pPgNejpDCsjp2PEbopEexw5NLUjDQ/exec"
 
+# Dynamic Date Logic (2026년 기준)
 today = datetime.date.today()
 current_monday = today - datetime.timedelta(days=today.weekday())
 issue_start_date = current_monday - datetime.timedelta(weeks=5)
@@ -34,6 +36,7 @@ issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.st
 
 future_10_days = today + datetime.timedelta(days=10)
 
+# 항공사별 RBD 계층(Hierarchy) 정의
 RBD_HIERARCHY = {
     'KE': list('YBMSHEKLUQTX'),
     'OZ': list('YBMHEQKSVWTLX'),
@@ -49,6 +52,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
+# 📌 고급 CSS 서식
 st.markdown("""
 <style>
     :root { --primary-color: #0ea5e9 !important; --primaryColor: #0ea5e9 !important; }
@@ -263,7 +267,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
             
-            # 📌 LCC 직판 보정된 Weighted_Value 바인딩
+            # 📌 LCC 직판 보정된 Weighted_Value를 그대로 수량으로 직접 사용
             if apply_weight_toggle and 'Weighted_Value' in merged_df.columns:
                 val_col = 'Weighted_Value'
             else:
