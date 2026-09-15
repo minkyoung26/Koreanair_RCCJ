@@ -608,7 +608,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_timeline)
                     st.plotly_chart(fig_timeline, width='stretch')
 
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 단일 아코디언 + #cccccc 배경 적용)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 0인 항목 전면 필터링 적용)
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
@@ -656,6 +656,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 if not df_ag_filtered.empty and 'O&D RBKD' in df_ag_filtered.columns and week_col_a:
                     week_list = sorted([str(x) for x in df_ag_filtered[week_col_a].dropna().unique()], reverse=True)
                     ag_al_sum = df_ag_filtered.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
+                    # 📌 0 초과 항공사만 선택
                     ag_al_list = ['KE'] + [str(x) for x in ag_al_sum.index if x != 'KE' and ag_al_sum[x] > 0]
 
                     rbd_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:180px; text-align:center;">항공사 / RBD 클래스</th>'
@@ -666,25 +667,30 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         al_sub = df_ag_filtered[df_ag_filtered['Dominant Marketing Airline'] == al_code]
                         al_tot_pax = al_sub['Value'].sum()
 
+                        # 📌 0인 항공사 표출 제외
                         if al_tot_pax > 0:
                             piv_rbd = al_sub.pivot_table(index='O&D RBKD', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
                             piv_rbd['총합계'] = piv_rbd.sum(axis=1)
 
-                            if al_code in RBD_HIERARCHY:
-                                hierarchy_order = RBD_HIERARCHY[al_code]
-                                existing_rbds = piv_rbd.index.tolist()
-                                sorted_rbds = [r for r in hierarchy_order if r in existing_rbds] + [r for r in existing_rbds if r not in hierarchy_order]
-                                piv_rbd = piv_rbd.loc[sorted_rbds]
+                            # 📌 총합계가 0인 RBD 클래스 행 숨김
+                            piv_rbd = piv_rbd[piv_rbd['총합계'] > 0]
 
-                            rbd_html += f'<tr><td colspan="{len(week_list)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center;">▼ ★ {al_code} 총계</td>'
-                            for wk in week_list: rbd_html += f'<td style="text-align:center;">{al_sub[al_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
-                            rbd_html += f'<td style="text-align:center;">{al_tot_pax:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
+                            if not piv_rbd.empty:
+                                if al_code in RBD_HIERARCHY:
+                                    hierarchy_order = RBD_HIERARCHY[al_code]
+                                    existing_rbds = piv_rbd.index.tolist()
+                                    sorted_rbds = [r for r in hierarchy_order if r in existing_rbds] + [r for r in existing_rbds if r not in hierarchy_order]
+                                    piv_rbd = piv_rbd.loc[sorted_rbds]
 
-                            for rbd_code, rbd_row in piv_rbd.head(100).iterrows():
-                                rbd_html += f'<tr class="rbd-child-row"><td style="width:180px; text-align:center; font-weight:700;">{rbd_code}</td>'
-                                for wk in week_list: rbd_html += f'<td style="text-align:center;">{rbd_row[wk]:,.0f}</td>'
-                                rbd_html += f'<td style="text-align:center; font-weight:700;">{rbd_row["총합계"]:,.0f}</td></tr>'
-                            rbd_html += '</table></details></td></tr>'
+                                rbd_html += f'<tr><td colspan="{len(week_list)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center;">▼ ★ {al_code} 총계</td>'
+                                for wk in week_list: rbd_html += f'<td style="text-align:center;">{al_sub[al_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
+                                rbd_html += f'<td style="text-align:center;">{al_tot_pax:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
+
+                                for rbd_code, rbd_row in piv_rbd.iterrows():
+                                    rbd_html += f'<tr class="rbd-child-row"><td style="width:180px; text-align:center; font-weight:700;">{rbd_code}</td>'
+                                    for wk in week_list: rbd_html += f'<td style="text-align:center;">{rbd_row[wk]:,.0f}</td>'
+                                    rbd_html += f'<td style="text-align:center; font-weight:700;">{rbd_row["총합계"]:,.0f}</td></tr>'
+                                rbd_html += '</table></details></td></tr>'
 
                     rbd_html += '</tbody></table></div>'
                     st.markdown(rbd_html, unsafe_allow_html=True)
@@ -692,7 +698,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
             with sub_tab_agency:
                 if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
                     week_list_ag = sorted([str(x) for x in df_ag_filtered[week_col_a].dropna().unique()], reverse=True)
-                    top_20_agencies = df_ag_filtered.groupby('Travel Agency Name', observed=False)['Value'].sum().sort_values(ascending=False).head(20).index.tolist()
+                    agency_totals = df_ag_filtered.groupby('Travel Agency Name', observed=False)['Value'].sum().sort_values(ascending=False)
+                    # 📌 실적 > 0 인 상위 20개 대리점만 추출
+                    top_20_agencies = [ag for ag in agency_totals.index if agency_totals[ag] > 0][:20]
 
                     ag_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:180px; text-align:center;">대리점 / 항공사</th>'
                     for wk in week_list_ag: ag_html += f'<th class="header-main">{wk}</th>'
@@ -702,26 +710,31 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         ag_sub = df_ag_filtered[df_ag_filtered['Travel Agency Name'] == ag_name]
                         ag_tot_val = ag_sub['Value'].sum()
 
+                        # 📌 0인 대리점 표출 제외
                         if ag_tot_val > 0:
                             piv_ag_sub = ag_sub.pivot_table(index='Dominant Marketing Airline', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
                             piv_ag_sub['총합계'] = piv_ag_sub.sum(axis=1)
+                            
+                            # 📌 실적 0인 항공사 행 필터링
+                            piv_ag_sub = piv_ag_sub[piv_ag_sub['총합계'] > 0]
 
-                            ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center;">▼ ★ {ag_name} 총계</td>'
-                            for wk in week_list_ag: ag_html += f'<td style="text-align:center;">{ag_sub[ag_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
-                            ag_html += f'<td style="text-align:center;">{ag_tot_val:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
+                            if not piv_ag_sub.empty:
+                                ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center;">▼ ★ {ag_name} 총계</td>'
+                                for wk in week_list_ag: ag_html += f'<td style="text-align:center;">{ag_sub[ag_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
+                                ag_html += f'<td style="text-align:center;">{ag_tot_val:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
 
-                            for al_code, al_row in piv_ag_sub.head(100).iterrows():
-                                is_ke_flag = (al_code == 'KE')
-                                cell_style = 'font-weight:700; color:#16a34a;' if is_ke_flag else 'color:#475569;'
-                                ag_html += f'<tr class="rbd-child-row"><td style="width:180px; text-align:center; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
-                                for wk in week_list_ag: ag_html += f'<td style="text-align:center; {cell_style}">{al_row[wk]:,.0f}</td>'
-                                ag_html += f'<td style="text-align:center; font-weight:700; {cell_style}">{al_row["총합계"]:,.0f}</td></tr>'
-                            ag_html += '</table></details></td></tr>'
+                                for al_code, al_row in piv_ag_sub.iterrows():
+                                    is_ke_flag = (al_code == 'KE')
+                                    cell_style = 'font-weight:700; color:#16a34a;' if is_ke_flag else 'color:#475569;'
+                                    ag_html += f'<tr class="rbd-child-row"><td style="width:180px; text-align:center; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
+                                    for wk in week_list_ag: ag_html += f'<td style="text-align:center; {cell_style}">{al_row[wk]:,.0f}</td>'
+                                    ag_html += f'<td style="text-align:center; font-weight:700; {cell_style}">{al_row["총합계"]:,.0f}</td></tr>'
+                                ag_html += '</table></details></td></tr>'
 
                     ag_html += '</tbody></table></div>'
                     st.markdown(ag_html, unsafe_allow_html=True)
 
-    # 4. 👥 단체실적 탭
+    # 4. 👥 단체실적 탭 (📌 0인 항목 전면 필터링 적용)
     with tab_34_4:
         st.subheader("👥 발매 - 항공사별/대리점별 단체 발매 현황")
         if df_iss_merged is not None:
@@ -737,28 +750,31 @@ if selected_group == "✈️ 3/4수송 대시보드":
             if not df_grp_filtered.empty and 'Travel Agency Name' in df_grp_filtered.columns:
                 ag_sum_df = df_grp_filtered.groupby(['Dominant Marketing Airline', 'Travel Agency Name'], observed=False)['Value'].sum().reset_index()
                 al_totals = ag_sum_df.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
-                al_sorted_list = ['KE'] + [str(x) for x in al_totals.index if x != 'KE']
+                # 📌 0인 항공사 제외
+                al_sorted_list = ['KE'] + [str(x) for x in al_totals.index if x != 'KE' and al_totals[x] > 0]
 
                 for al_code in al_sorted_list:
                     al_sub = ag_sum_df[ag_sum_df['Dominant Marketing Airline'] == al_code]
                     al_tot_val = al_sub['Value'].sum()
 
+                    # 📌 실적 0인 항공사 카드 제외
                     if al_tot_val > 0:
-                        with st.expander(f"✈️ 항공사: **{al_code}**  |  총 단체 실적: **{al_tot_val:,.0f}**건", expanded=(al_code == 'KE')):
-                            top_ag_sub = al_sub.sort_values(by='Value', ascending=False).head(100).reset_index(drop=True)
+                        top_ag_sub = al_sub[al_sub['Value'] > 0].sort_values(by='Value', ascending=False).head(100).reset_index(drop=True)
+                        if not top_ag_sub.empty:
                             top_ag_sub.index = range(1, len(top_ag_sub) + 1)
 
-                            g_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:80px;">순위</th><th class="header-main">여행사(대리점)명</th><th class="header-main" style="width:200px;">단체 예약 실적 (석)</th></tr></thead><tbody>'
-                            g_html += f'<tr class="row-group-header-custom"><td style="text-align:center;">-</td><td style="text-align:center; font-weight:800;">★ {al_code} 전체 총합계</td><td style="text-align:center;"><b>{al_tot_val:,.0f}</b></td></tr>'
+                            with st.expander(f"✈️ 항공사: **{al_code}**  |  총 단체 실적: **{al_tot_val:,.0f}**건", expanded=(al_code == 'KE')):
+                                g_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:80px;">순위</th><th class="header-main">여행사(대리점)명</th><th class="header-main" style="width:200px;">단체 예약 실적 (석)</th></tr></thead><tbody>'
+                                g_html += f'<tr class="row-group-header-custom"><td style="text-align:center;">-</td><td style="text-align:center; font-weight:800;">★ {al_code} 전체 총합계</td><td style="text-align:center;"><b>{al_tot_val:,.0f}</b></td></tr>'
 
-                            for r_idx, ag_row in top_ag_sub.iterrows():
-                                g_html += f'<tr><td style="text-align:center;">{r_idx}위</td><td style="text-align:center; font-weight:600;">{ag_row["Travel Agency Name"]}</td><td style="text-align:center; font-weight:700;">{ag_row["Value"]:,.0f}</td></tr>'
+                                for r_idx, ag_row in top_ag_sub.iterrows():
+                                    g_html += f'<tr><td style="text-align:center;">{r_idx}위</td><td style="text-align:center; font-weight:600;">{ag_row["Travel Agency Name"]}</td><td style="text-align:center; font-weight:700;">{ag_row["Value"]:,.0f}</td></tr>'
 
-                            g_html += '</tbody></table></div>'
-                            st.markdown(g_html, unsafe_allow_html=True)
+                                g_html += '</tbody></table></div>'
+                                st.markdown(g_html, unsafe_allow_html=True)
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (복원 및 고도화)
+# GROUP 2: 🌐 6수송 대시보드 (원래 2개 피벗/분석 테이블 완전 복원)
 # ==========================================
 elif selected_group == "🌐 6수송 대시보드":
     st.markdown('<div class="unified-sub-header">🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드</div>', unsafe_allow_html=True)
@@ -767,11 +783,9 @@ elif selected_group == "🌐 6수송 대시보드":
         df6 = df_6th_raw.copy()
         df6.columns = [str(c).strip() for c in df6.columns]
 
-        # 필수 수량 컬럼 파싱
         val_col_6 = 'Pax' if 'Pax' in df6.columns else ('Value' if 'Value' in df6.columns else df6.columns[-1])
         df6['Pax_num'] = pd.to_numeric(df6[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
 
-        # 컬럼 표준화
         year_col_6 = '금/전' if '금/전' in df6.columns else 'Year'
         month_col_6 = 'Travel Month' if 'Travel Month' in df6.columns else ('출발월' if '출발월' in df6.columns else None)
         mkt_col_6 = 'Trip O&D Market' if 'Trip O&D Market' in df6.columns else ('O&D Market' if 'O&D Market' in df6.columns else None)
@@ -787,7 +801,6 @@ elif selected_group == "🌐 6수송 대시보드":
             sel_m_6 = render_slicer_box(f6_2, "2. Travel Month (출발월)", all_months_6, "slicer_m_6") if month_col_6 else ALL_OPTION
             sel_al_6 = render_slicer_box(f6_3, "3. 항공사", all_als_6, "slicer_al_6") if al_col_6 else ALL_OPTION
 
-        # 필터링
         mask6 = pd.Series(True, index=df6.index)
         if mkt_col_6 and sel_mkt_6 != ALL_OPTION: mask6 &= (df6[mkt_col_6].astype(str) == sel_mkt_6)
         if month_col_6 and sel_m_6 != ALL_OPTION: mask6 &= (df6[month_col_6].astype(str) == sel_m_6)
@@ -796,47 +809,68 @@ elif selected_group == "🌐 6수송 대시보드":
         df6_filt = df6[mask6]
 
         if not df6_filt.empty:
-            tab6_1, tab6_2, tab6_3 = st.tabs(["📊 금년 vs 전년(YoY) 비교 피벗", "📈 항공사별 M/S 점유비", "🔒 Raw Data View"])
+            # 📌 6수송 복원 1번 테이블: OD Market별 금년 vs 전년 비교 및 주요 항공사 M/S 피벗 집계표
+            st.markdown('<div class="unified-sub-header">1. OD Market별 수송 실적 및 전년비(YoY) M/S 피벗 요약</div>', unsafe_allow_html=True)
+            if mkt_col_6 and year_col_6 and al_col_6:
+                piv_mkt_al = df6_filt.pivot_table(
+                    index=mkt_col_6,
+                    columns=[year_col_6, al_col_6],
+                    values='Pax_num',
+                    aggfunc='sum',
+                    fill_value=0,
+                    observed=False
+                )
+                
+                # 전체 M/S 및 총합 산출
+                piv_mkt_tot = df6_filt.pivot_table(
+                    index=mkt_col_6,
+                    columns=year_col_6,
+                    values='Pax_num',
+                    aggfunc='sum',
+                    fill_value=0,
+                    observed=False
+                )
+                
+                st.dataframe(piv_mkt_tot, width='stretch')
 
-            with tab6_1:
-                st.markdown("##### 📌 OD Market 및 항공사별 금년 vs 전년(YoY) 실적 집계표")
-                if mkt_col_6 and year_col_6 and al_col_6:
-                    piv_yoy = df6_filt.pivot_table(
-                        index=[mkt_col_6, al_col_6],
-                        columns=year_col_6,
-                        values='Pax_num',
-                        aggfunc='sum',
-                        fill_value=0,
-                        observed=False
-                    ).reset_index()
+            st.markdown("---")
 
-                    # YoY 증감 및 증감률 계산
-                    cur_col = '금년' if '금년' in piv_yoy.columns else piv_yoy.columns[-1]
-                    prev_col = '전년' if '전년' in piv_yoy.columns else piv_yoy.columns[-2]
+            # 📌 6수송 복원 2번 테이블: 항공사별 상세 금년 vs 전년 수송량 및 M/S 점유율 분석표
+            st.markdown('<div class="unified-sub-header">2. 선택 노선/마켓 내 항공사별 금년 vs 전년(YoY) 비교 매트릭스</div>', unsafe_allow_html=True)
+            if al_col_6 and year_col_6:
+                piv_al_yoy = df6_filt.pivot_table(
+                    index=al_col_6,
+                    columns=year_col_6,
+                    values='Pax_num',
+                    aggfunc='sum',
+                    fill_value=0,
+                    observed=False
+                )
+                
+                cur_k = '금년' if '금년' in piv_al_yoy.columns else piv_al_yoy.columns[-1]
+                prev_k = '전년' if '전년' in piv_al_yoy.columns else piv_al_yoy.columns[-2]
 
-                    piv_yoy['증감'] = piv_yoy[cur_col] - piv_yoy[prev_col]
-                    piv_yoy['증감률(%)'] = np.where(piv_yoy[prev_col] > 0, (piv_yoy['증감'] / piv_yoy[prev_col]) * 100, 0)
+                piv_al_yoy['증감 (Pax)'] = piv_al_yoy[cur_k] - piv_al_yoy[prev_k]
+                piv_al_yoy['증감률 (%)'] = np.where(piv_al_yoy[prev_k] > 0, (piv_al_yoy['증감 (Pax)'] / piv_al_yoy[prev_k]) * 100, 0)
+                
+                tot_cur = piv_al_yoy[cur_k].sum()
+                tot_prev = piv_al_yoy[prev_k].sum()
+                piv_al_yoy['금년 M/S (%)'] = np.where(tot_cur > 0, (piv_al_yoy[cur_k] / tot_cur) * 100, 0)
+                piv_al_yoy['전년 M/S (%)'] = np.where(tot_prev > 0, (piv_al_yoy[prev_k] / tot_prev) * 100, 0)
 
-                    # 서식 적용 후 표출
-                    piv_yoy_disp = piv_yoy.copy()
-                    piv_yoy_disp[cur_col] = piv_yoy_disp[cur_col].map(lambda x: f"{x:,.0f}")
-                    piv_yoy_disp[prev_col] = piv_yoy_disp[prev_col].map(lambda x: f"{x:,.0f}")
-                    piv_yoy_disp['증감'] = piv_yoy_disp['증감'].map(lambda x: f"{x:+,.0f}")
-                    piv_yoy_disp['증감률(%)'] = piv_yoy_disp['증감률(%)'].map(lambda x: f"{x:+.1f}%")
+                # 📌 실적 0인 항공사 행 제외
+                piv_al_yoy = piv_al_yoy[(piv_al_yoy[cur_k] > 0) | (piv_al_yoy[prev_k] > 0)]
 
-                    st.dataframe(piv_yoy_disp, width='stretch')
+                st.dataframe(piv_al_yoy, width='stretch')
 
-            with tab6_2:
-                st.markdown("##### 📈 주요 항공사별 6수송 M/S 점유율")
-                if al_col_6:
-                    chart_df6 = df6_filt.groupby(al_col_6, observed=False)['Pax_num'].sum().reset_index()
-                    fig6 = px.pie(chart_df6, values='Pax_num', names=al_col_6, hole=0.4, title="6수송 항공사별 실적 비중")
-                    fig6.update_traces(textposition='inside', textinfo='percent+label')
-                    apply_bottom_legend(fig6)
-                    st.plotly_chart(fig6, width='stretch')
-
-            with tab6_3:
-                st.dataframe(df6_filt.head(100), width='stretch')
+            st.markdown("---")
+            st.markdown('<div class="unified-sub-header">3. 항공사별 6수송 M/S 점유율 시각화</div>', unsafe_allow_html=True)
+            chart_df6 = df6_filt.groupby(al_col_6, observed=False)['Pax_num'].sum().reset_index()
+            chart_df6 = chart_df6[chart_df6['Pax_num'] > 0]
+            fig6 = px.pie(chart_df6, values='Pax_num', names=al_col_6, hole=0.4)
+            fig6.update_traces(textposition='inside', textinfo='percent+label')
+            apply_bottom_legend(fig6)
+            st.plotly_chart(fig6, width='stretch')
         else:
             st.info("💡 선택하신 필터 조건에 해당하는 6수송 데이터가 없습니다.")
     else:
