@@ -15,10 +15,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 외부 구글 앱스 스크립트 웹앱 URL
 EXT_WEB_APP_URL = "https://script.google.com/a/macros/koreanair.com/s/AKfycbxt3IfN0gB4n344U4gL1kt5i4RVjn7_uuG5PtKY-pPgNejpDCsjp2PEbopEexw5NLUjDQ/exec"
 
-# Dynamic Date Logic (2026년 기준)
 today = datetime.date.today()
 current_monday = today - datetime.timedelta(days=today.weekday())
 issue_start_date = current_monday - datetime.timedelta(weeks=5)
@@ -36,7 +34,6 @@ issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.st
 
 future_10_days = today + datetime.timedelta(days=10)
 
-# 항공사별 RBD 계층(Hierarchy) 정의
 RBD_HIERARCHY = {
     'KE': list('YBMSHEKLUQTX'),
     'OZ': list('YBMHEQKSVWTLX'),
@@ -52,13 +49,9 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식
 st.markdown("""
 <style>
-    :root {
-        --primary-color: #0ea5e9 !important;
-        --primaryColor: #0ea5e9 !important;
-    }
+    :root { --primary-color: #0ea5e9 !important; --primaryColor: #0ea5e9 !important; }
     .main-app-title { font-size: 26px !important; font-weight: 800 !important; color: #0f172a; margin-bottom: 12px; }
     .unified-sub-header { font-size: 16px !important; font-weight: 700 !important; color: #0f172a; margin-top: 10px; margin-bottom: 10px; }
     div[role="radiogroup"] label div[role="radio"][aria-checked="true"] { background-color: #0ea5e9 !important; border-color: #0ea5e9 !important; }
@@ -92,7 +85,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar
 st.sidebar.header("📁 실시간 데이터 업로드")
 uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=['parquet', 'csv'], key="sb_uploader_iss")
 uploaded_sup = st.sidebar.file_uploader("2. 공급 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_sup")
@@ -144,13 +136,11 @@ def load_aux_files():
 
 disk_sup, disk_6th = load_aux_files()
 
-# 📌 1. 3/4수송 데이터 로드
 if uploaded_iss is not None:
     df_iss_merged = load_uploaded_parquet(uploaded_iss)
 else:
     df_iss_merged = load_fast_parquet_data_file()
 
-# 📌 2. 공급 데이터 로드
 df_sup_raw = None
 if uploaded_sup is not None:
     try:
@@ -162,7 +152,6 @@ if uploaded_sup is not None:
     except: pass
 if df_sup_raw is None: df_sup_raw = disk_sup
 
-# 📌 3. 6수송 데이터 로드
 df_6th_raw = None
 if uploaded_6th is not None:
     try:
@@ -174,10 +163,9 @@ if uploaded_6th is not None:
     except: pass
 if df_6th_raw is None: df_6th_raw = disk_6th
 
-# 메인 타이틀
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
-
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
+
 selected_group = st.radio(
     "분석할 수송 영역을 선택하세요:",
     options=["✈️ 3/4수송 대시보드", "🌐 6수송 대시보드", "🔗 W26 연결 네트워크"],
@@ -248,7 +236,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         "👥 단체실적"
     ])
 
-    # 1. 🎟️ 발매 M/S 탭
     with tab_34_1:
         if df_iss_merged is None:
             st.warning("❌ 'cache_34_data.parquet' 캐시 파일이 준비되지 않았습니다. 터미널에서 `python batch_processor.py`를 먼저 실행해주세요.")
@@ -275,7 +262,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
-            val_col = 'Weighted_Value' if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else 'Value'
+            
+            # 📌 LCC 직판 보정된 Weighted_Value 바인딩
+            if apply_weight_toggle and 'Weighted_Value' in merged_df.columns:
+                val_col = 'Weighted_Value'
+            else:
+                val_col = 'Value'
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_iss")
@@ -609,7 +601,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_timeline)
                     st.plotly_chart(fig_timeline, width='stretch')
 
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (📌 0인 항목 전면 필터링)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
@@ -729,14 +721,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     ag_html += '</tbody></table></div>'
                     st.markdown(ag_html, unsafe_allow_html=True)
 
-    # 4. 👥 단체실적 탭 (📌 필터 6종 확장 및 실적 0 숨김 처리)
+    # 4. 👥 단체실적 탭
     with tab_34_4:
         st.subheader("👥 발매 - 항공사별/대리점별 단체 발매 현황")
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
             dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else ('출발일자' if '출발일자' in df_grp_raw.columns else None)
             
-            # 6종 필터 옵션 구성
             g_routes = sorted([str(x) for x in df_grp_raw['노선'].dropna().unique()]) if '노선' in df_grp_raw.columns else []
             g_m_col = '출발월' if '출발월' in df_grp_raw.columns else ('출발 월' if '출발 월' in df_grp_raw.columns else None)
             g_months = sorted([str(x) for x in df_grp_raw[g_m_col].dropna().unique()]) if g_m_col else []
@@ -758,7 +749,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 sel_g_time = render_slicer_box(gc5, "5. 출발 시간대", g_times, "slicer_g_time") if g_t_col else ALL_OPTION
                 sel_g_al = render_slicer_box(gc6, "6. 항공사", g_als, "slicer_g_al")
 
-            # 단체 필터 마스크 연산
             mask_grp = pd.Series(True, index=df_grp_raw.index)
             if sel_g_route != ALL_OPTION: mask_grp &= (df_grp_raw['노선'].astype(str) == sel_g_route)
             if g_m_col and sel_g_month != ALL_OPTION: mask_grp &= (df_grp_raw[g_m_col].astype(str) == sel_g_month)
@@ -767,7 +757,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             if g_t_col and sel_g_time != ALL_OPTION: mask_grp &= (df_grp_raw[g_t_col].astype(str) == sel_g_time)
             if 'Dominant Marketing Airline' in df_grp_raw.columns and sel_g_al != ALL_OPTION: mask_grp &= (df_grp_raw['Dominant Marketing Airline'].astype(str) == sel_g_al)
 
-            # 단체 예약 클래스 조건 (7C: V, 타사: G)
             is_grp_cond = (((df_grp_raw['Dominant Marketing Airline'] == '7C') & (df_grp_raw['O&D RBKD'] == 'V')) | ((df_grp_raw['Dominant Marketing Airline'] != '7C') & (df_grp_raw['O&D RBKD'] == 'G')))
             df_grp_filtered = df_grp_raw[mask_grp & is_grp_cond].copy()
 
@@ -904,7 +893,6 @@ elif selected_group == "🌐 6수송 대시보드":
     od_col_6 = actual_cols['OD ON/OFF']
     month_col_6 = actual_cols['TRIP MONTH']
 
-    # 📌 6수송 출처 및 동적 기간 상자 추가
     m_list_6 = sorted([str(x).strip() for x in df_6[month_col_6].dropna().unique() if str(x).strip() != 'nan']) if month_col_6 and month_col_6 in df_6.columns else []
     dynamic_dep_6th = f"{m_list_6[0]} ~ {m_list_6[-1]}" if m_list_6 else dep_range_str
 
@@ -1172,7 +1160,7 @@ elif selected_group == "🌐 6수송 대시보드":
                     carrier_html += f'<td style="text-align:center;"><b>{k_ms_cy:.1f}%</b></td><td style="text-align:center;">{k_ms_diff_str if m_py>0 and k_py>0 else "-"}</td>'
                     carrier_html += '</tr>'
 
-                # TOP 30 요약행 (#efefef)
+                # TOP 30 요약행
                 tot_m_cy = df_top['Val_num'].sum()
                 tot_m_py = df_top['Val_PY_num'].sum()
                 tot_m_yoy = ((tot_m_cy - tot_m_py) / tot_m_py * 100) if tot_m_py > 0 else 0
@@ -1206,7 +1194,7 @@ elif selected_group == "🌐 6수송 대시보드":
                 carrier_html += f'<td style="text-align:center;">{tot_k_ms_cy:.1f}%</td><td style="text-align:center;">{"▲" if tot_k_ms_diff>=0 else "▼"} {abs(tot_k_ms_diff):.1f}%p</td>'
                 carrier_html += '</tr>'
 
-                # 전체 시장 총합 (Market Total) 요약행 (#cccccc)
+                # 전체 시장 총합 (Market Total) 요약행
                 mkt_all_cy = df_mkt_full_2['Val_num'].sum()
                 mkt_all_py = df_mkt_full_2['Val_PY_num'].sum()
                 mkt_all_yoy = ((mkt_all_cy - mkt_all_py) / mkt_all_py * 100) if mkt_all_py > 0 else 0
@@ -1252,7 +1240,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.dataframe(df_6.head(100), width="stretch")
 
 # ==========================================
-# GROUP 3: 🔗 W26 연결 네트워크 (외부 연동)
+# GROUP 3: 🔗 W26 연결 네트워크
 # ==========================================
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
