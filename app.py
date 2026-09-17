@@ -133,37 +133,37 @@ def load_uploaded_parquet(file_obj):
         return optimize_df(clean_transport_column(pd.read_csv(file_obj, low_memory=False)))
 
 @st.cache_data(max_entries=5, show_spinner=False)
+@st.cache_data(max_entries=5, show_spinner=False)
 def load_aux_files():
     df_sup, df_6th = None, None
     
-    # 📌 [자동 탐색 적용] '공급' 키워드가 들어간 최신 파일 자동 검색
-    sup_files = glob.glob('*공급*.csv') + glob.glob('*공급*.xlsx')
-    if sup_files:
-        latest_sup_file = sorted(sup_files, key=os.path.getmtime, reverse=True)[0]
-        try:
-            if latest_sup_file.endswith('.csv'):
-                df_sup = pd.read_csv(latest_sup_file, low_memory=False)
-            else:
-                df_sup = pd.read_excel(latest_sup_file)
+    # 📌 1순위: '공급.csv' 직접 탐색, 2순위: 기타 공급 키워드 파일 탐색
+    if os.path.exists('공급.csv'):
+        try: df_sup = pd.read_csv('공급.csv', low_memory=False)
         except: pass
+    else:
+        sup_files = glob.glob('*공급*.csv') + glob.glob('*공급*.xlsx')
+        if sup_files:
+            latest_sup_file = sorted(sup_files, key=os.path.getmtime, reverse=True)[0]
+            try:
+                if latest_sup_file.endswith('.csv'): df_sup = pd.read_csv(latest_sup_file, low_memory=False)
+                else: df_sup = pd.read_excel(latest_sup_file)
+            except: pass
 
-    # 📌 [자동 탐색 적용] 'cache_6th_data.parquet' 또는 '6수송' 키워드 파일 자동 검색
+    # 📌 6수송 캐시 및 CSV 탐색
     if os.path.exists('cache_6th_data.parquet'):
-        df_6th = pd.read_parquet('cache_6th_data.parquet')
+        try: df_6th = pd.read_parquet('cache_6th_data.parquet')
+        except: pass
     else:
         six_files = glob.glob('*6수송*.csv') + glob.glob('*6TRF*.csv') + glob.glob('*6수송*.xlsx')
         if six_files:
             latest_6th_file = sorted(six_files, key=os.path.getmtime, reverse=True)[0]
             try:
-                if latest_6th_file.endswith('.csv'):
-                    df_6th = pd.read_csv(latest_6th_file, low_memory=False)
-                else:
-                    df_6th = pd.read_excel(latest_6th_file)
+                if latest_6th_file.endswith('.csv'): df_6th = pd.read_csv(latest_6th_file, low_memory=False)
+                else: df_6th = pd.read_excel(latest_6th_file)
             except: pass
 
     return optimize_df(df_sup), optimize_df(df_6th)
-
-disk_sup, disk_6th = load_aux_files()
 
 if uploaded_iss is not None:
     df_iss_merged = load_uploaded_parquet(uploaded_iss)
