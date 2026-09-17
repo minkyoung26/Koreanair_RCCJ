@@ -133,11 +133,10 @@ def load_uploaded_parquet(file_obj):
         return optimize_df(clean_transport_column(pd.read_csv(file_obj, low_memory=False)))
 
 @st.cache_data(max_entries=5, show_spinner=False)
-@st.cache_data(max_entries=5, show_spinner=False)
 def load_aux_files():
     df_sup, df_6th = None, None
     
-    # 📌 1순위: '공급.csv' 직접 탐색, 2순위: 기타 공급 키워드 파일 탐색
+    # 📌 공급 데이터 탐색
     if os.path.exists('공급.csv'):
         try: df_sup = pd.read_csv('공급.csv', low_memory=False)
         except: pass
@@ -150,7 +149,7 @@ def load_aux_files():
                 else: df_sup = pd.read_excel(latest_sup_file)
             except: pass
 
-    # 📌 6수송 캐시 및 CSV 탐색
+    # 📌 6수송 데이터 탐색
     if os.path.exists('cache_6th_data.parquet'):
         try: df_6th = pd.read_parquet('cache_6th_data.parquet')
         except: pass
@@ -164,6 +163,9 @@ def load_aux_files():
             except: pass
 
     return optimize_df(df_sup), optimize_df(df_6th)
+
+# 📌 [수정] disk_sup, disk_6th 변수를 최상단에서 명확히 선언
+disk_sup, disk_6th = load_aux_files()
 
 if uploaded_iss is not None:
     df_iss_merged = load_uploaded_parquet(uploaded_iss)
@@ -179,7 +181,8 @@ if uploaded_sup is not None:
         else:
             df_sup_raw = optimize_df(pd.read_csv(uploaded_sup, low_memory=False))
     except: pass
-if df_sup_raw is None: df_sup_raw = disk_sup
+if df_sup_raw is None: 
+    df_sup_raw = disk_sup
 
 df_6th_raw = None
 if uploaded_6th is not None:
@@ -190,7 +193,8 @@ if uploaded_6th is not None:
         else:
             df_6th_raw = optimize_df(pd.read_csv(uploaded_6th, low_memory=False))
     except: pass
-if df_6th_raw is None: df_6th_raw = disk_6th
+if df_6th_raw is None: 
+    df_6th_raw = disk_6th
 
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
@@ -878,7 +882,7 @@ elif selected_group == "🌐 6수송 대시보드":
 
         year_type_col = actual_cols['금전구분']
 
-        # 📌 [핵심 보정] "금/전" 필드에서 "금년"만 파싱하는 로직
+        # 📌 "금/전" 필드에서 "금년"만 파싱하는 로직
         if year_type_col and year_type_col in df_6_raw.columns:
             cy_mask = df_6_raw[year_type_col].astype(str).str.strip().str.contains('금년|CY', na=False)
             py_mask = df_6_raw[year_type_col].astype(str).str.strip().str.contains('전년|PY', na=False)
