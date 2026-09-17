@@ -110,7 +110,6 @@ def optimize_df(df_in):
         elif df_in[col].dtype == 'float64': df_in[col] = df_in[col].astype('float32')
     return df_in
 
-# 📌 [수정] 원본 데이터 제외 없는 직결 로딩
 def clean_transport_column(df):
     if df is None: return df
     b_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
@@ -127,14 +126,6 @@ def load_fast_parquet_data_file():
     return None
 
 @st.cache_data(max_entries=5, show_spinner=False)
-def filter_supply_ke_only(df_in):
-    """공급 데이터 원천 로드"""
-    if df_in is None or df_in.empty: return df_in
-    df = df_in.copy()
-    df.columns = [str(c).strip() for c in df.columns]
-    return df.reset_index(drop=True)
-
-@st.cache_data(max_entries=5, show_spinner=False)
 def load_uploaded_parquet(file_obj):
     file_obj.seek(0)
     if file_obj.name.endswith('.parquet'):
@@ -147,14 +138,12 @@ def load_aux_files():
     df_sup, df_6th = None, None
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # 📌 공급.csv 우선 직접 읽기
     sup_paths = [os.path.join(base_dir, '공급.csv'), '공급.csv']
     for sp in sup_paths:
         if os.path.exists(sp):
             try:
                 df_sup = pd.read_csv(sp, low_memory=False)
-                if df_sup is not None and not df_sup.empty:
-                    break
+                if df_sup is not None and not df_sup.empty: break
             except: pass
 
     if df_sup is None:
@@ -166,14 +155,12 @@ def load_aux_files():
                 else: df_sup = pd.read_excel(latest_sup_file)
             except: pass
 
-    # 📌 6수송 캐시 읽기
     six_paths = [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']
     for sp in six_paths:
         if os.path.exists(sp):
             try:
                 df_6th = pd.read_parquet(sp)
-                if df_6th is not None and not df_6th.empty:
-                    break
+                if df_6th is not None and not df_6th.empty: break
             except: pass
 
     if df_6th is None:
@@ -316,7 +303,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
         route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
-            apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
+            # 📌 [핵심 수정] 기본값을 False(가중치 미적용=순수 Raw Pax)로 원천 변경
+            apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=False)
             
             if apply_weight_toggle and 'Weighted_Value' in merged_df.columns:
                 val_col = 'Weighted_Value'
@@ -1201,7 +1189,7 @@ elif selected_group == "🌐 6수송 대시보드":
                     carrier_html += f'<td style="font-weight:600; text-align:center;">{od_name}</td>'
                     carrier_html += f'<td style="text-align:center;"><b>{m_cy:,.0f}</b></td><td style="text-align:center;">{m_yoy_str if m_py>0 else "-"}</td>'
                     carrier_html += f'<td style="text-align:center;">{c_cy:,.0f}</td><td style="text-align:center;">{c_yoy_str if c_py>0 else "-"}</td>'
-                    carrier_html += f'<td style="text-align:center;"><b>{c_ms_cy:.0f}%</b></td><td style="text-align:center;">{c_ms_diff_str if m_py>0 and c_py>0 else "-"}</td>'
+                    carrier_html += f'<td style="text-align:center;"><b>{c_ms_cy:.0f}%</b></td><td style="text-align:center;">{diff_str if m_py>0 and c_py>0 else "-"}</td>'
                     k_cy_display = f"{k_cy:,.0f}" if k_cy > 0 else "-"
                     carrier_html += f'<td style="text-align:center;">{k_cy_display}</td><td style="text-align:center;">{k_yoy_str if k_cy>0 and k_py>0 else "-"}</td>'
                     carrier_html += f'<td style="text-align:center;"><b>{k_ms_cy:.1f}%</b></td><td style="text-align:center;">{k_ms_diff_str if m_py>0 and k_py>0 else "-"}</td>'
