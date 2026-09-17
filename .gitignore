@@ -8,4 +8,5 @@ __pycache__
 !batch_processor.py
 !cache_34_data.parquet
 !cache_6th_data.parquet
-!*공급*.csv
+!공급.csv
+!가중치 파일_7월.csv
