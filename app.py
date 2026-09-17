@@ -134,34 +134,34 @@ def load_uploaded_parquet(file_obj):
 
 @st.cache_data(max_entries=5, show_spinner=False)
 def filter_supply_ke_only(df_in):
-    """공급 데이터에서 KE 취항 노선만 유연하고 정확하게 추출하는 헬퍼 함수"""
+    """공급 데이터 예외 없는 안전 정제 함수"""
     if df_in is None or df_in.empty: return df_in
     df = df_in.copy()
     df.columns = [str(c).strip() for c in df.columns]
     
-    # 1) 항공사 컬럼 유연 탐색
+    # 1. KE취항여부 컬럼 처리 (존재하고 '취항' 데이터가 있을 때만 적용)
+    sup_ke_col = 'KE취항여부' if 'KE취항여부' in df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df.columns else None)
+    if sup_ke_col:
+        filtered = df[df[sup_ke_col].astype(str).str.contains('취항', na=False)]
+        if not filtered.empty:
+            return filtered.reset_index(drop=True)
+            
+    # 2. 항공사 컬럼 기준 처리
     al_col = None
-    possible_al_cols = ['Op Airline Code', 'Mkt Al', 'Airline', 'Op Airline', 'Mkt Airline', 'CARRIER', '항공사']
-    for c in possible_al_cols:
+    for c in ['Op Airline Code', 'Mkt Al', 'Airline', 'Op Airline', 'Mkt Airline', 'CARRIER', '항공사']:
         if c in df.columns:
             al_col = c
             break
             
-    # 2) 'KE취항여부' 또는 'KE' 운항 실적 기반으로 노선 정제
-    ke_routes = []
-    sup_ke_col = 'KE취항여부' if 'KE취항여부' in df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df.columns else None)
-    
-    if sup_ke_col:
-        ke_routes = df[df[sup_ke_col].astype(str).str.contains('취항', na=False)]['노선'].dropna().unique().tolist()
-    
-    if not ke_routes and al_col and '노선' in df.columns:
+    if al_col and '노선' in df.columns:
         ke_routes = df[df[al_col].astype(str).str.strip().str.upper() == 'KE']['노선'].dropna().unique().tolist()
-        
-    if ke_routes and '노선' in df.columns:
-        df = df[df['노선'].isin(ke_routes)]
-            
+        if ke_routes:
+            filtered = df[df['노선'].isin(ke_routes)]
+            if not filtered.empty:
+                return filtered.reset_index(drop=True)
+                
+    # 3. 만약 위 조건으로 필터링 후 0건이 되면 원본을 그대로 반환하여 오류 방지
     return df.reset_index(drop=True)
-
 @st.cache_data(max_entries=5, show_spinner=False)
 def load_aux_files():
     df_sup, df_6th = None, None
