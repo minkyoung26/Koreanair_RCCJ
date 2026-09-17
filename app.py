@@ -506,6 +506,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # 2. ✈️ 공급 M/S 탭
+    # 2. ✈️ 공급 M/S 탭
     with tab_34_2:
         if df_sup_raw is None:
             st.info("👈 좌측 사이드바 2번 위치에서 공급 CSV 파일을 업로드해 주세요.")
@@ -514,17 +515,26 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df_sup = df_sup_raw.copy()
         df_sup.columns = [c.strip() for c in df_sup.columns]
 
+        # 📌 [KE 취항 노선 한정 로직 강화]
+        # 1) 'KE취항여부' 필드가 존재하는 경우 '취항' 데이터만 1차 필터링
         sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
         if sup_ke_col:
-            df_sup = df_sup[df_sup[sup_ke_col].astype(str) == '취항'].reset_index(drop=True)
+            df_sup = df_sup[df_sup[sup_ke_col].astype(str).str.contains('취항', na=False)].reset_index(drop=True)
         
+        # 2) 항공사 컬럼 표준화
         if 'Op Airline Code' in df_sup.columns: df_sup['Airline'] = df_sup['Op Airline Code']
         elif 'Mkt Al' in df_sup.columns: df_sup['Airline'] = df_sup['Mkt Al']
         else: df_sup['Airline'] = 'Unknown'
 
+        # 3) KE가 실제로 운항/공급을 제공하는 노선 목록만 추출하여 전체 대상 노선 제한
+        ke_routes = df_sup[df_sup['Airline'].astype(str) == 'KE']['노선'].dropna().unique().tolist()
+        if ke_routes:
+            df_sup = df_sup[df_sup['노선'].isin(ke_routes)].reset_index(drop=True)
+
         df_sup['Seats_num'] = pd.to_numeric(df_sup['Seats'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if 'Seats' in df_sup.columns else 0
         df_sup['Flights_num'] = pd.to_numeric(df_sup['Flights'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if 'Flights' in df_sup.columns else 1
 
+        # KE 취항 노선만 정렬되어 노선 슬라이서 옵션 구성
         sup_routes = df_sup.groupby('노선', observed=False)['Seats_num'].sum().sort_values(ascending=False).index.astype(str).tolist()
         sup_month_col = '출발월' if '출발월' in df_sup.columns else ('출발 월' if '출발 월' in df_sup.columns else ('Travel Month' if 'Travel Month' in df_sup.columns else None))
         sup_months = sorted([str(x) for x in df_sup[sup_month_col].dropna().unique()]) if sup_month_col else []
@@ -538,7 +548,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
         
         sf_col1, sf_col2, sf_col3, sf_col4 = st.columns(4)
-        selected_sup_route_str = render_slicer_box(sf_col1, "1. 노선", sup_routes, "slicer_route_sup")
+        selected_sup_route_str = render_slicer_box(sf_col1, "1. 노선 (KE 취항 한정)", sup_routes, "slicer_route_sup")
         selected_sup_month_str = render_slicer_box(sf_col2, "2. 출발 월", sup_months, "slicer_month_sup") if sup_month_col else ALL_OPTION
         selected_sup_time_str = render_slicer_box(sf_col3, "3. 출발 시간대", sup_time_cats, "slicer_time_sup")
         selected_sup_al_str = render_slicer_box(sf_col4, "4. 항공사", sup_airlines, "slicer_al_sup")
