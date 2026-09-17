@@ -120,8 +120,10 @@ def clean_transport_column(df):
 
 @st.cache_data(max_entries=5, show_spinner=False)
 def load_fast_parquet_data_file():
-    if os.path.exists('cache_34_data.parquet'):
-        return optimize_df(clean_transport_column(pd.read_parquet('cache_34_data.parquet')))
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    target_path = os.path.join(base_dir, 'cache_34_data.parquet')
+    if os.path.exists(target_path):
+        return optimize_df(clean_transport_column(pd.read_parquet(target_path)))
     return None
 
 @st.cache_data(max_entries=5, show_spinner=False)
@@ -133,12 +135,11 @@ def load_uploaded_parquet(file_obj):
         return optimize_df(clean_transport_column(pd.read_csv(file_obj, low_memory=False)))
 
 @st.cache_data(max_entries=5, show_spinner=False)
-@st.cache_data(max_entries=5, show_spinner=False)
 def load_aux_files():
     df_sup, df_6th = None, None
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # 📌 절대 경로 기준 '공급.csv' 및 키워드 파일 탐색
+    # 📌 절대 경로 기준 공급 파일 탐색
     sup_target_path = os.path.join(base_dir, '공급.csv')
     if os.path.exists(sup_target_path):
         try: df_sup = pd.read_csv(sup_target_path, low_memory=False)
@@ -152,7 +153,7 @@ def load_aux_files():
                 else: df_sup = pd.read_excel(latest_sup_file)
             except: pass
 
-    # 📌 절대 경로 기준 6수송 캐시 및 CSV 탐색
+    # 📌 절대 경로 기준 6수송 캐시 탐색
     six_target_path = os.path.join(base_dir, 'cache_6th_data.parquet')
     if os.path.exists(six_target_path):
         try: df_6th = pd.read_parquet(six_target_path)
@@ -167,6 +168,10 @@ def load_aux_files():
             except: pass
 
     return optimize_df(df_sup), optimize_df(df_6th)
+
+# 📌 [핵심 수정] disk_sup 및 disk_6th 변수를 전역 공간에서 최우선 정의
+disk_sup, disk_6th = load_aux_files()
+
 if uploaded_iss is not None:
     df_iss_merged = load_uploaded_parquet(uploaded_iss)
 else:
