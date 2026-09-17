@@ -110,12 +110,12 @@ def optimize_df(df_in):
         elif df_in[col].dtype == 'float64': df_in[col] = df_in[col].astype('float32')
     return df_in
 
+# 📌 [수정] 원본 데이터 제외 없는 직결 로딩
 def clean_transport_column(df):
     if df is None: return df
     b_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
     if b_col:
         df['수송'] = df[b_col].astype(str).str.strip()
-        df['수송'] = df['수송'].replace({'nan': 'OTHERS', '': 'OTHERS', 'None': 'OTHERS', 'NaN': 'OTHERS'})
     return df
 
 @st.cache_data(max_entries=5, show_spinner=False)
@@ -128,33 +128,10 @@ def load_fast_parquet_data_file():
 
 @st.cache_data(max_entries=5, show_spinner=False)
 def filter_supply_ke_only(df_in):
-    """공급 데이터에서 KE 취항 노선만 추출하는 안전 정제 함수"""
+    """공급 데이터 원천 로드"""
     if df_in is None or df_in.empty: return df_in
     df = df_in.copy()
     df.columns = [str(c).strip() for c in df.columns]
-    
-    # 항공사 컬럼 유연 탐색
-    al_col = None
-    for c in ['Op Airline Code', 'Mkt Al', 'Airline', 'Op Airline', 'Mkt Airline', 'CARRIER', '항공사']:
-        if c in df.columns:
-            al_col = c
-            break
-            
-    # KE 취항 여부 / KE 실제 공급 있는 노선 추출
-    ke_routes = []
-    sup_ke_col = 'KE취항여부' if 'KE취항여부' in df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df.columns else None)
-    
-    if sup_ke_col:
-        ke_routes = df[df[sup_ke_col].astype(str).str.contains('취항', na=False)]['노선'].dropna().unique().tolist()
-    
-    if not ke_routes and al_col and '노선' in df.columns:
-        ke_routes = df[df[al_col].astype(str).str.strip().str.upper() == 'KE']['노선'].dropna().unique().tolist()
-        
-    if ke_routes and '노선' in df.columns:
-        filtered = df[df['노선'].isin(ke_routes)]
-        if not filtered.empty:
-            return filtered.reset_index(drop=True)
-            
     return df.reset_index(drop=True)
 
 @st.cache_data(max_entries=5, show_spinner=False)
@@ -189,9 +166,6 @@ def load_aux_files():
                 else: df_sup = pd.read_excel(latest_sup_file)
             except: pass
 
-    if df_sup is not None:
-        df_sup = filter_supply_ke_only(df_sup)
-
     # 📌 6수송 캐시 읽기
     six_paths = [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']
     for sp in six_paths:
@@ -213,7 +187,6 @@ def load_aux_files():
 
     return optimize_df(df_sup), optimize_df(df_6th)
 
-# 📌 전역 변수로 디스크 데이터 로드
 disk_sup, disk_6th = load_aux_files()
 
 if uploaded_iss is not None:
@@ -229,7 +202,6 @@ if uploaded_sup is not None:
             df_sup_raw = optimize_df(pd.read_parquet(uploaded_sup))
         else:
             df_sup_raw = optimize_df(pd.read_csv(uploaded_sup, low_memory=False))
-        df_sup_raw = filter_supply_ke_only(df_sup_raw)
     except: pass
 if df_sup_raw is None: 
     df_sup_raw = disk_sup
@@ -343,7 +315,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         full_route_sum = merged_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
         route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
-        with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
+        with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
             
             if apply_weight_toggle and 'Weighted_Value' in merged_df.columns:
@@ -352,7 +324,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 val_col = 'Value'
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-            sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_iss")
+            sel_route_str = render_slicer_box(f_col1, "1. 노선", route_order_list, "slicer_route_iss")
             sel_week_str = render_slicer_box(f_col2, "2. 발매 주차 및 일자", all_issue_weeks, "slicer_week_iss") if week_col else ALL_OPTION
             sel_month_str = render_slicer_box(f_col3, "3. 출발 월", all_dep_months, "slicer_month_iss") if month_col else ALL_OPTION
             sel_bound_str = render_slicer_box(f_col4, "4. 수송 구분 (3TF/4TF/OTHERS)", all_bounds, "slicer_bound_iss") if bound_col else ALL_OPTION
@@ -565,11 +537,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_sup.columns = [str(c).strip() for c in df_sup.columns]
 
-        # 📌 KE 취항 노선 원천 선별 정제
-        sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
-        if sup_ke_col:
-            df_sup = df_sup[df_sup[sup_ke_col].astype(str).str.contains('취항', na=False)]
-
         al_col = None
         for c in ['Op Airline Code', 'Mkt Al', 'Airline', 'Op Airline', 'CARRIER', '항공사']:
             if c in df_sup.columns:
@@ -578,12 +545,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         if al_col: df_sup['Airline'] = df_sup[al_col]
         else: df_sup['Airline'] = 'Unknown'
-
-        # KE 실제 공급이 있는 노선으로 필터링 고정
-        if '노선' in df_sup.columns:
-            ke_routes = df_sup[df_sup['Airline'].astype(str).str.strip().str.upper() == 'KE']['노선'].dropna().unique().tolist()
-            if ke_routes:
-                df_sup = df_sup[df_sup['노선'].isin(ke_routes)]
 
         df_sup = df_sup.reset_index(drop=True)
 
@@ -599,11 +560,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
         sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
         sup_color_map = build_airline_color_map(sup_airlines)
 
-        st.markdown('<div class="unified-sub-header">🔍 공급 대시보드 필터 설정 (KE 취항노선 전용)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="unified-sub-header">🔍 공급 대시보드 필터 설정</div>', unsafe_allow_html=True)
         metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
         
         sf_col1, sf_col2, sf_col3, sf_col4 = st.columns(4)
-        selected_sup_route_str = render_slicer_box(sf_col1, "1. 노선 (KE 취항 한정)", sup_routes, "slicer_route_sup")
+        selected_sup_route_str = render_slicer_box(sf_col1, "1. 노선", sup_routes, "slicer_route_sup")
         selected_sup_month_str = render_slicer_box(sf_col2, "2. 출발 월", sup_months, "slicer_month_sup") if sup_month_col else ALL_OPTION
         selected_sup_time_str = render_slicer_box(sf_col3, "3. 출발 시간대", sup_time_cats, "slicer_time_sup")
         selected_sup_al_str = render_slicer_box(sf_col4, "4. 항공사", sup_airlines, "slicer_al_sup")
