@@ -133,40 +133,10 @@ def load_uploaded_parquet(file_obj):
         return optimize_df(clean_transport_column(pd.read_csv(file_obj, low_memory=False)))
 
 @st.cache_data(max_entries=5, show_spinner=False)
-def filter_supply_ke_only(df_in):
-    """공급 데이터 예외 없는 안전 정제 함수"""
-    if df_in is None or df_in.empty: return df_in
-    df = df_in.copy()
-    df.columns = [str(c).strip() for c in df.columns]
-    
-    # 1. KE취항여부 컬럼 처리 (존재하고 '취항' 데이터가 있을 때만 적용)
-    sup_ke_col = 'KE취항여부' if 'KE취항여부' in df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df.columns else None)
-    if sup_ke_col:
-        filtered = df[df[sup_ke_col].astype(str).str.contains('취항', na=False)]
-        if not filtered.empty:
-            return filtered.reset_index(drop=True)
-            
-    # 2. 항공사 컬럼 기준 처리
-    al_col = None
-    for c in ['Op Airline Code', 'Mkt Al', 'Airline', 'Op Airline', 'Mkt Airline', 'CARRIER', '항공사']:
-        if c in df.columns:
-            al_col = c
-            break
-            
-    if al_col and '노선' in df.columns:
-        ke_routes = df[df[al_col].astype(str).str.strip().str.upper() == 'KE']['노선'].dropna().unique().tolist()
-        if ke_routes:
-            filtered = df[df['노선'].isin(ke_routes)]
-            if not filtered.empty:
-                return filtered.reset_index(drop=True)
-                
-    # 3. 만약 위 조건으로 필터링 후 0건이 되면 원본을 그대로 반환하여 오류 방지
-    return df.reset_index(drop=True)
-@st.cache_data(max_entries=5, show_spinner=False)
 def load_aux_files():
     df_sup, df_6th = None, None
     
-    # 📌 공급 데이터 탐색 및 즉시 KE 취항 한정 정제
+    # 📌 공급 데이터 탐색
     if os.path.exists('공급.csv'):
         try: df_sup = pd.read_csv('공급.csv', low_memory=False)
         except: pass
@@ -178,9 +148,6 @@ def load_aux_files():
                 if latest_sup_file.endswith('.csv'): df_sup = pd.read_csv(latest_sup_file, low_memory=False)
                 else: df_sup = pd.read_excel(latest_sup_file)
             except: pass
-
-    if df_sup is not None:
-        df_sup = filter_supply_ke_only(df_sup)
 
     # 📌 6수송 데이터 탐색
     if os.path.exists('cache_6th_data.parquet'):
@@ -212,7 +179,6 @@ if uploaded_sup is not None:
             df_sup_raw = optimize_df(pd.read_parquet(uploaded_sup))
         else:
             df_sup_raw = optimize_df(pd.read_csv(uploaded_sup, low_memory=False))
-        df_sup_raw = filter_supply_ke_only(df_sup_raw)
     except: pass
 if df_sup_raw is None: 
     df_sup_raw = disk_sup
@@ -540,20 +506,50 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     # 2. ✈️ 공급 M/S 탭
     with tab_34_2:
-        if df_sup_raw is None:
-            st.info("👈 좌측 사이드바 2번 위치에서 공급 CSV 파일을 업로드해 주세요.")
+        df_sup = None
+        if uploaded_sup is not None:
+            try:
+                uploaded_sup.seek(0)
+                if uploaded_sup.name.endswith('.parquet'): df_sup = pd.read_parquet(uploaded_sup)
+                else: df_sup = pd.read_csv(uploaded_sup, low_memory=False)
+            except: pass
+        
+        if df_sup is None:
+            df_sup = disk_sup
+
+        if df_sup is None:
+            st.warning("⚠️ 공급 데이터(`공급.csv`)를 읽을 수 없습니다. 좌측 사이드바 2번에서 파일을 직접 업로드해 주세요.")
             st.stop()
 
-        df_sup = df_sup_raw.copy()
+        df_sup = df_sup.copy()
+        df_sup.columns = [str(c).strip() for c in df_sup.columns]
 
-        if 'Op Airline Code' in df_sup.columns: df_sup['Airline'] = df_sup['Op Airline Code']
-        elif 'Mkt Al' in df_sup.columns: df_sup['Airline'] = df_sup['Mkt Al']
+        # 📌 KE 취항 노선 원천 선별 정제
+        sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
+        if sup_ke_col:
+            df_sup = df_sup[df_sup[sup_ke_col].astype(str).str.contains('취항', na=False)]
+
+        al_col = None
+        for c in ['Op Airline Code', 'Mkt Al', 'Airline', 'Op Airline', 'CARRIER', '항공사']:
+            if c in df_sup.columns:
+                al_col = c
+                break
+
+        if al_col: df_sup['Airline'] = df_sup[al_col]
         else: df_sup['Airline'] = 'Unknown'
+
+        # KE 실제 공급이 있는 노선으로 필터링 고정
+        if '노선' in df_sup.columns:
+            ke_routes = df_sup[df_sup['Airline'].astype(str).str.strip().str.upper() == 'KE']['노선'].dropna().unique().tolist()
+            if ke_routes:
+                df_sup = df_sup[df_sup['노선'].isin(ke_routes)]
+
+        df_sup = df_sup.reset_index(drop=True)
 
         df_sup['Seats_num'] = pd.to_numeric(df_sup['Seats'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if 'Seats' in df_sup.columns else 0
         df_sup['Flights_num'] = pd.to_numeric(df_sup['Flights'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if 'Flights' in df_sup.columns else 1
 
-        sup_routes = df_sup.groupby('노선', observed=False)['Seats_num'].sum().sort_values(ascending=False).index.astype(str).tolist()
+        sup_routes = df_sup.groupby('노선', observed=False)['Seats_num'].sum().sort_values(ascending=False).index.astype(str).tolist() if '노선' in df_sup.columns else []
         sup_month_col = '출발월' if '출발월' in df_sup.columns else ('출발 월' if '출발 월' in df_sup.columns else ('Travel Month' if 'Travel Month' in df_sup.columns else None))
         sup_months = sorted([str(x) for x in df_sup[sup_month_col].dropna().unique()]) if sup_month_col else []
         sup_time_cats = sorted([str(x) for x in df_sup['출발 시간대'].dropna().unique()]) if '출발 시간대' in df_sup.columns else []
@@ -574,7 +570,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         target_val = 'Seats_num' if "공급석" in metric_mode else 'Flights_num'
 
         filter_mask_sup = pd.Series(True, index=df_sup.index)
-        if selected_sup_route_str != ALL_OPTION: filter_mask_sup &= (df_sup['노선'].astype(str) == selected_sup_route_str)
+        if selected_sup_route_str != ALL_OPTION and '노선' in df_sup.columns: filter_mask_sup &= (df_sup['노선'].astype(str) == selected_sup_route_str)
         if selected_sup_al_str != ALL_OPTION: filter_mask_sup &= (df_sup['Airline'].astype(str) == selected_sup_al_str)
         if sup_month_col and selected_sup_month_str != ALL_OPTION: filter_mask_sup &= (df_sup[sup_month_col].astype(str) == selected_sup_month_str)
         if '출발 시간대' in df_sup.columns and selected_sup_time_str != ALL_OPTION: filter_mask_sup &= (df_sup['출발 시간대'].astype(str) == selected_sup_time_str)
