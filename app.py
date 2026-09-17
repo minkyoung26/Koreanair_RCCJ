@@ -127,6 +127,37 @@ def load_fast_parquet_data_file():
     return None
 
 @st.cache_data(max_entries=5, show_spinner=False)
+def filter_supply_ke_only(df_in):
+    """공급 데이터에서 KE 취항 노선만 추출하는 안전 정제 함수"""
+    if df_in is None or df_in.empty: return df_in
+    df = df_in.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+    
+    # 항공사 컬럼 유연 탐색
+    al_col = None
+    for c in ['Op Airline Code', 'Mkt Al', 'Airline', 'Op Airline', 'Mkt Airline', 'CARRIER', '항공사']:
+        if c in df.columns:
+            al_col = c
+            break
+            
+    # KE 취항 여부 / KE 실제 공급 있는 노선 추출
+    ke_routes = []
+    sup_ke_col = 'KE취항여부' if 'KE취항여부' in df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df.columns else None)
+    
+    if sup_ke_col:
+        ke_routes = df[df[sup_ke_col].astype(str).str.contains('취항', na=False)]['노선'].dropna().unique().tolist()
+    
+    if not ke_routes and al_col and '노선' in df.columns:
+        ke_routes = df[df[al_col].astype(str).str.strip().str.upper() == 'KE']['노선'].dropna().unique().tolist()
+        
+    if ke_routes and '노선' in df.columns:
+        filtered = df[df['노선'].isin(ke_routes)]
+        if not filtered.empty:
+            return filtered.reset_index(drop=True)
+            
+    return df.reset_index(drop=True)
+
+@st.cache_data(max_entries=5, show_spinner=False)
 def load_uploaded_parquet(file_obj):
     file_obj.seek(0)
     if file_obj.name.endswith('.parquet'):
@@ -139,13 +170,18 @@ def load_aux_files():
     df_sup, df_6th = None, None
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # 📌 절대 경로 기준 공급 파일 탐색
-    sup_target_path = os.path.join(base_dir, '공급.csv')
-    if os.path.exists(sup_target_path):
-        try: df_sup = pd.read_csv(sup_target_path, low_memory=False)
-        except: pass
-    else:
-        sup_files = glob.glob(os.path.join(base_dir, '*공급*.csv')) + glob.glob(os.path.join(base_dir, '*공급*.xlsx'))
+    # 📌 공급.csv 우선 직접 읽기
+    sup_paths = [os.path.join(base_dir, '공급.csv'), '공급.csv']
+    for sp in sup_paths:
+        if os.path.exists(sp):
+            try:
+                df_sup = pd.read_csv(sp, low_memory=False)
+                if df_sup is not None and not df_sup.empty:
+                    break
+            except: pass
+
+    if df_sup is None:
+        sup_files = glob.glob(os.path.join(base_dir, '*공급*.csv')) + glob.glob('*공급*.csv') + glob.glob('*공급*.xlsx')
         if sup_files:
             latest_sup_file = sorted(sup_files, key=os.path.getmtime, reverse=True)[0]
             try:
@@ -153,13 +189,21 @@ def load_aux_files():
                 else: df_sup = pd.read_excel(latest_sup_file)
             except: pass
 
-    # 📌 절대 경로 기준 6수송 캐시 탐색
-    six_target_path = os.path.join(base_dir, 'cache_6th_data.parquet')
-    if os.path.exists(six_target_path):
-        try: df_6th = pd.read_parquet(six_target_path)
-        except: pass
-    else:
-        six_files = glob.glob(os.path.join(base_dir, '*6수송*.csv')) + glob.glob(os.path.join(base_dir, '*6TRF*.csv'))
+    if df_sup is not None:
+        df_sup = filter_supply_ke_only(df_sup)
+
+    # 📌 6수송 캐시 읽기
+    six_paths = [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']
+    for sp in six_paths:
+        if os.path.exists(sp):
+            try:
+                df_6th = pd.read_parquet(sp)
+                if df_6th is not None and not df_6th.empty:
+                    break
+            except: pass
+
+    if df_6th is None:
+        six_files = glob.glob(os.path.join(base_dir, '*6수송*.csv')) + glob.glob('*6수송*.csv')
         if six_files:
             latest_6th_file = sorted(six_files, key=os.path.getmtime, reverse=True)[0]
             try:
@@ -169,7 +213,7 @@ def load_aux_files():
 
     return optimize_df(df_sup), optimize_df(df_6th)
 
-# 📌 [핵심 수정] disk_sup 및 disk_6th 변수를 전역 공간에서 최우선 정의
+# 📌 전역 변수로 디스크 데이터 로드
 disk_sup, disk_6th = load_aux_files()
 
 if uploaded_iss is not None:
@@ -185,6 +229,7 @@ if uploaded_sup is not None:
             df_sup_raw = optimize_df(pd.read_parquet(uploaded_sup))
         else:
             df_sup_raw = optimize_df(pd.read_csv(uploaded_sup, low_memory=False))
+        df_sup_raw = filter_supply_ke_only(df_sup_raw)
     except: pass
 if df_sup_raw is None: 
     df_sup_raw = disk_sup
@@ -512,22 +557,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     # 2. ✈️ 공급 M/S 탭
     with tab_34_2:
-        df_sup = None
-        if uploaded_sup is not None:
-            try:
-                uploaded_sup.seek(0)
-                if uploaded_sup.name.endswith('.parquet'): df_sup = pd.read_parquet(uploaded_sup)
-                else: df_sup = pd.read_csv(uploaded_sup, low_memory=False)
-            except: pass
+        df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
         
-        if df_sup is None:
-            df_sup = disk_sup
-
         if df_sup is None:
             st.warning("⚠️ 공급 데이터(`공급.csv`)를 읽을 수 없습니다. 좌측 사이드바 2번에서 파일을 직접 업로드해 주세요.")
             st.stop()
 
-        df_sup = df_sup.copy()
         df_sup.columns = [str(c).strip() for c in df_sup.columns]
 
         # 📌 KE 취항 노선 원천 선별 정제
