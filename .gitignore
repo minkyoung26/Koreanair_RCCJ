@@ -1,0 +1,11 @@
+*.csv
+*.xlsx
+*원본파일*
+__pycache__
+!.gitignore
+!requirements.txt
+!app.py
+!batch_processor.py
+!cache_34_data.parquet
+!cache_6th_data.parquet
+!*공급*.csv
