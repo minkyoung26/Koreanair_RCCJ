@@ -16,14 +16,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 외부 구글 앱스 스크립트 웹앱 URL
 EXT_WEB_APP_URL = "https://script.google.com/a/macros/koreanair.com/s/AKfycbxt3IfN0gB4n344U4gL1kt5i4RVjn7_uuG5PtKY-pPgNejpDCsjp2PEbopEexw5NLUjDQ/exec"
 
-# Dynamic Date Logic (2026년 기준)
 today = datetime.date.today()
 current_monday = today - datetime.timedelta(days=today.weekday())
 
-# 3/4수송 날짜 로직
 issue_start_date = current_monday - datetime.timedelta(weeks=5)
 issue_end_date = current_monday - datetime.timedelta(days=1)
 
@@ -37,12 +34,10 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
-# 6수송 전용 동적 발매기간
 issue_end_6th = current_monday - datetime.timedelta(days=1)
 issue_start_6th = current_monday - datetime.timedelta(weeks=13)
 issue_range_str_6th = f"{issue_start_6th.strftime('%Y.%m.%d')} ~ {issue_end_6th.strftime('%Y.%m.%d')}"
 
-# 항공사별 RBD 계층 정의
 RBD_HIERARCHY = {
     'KE': list('YBMSHEKLUQTX'),
     'OZ': list('YBMHEQKSVWTLX'),
@@ -284,8 +279,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         merged_df = df_iss_merged.copy()
 
-        # 📌 가중치 계산 (Weight 적용)
-        if 'Weighted_Value' not in merged_df.columns:
+        # 📌 가중치 자동 계산 보정
+        if 'Weighted_Value' not in merged_df.columns or merged_df['Weighted_Value'].sum() == merged_df['Value'].sum():
             if 'Weight' in merged_df.columns:
                 w_num = pd.to_numeric(merged_df['Weight'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1.0)
                 v_num = pd.to_numeric(merged_df['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
@@ -307,7 +302,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # 📌 [복원] KE 취항 노선만 선별하여 노선 필터 목록에 반영
+        # 📌 [복원] KE 취항 노선만 선별하여 노선 필터 목록 구성
         ke_routes_iss = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']['노선'].dropna().unique().tolist()
         if ke_routes_iss:
             full_route_sum = merged_df[merged_df['노선'].isin(ke_routes_iss)].groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
@@ -538,7 +533,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_sup.columns = [str(c).strip() for c in df_sup.columns]
 
-        # 📌 [복원] 공급 M/S 탭에서도 KE 취항 노선만 정제
         sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
         if sup_ke_col:
             df_sup = df_sup[df_sup[sup_ke_col].astype(str).str.contains('취항', na=False)]
