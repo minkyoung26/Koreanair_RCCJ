@@ -16,11 +16,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# 외부 구글 앱스 스크립트 웹앱 URL
 EXT_WEB_APP_URL = "https://script.google.com/a/macros/koreanair.com/s/AKfycbxt3IfN0gB4n344U4gL1kt5i4RVjn7_uuG5PtKY-pPgNejpDCsjp2PEbopEexw5NLUjDQ/exec"
 
+# Dynamic Date Logic (2026년 기준)
 today = datetime.date.today()
 current_monday = today - datetime.timedelta(days=today.weekday())
 
+# 3/4수송 날짜 로직
 issue_start_date = current_monday - datetime.timedelta(weeks=5)
 issue_end_date = current_monday - datetime.timedelta(days=1)
 
@@ -34,10 +37,12 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
+# 6수송 전용 동적 발매기간
 issue_end_6th = current_monday - datetime.timedelta(days=1)
 issue_start_6th = current_monday - datetime.timedelta(weeks=13)
 issue_range_str_6th = f"{issue_start_6th.strftime('%Y.%m.%d')} ~ {issue_end_6th.strftime('%Y.%m.%d')}"
 
+# 항공사별 RBD 계층 정의
 RBD_HIERARCHY = {
     'KE': list('YBMSHEKLUQTX'),
     'OZ': list('YBMHEQKSVWTLX'),
@@ -53,6 +58,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
+# CSS 서식
 st.markdown("""
 <style>
     :root { --primary-color: #0ea5e9 !important; --primaryColor: #0ea5e9 !important; }
@@ -114,9 +120,34 @@ def clean_transport_column(df):
 @st.cache_data(max_entries=5, show_spinner=False)
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 📌 원본 CSV 직접 탐색 및 가중치 실시간 로딩 (100% 원본 수치 보장)
+    iss_files = glob.glob(os.path.join(base_dir, '*34수송*.csv')) + glob.glob('*34수송*.csv')
+    if iss_files:
+        latest_iss = sorted(iss_files, key=os.path.getmtime, reverse=True)[0]
+        try:
+            df = pd.read_csv(latest_iss, low_memory=False)
+            df.columns = [str(c).strip() for c in df.columns]
+            
+            # Value 수치형 변환
+            if 'Value' in df.columns:
+                df['Value'] = pd.to_numeric(df['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+            
+            # 가중치 계산 (Value * Weight)
+            if 'Weight' in df.columns:
+                w_num = pd.to_numeric(df['Weight'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1.0)
+                df['Weighted_Value'] = df['Value'] * w_num
+            else:
+                df['Weighted_Value'] = df['Value']
+
+            return optimize_df(clean_transport_column(df))
+        except: pass
+
+    # 예외시 기존 파켓 캐시 탐색
     target_path = os.path.join(base_dir, 'cache_34_data.parquet')
     if os.path.exists(target_path):
         return optimize_df(clean_transport_column(pd.read_parquet(target_path)))
+        
     return None
 
 @st.cache_data(max_entries=5, show_spinner=False)
@@ -257,7 +288,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
     st.markdown(f"""
     <div class="source-header-box">
-        <b>📌 출처: DDS & OAG 데이터 (3/4수송 - ⚡1번 초고속 배치 캐시 모드)</b> &nbsp;|&nbsp; 
+        <b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; 
         <b>🗓️ 발매기간 (Purchase Month):</b> {dynamic_iss_str_34} &nbsp;|&nbsp; 
         <b>✈️ 출발기간 (Trip Month):</b> {dynamic_dep_str_34}
     </div>
@@ -274,19 +305,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     with tab_34_1:
         if df_iss_merged is None:
-            st.warning("❌ 'cache_34_data.parquet' 캐시 파일이 준비되지 않았습니다.")
+            st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다. 좌측 사이드바 1번에서 파일/캐시를 확인해주세요.")
             st.stop()
 
         merged_df = df_iss_merged.copy()
-
-        # 📌 가중치 자동 계산 보정
-        if 'Weighted_Value' not in merged_df.columns or merged_df['Weighted_Value'].sum() == merged_df['Value'].sum():
-            if 'Weight' in merged_df.columns:
-                w_num = pd.to_numeric(merged_df['Weight'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1.0)
-                v_num = pd.to_numeric(merged_df['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
-                merged_df['Weighted_Value'] = v_num * w_num
-            else:
-                merged_df['Weighted_Value'] = merged_df['Value']
 
         week_col = '발매주차_일자' if '발매주차_일자' in merged_df.columns else ('발매 주차' if '발매 주차' in merged_df.columns else '발매주차')
         all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
@@ -302,7 +324,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # 📌 [복원] KE 취항 노선만 선별하여 노선 필터 목록 구성
+        # 📌 KE 취항 노선만 선별하여 슬라이서 구성
         ke_routes_iss = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']['노선'].dropna().unique().tolist()
         if ke_routes_iss:
             full_route_sum = merged_df[merged_df['노선'].isin(ke_routes_iss)].groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
