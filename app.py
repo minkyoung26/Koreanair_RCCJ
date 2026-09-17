@@ -133,15 +133,18 @@ def load_uploaded_parquet(file_obj):
         return optimize_df(clean_transport_column(pd.read_csv(file_obj, low_memory=False)))
 
 @st.cache_data(max_entries=5, show_spinner=False)
+@st.cache_data(max_entries=5, show_spinner=False)
 def load_aux_files():
     df_sup, df_6th = None, None
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # 📌 공급 데이터 탐색
-    if os.path.exists('공급.csv'):
-        try: df_sup = pd.read_csv('공급.csv', low_memory=False)
+    # 📌 절대 경로 기준 '공급.csv' 및 키워드 파일 탐색
+    sup_target_path = os.path.join(base_dir, '공급.csv')
+    if os.path.exists(sup_target_path):
+        try: df_sup = pd.read_csv(sup_target_path, low_memory=False)
         except: pass
     else:
-        sup_files = glob.glob('*공급*.csv') + glob.glob('*공급*.xlsx')
+        sup_files = glob.glob(os.path.join(base_dir, '*공급*.csv')) + glob.glob(os.path.join(base_dir, '*공급*.xlsx'))
         if sup_files:
             latest_sup_file = sorted(sup_files, key=os.path.getmtime, reverse=True)[0]
             try:
@@ -149,12 +152,13 @@ def load_aux_files():
                 else: df_sup = pd.read_excel(latest_sup_file)
             except: pass
 
-    # 📌 6수송 데이터 탐색
-    if os.path.exists('cache_6th_data.parquet'):
-        try: df_6th = pd.read_parquet('cache_6th_data.parquet')
+    # 📌 절대 경로 기준 6수송 캐시 및 CSV 탐색
+    six_target_path = os.path.join(base_dir, 'cache_6th_data.parquet')
+    if os.path.exists(six_target_path):
+        try: df_6th = pd.read_parquet(six_target_path)
         except: pass
     else:
-        six_files = glob.glob('*6수송*.csv') + glob.glob('*6TRF*.csv') + glob.glob('*6수송*.xlsx')
+        six_files = glob.glob(os.path.join(base_dir, '*6수송*.csv')) + glob.glob(os.path.join(base_dir, '*6TRF*.csv'))
         if six_files:
             latest_6th_file = sorted(six_files, key=os.path.getmtime, reverse=True)[0]
             try:
@@ -163,9 +167,6 @@ def load_aux_files():
             except: pass
 
     return optimize_df(df_sup), optimize_df(df_6th)
-
-disk_sup, disk_6th = load_aux_files()
-
 if uploaded_iss is not None:
     df_iss_merged = load_uploaded_parquet(uploaded_iss)
 else:
