@@ -677,7 +677,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
             time_col_a = '출발시간대' if '출발시간대' in df_agency.columns else None
             
-            # 💡 22개 마스터 노선 중 실적이 있는 노선으로 필터링
+            # 💡 22개 마스터 노선 중 실적(Value > 0)이 있는 노선으로 정확하게 제한
             df_ag_has_val = df_agency[(df_agency['노선'].astype(str).str.strip().isin(EXCEL_KE_ROUTES_MASTER)) & (df_agency['Value'] > 0)]
             ag_route_sum = df_ag_has_val.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
             all_routes_a = [str(x).strip() for x in ag_route_sum.index.tolist() if str(x) != 'nan']
@@ -802,7 +802,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
             
-            # 💡 22개 마스터 노선 중 실적이 있는 노선으로 필터링
+            # 💡 22개 마스터 노선 중 실적이 있는 노선으로 정확하게 제한
             df_g_has_val = df_grp_raw[(df_grp_raw['노선'].astype(str).str.strip().isin(EXCEL_KE_ROUTES_MASTER)) & (df_grp_raw['Value'] > 0)]
             g_route_sum = df_g_has_val.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
             g_routes = [str(x).strip() for x in g_route_sum.index.tolist() if str(x) != 'nan']
@@ -1103,7 +1103,7 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
 
-            # 📌 Carrier별 M/S 커스텀 HTML 테이블 (f-string 포맷팅 문법 보정 완수)
+            # 📌 Carrier별 M/S 커스텀 HTML 테이블
             st.markdown("---")
             st.markdown('<div class="unified-sub-header">📊 Carrier별 M/S 상세 종합 실적 테이블</div>', unsafe_allow_html=True)
 
@@ -1147,7 +1147,7 @@ elif selected_group == "🌐 6수송 대시보드":
                 s_ms_diff = s_ms_cy - s_ms_py
                 s_ms_yoy_str = f"▲ {s_ms_diff:.0f}%p" if s_ms_diff >= 0 else f"▼ {abs(s_ms_diff):.0f}%p"
 
-                # KE (f-string 포맷팅 문자열 사전 처리)
+                # KE (f-string 포맷팅 문법 보정)
                 ke_al_row = od_al_sub[od_al_sub[al_col_6] == 'KE']
                 k_cy = ke_al_row['Val_num'].sum() if not ke_al_row.empty else 0
                 k_py = ke_al_row['Val_PY_num'].sum() if not ke_al_row.empty else 0
