@@ -273,11 +273,12 @@ def format_yoy_html(val, is_percentage_point=False):
 # ==========================================
 if selected_group == "✈️ 3/4수송 대시보드":
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
+    # 📌 3/4수송 날짜 괄호 설명 문구 추가 (과거 5주), (향후 6개월)
     st.markdown(f"""
     <div class="source-header-box">
         <b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; 
-        <b>🗓️ 발매기간 (Purchase Month):</b> {dynamic_iss_str_34} &nbsp;|&nbsp; 
-        <b>✈️ 출발기간 (Trip Month):</b> {dynamic_dep_str_34}
+        <b>🗓️ 발매기간 (Purchase Month):</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; 
+        <b>✈️ 출발기간 (Trip Month):</b> {dynamic_dep_str_34} (향후 6개월)
     </div>
     """, unsafe_allow_html=True)
 
@@ -992,11 +993,12 @@ elif selected_group == "🌐 6수송 대시보드":
     m_list_6 = sorted([str(x).strip() for x in df_6[month_col_6].dropna().unique() if str(x).strip() != 'nan']) if month_col_6 and month_col_6 in df_6.columns else []
     dynamic_dep_6th = f"{m_list_6[0]} ~ {m_list_6[-1]}" if m_list_6 else dep_range_str
 
+    # 📌 6수송 날짜 괄호 설명 문구 추가 (과거 3개월), (향후 6개월)
     st.markdown(f"""
     <div class="source-header-box">
         <b>📌 출처: DDS & OAG 데이터 (6수송 대시보드)</b> &nbsp;|&nbsp; 
-        <b>🗓️ 발매기간 (Purchase Month):</b> {issue_range_str_6th} &nbsp;|&nbsp; 
-        <b>✈️ 출발기간 (Trip Month):</b> {dynamic_dep_6th}
+        <b>🗓️ 발매기간 (Purchase Month):</b> {issue_range_str_6th} (과거 3개월) &nbsp;|&nbsp; 
+        <b>✈️ 출발기간 (Trip Month):</b> {dynamic_dep_6th} (향후 6개월)
     </div>
     """, unsafe_allow_html=True)
 
