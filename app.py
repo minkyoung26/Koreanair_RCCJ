@@ -677,7 +677,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
             bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
             time_col_a = '출발시간대' if '출발시간대' in df_agency.columns else None
             
-            all_routes_a = sorted([str(x) for x in df_agency['노선'].dropna().unique()])
+            # 💡 22개 마스터 노선 중 실적이 있는 노선으로 필터링
+            df_ag_has_val = df_agency[(df_agency['노선'].astype(str).str.strip().isin(EXCEL_KE_ROUTES_MASTER)) & (df_agency['Value'] > 0)]
+            ag_route_sum = df_ag_has_val.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
+            all_routes_a = [str(x).strip() for x in ag_route_sum.index.tolist() if str(x) != 'nan']
+            
             all_months_a = sorted([str(x) for x in df_agency[month_col_a].dropna().unique()]) if month_col_a else []
             all_bounds_a = sorted([str(x) for x in df_agency[bound_col_a].dropna().unique()]) if bound_col_a else []
             all_tt_a = sorted([str(x) for x in df_agency['Ticket Type'].dropna().unique()]) if 'Ticket Type' in df_agency.columns else []
@@ -698,7 +702,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 sel_al_ag_str = render_slicer_box(ac6, "6. 항공사", all_al_a, "slicer_al_ag_fixed")
 
             mask_ag = pd.Series(True, index=df_agency.index)
-            if sel_route_ag_str != ALL_OPTION: mask_ag &= (df_agency['노선'].astype(str) == sel_route_ag_str)
+            if sel_route_ag_str != ALL_OPTION:
+                mask_ag &= (df_agency['노선'].astype(str).str.strip() == sel_route_ag_str)
+            else:
+                mask_ag &= (df_agency['노선'].astype(str).str.strip().isin(all_routes_a))
+
             if sel_al_ag_str != ALL_OPTION: mask_ag &= (df_agency['Dominant Marketing Airline'].astype(str) == sel_al_ag_str)
             if month_col_a and sel_month_ag_str != ALL_OPTION: mask_ag &= (df_agency[month_col_a].astype(str) == sel_month_ag_str)
             if bound_col_a and sel_bound_ag_str != ALL_OPTION: mask_ag &= (df_agency[bound_col_a].astype(str) == sel_bound_ag_str)
@@ -794,7 +802,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
             
-            g_routes = sorted([str(x) for x in df_grp_raw['노선'].dropna().unique()]) if '노선' in df_grp_raw.columns else []
+            # 💡 22개 마스터 노선 중 실적이 있는 노선으로 필터링
+            df_g_has_val = df_grp_raw[(df_grp_raw['노선'].astype(str).str.strip().isin(EXCEL_KE_ROUTES_MASTER)) & (df_grp_raw['Value'] > 0)]
+            g_route_sum = df_g_has_val.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
+            g_routes = [str(x).strip() for x in g_route_sum.index.tolist() if str(x) != 'nan']
+
             g_m_col = '출발월' if '출발월' in df_grp_raw.columns else ('출발 월' if '출발 월' in df_grp_raw.columns else None)
             g_months = sorted([str(x) for x in df_grp_raw[g_m_col].dropna().unique()]) if g_m_col else []
             g_b_col = '수송' if '수송' in df_grp_raw.columns else ('Bound' if 'Bound' in df_grp_raw.columns else None)
@@ -816,7 +828,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 sel_g_al = render_slicer_box(gc6, "6. 항공사", g_als, "slicer_g_al_fixed")
 
             mask_grp = pd.Series(True, index=df_grp_raw.index)
-            if sel_g_route != ALL_OPTION: mask_grp &= (df_grp_raw['노선'].astype(str) == sel_g_route)
+            if sel_g_route != ALL_OPTION:
+                mask_grp &= (df_grp_raw['노선'].astype(str).str.strip() == sel_g_route)
+            else:
+                mask_grp &= (df_grp_raw['노선'].astype(str).str.strip().isin(g_routes))
+
             if g_m_col and sel_g_month != ALL_OPTION: mask_grp &= (df_grp_raw[g_m_col].astype(str) == sel_g_month)
             if g_b_col and sel_g_bound != ALL_OPTION: mask_grp &= (df_grp_raw[g_b_col].astype(str) == sel_g_bound)
             if 'Ticket Type' in df_grp_raw.columns and sel_g_tt != ALL_OPTION: mask_grp &= (df_grp_raw['Ticket Type'].astype(str) == sel_g_tt)
@@ -1087,15 +1103,12 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
 
-            # 📌 2번째 엑셀 서식 이미지 원본 그대로의 Carrier별 M/S 2단계 커스텀 HTML 데이터 테이블 복원
+            # 📌 Carrier별 M/S 커스텀 HTML 테이블 (f-string 포맷팅 문법 보정 완수)
             st.markdown("---")
             st.markdown('<div class="unified-sub-header">📊 Carrier별 M/S 상세 종합 실적 테이블</div>', unsafe_allow_html=True)
 
-            # O&D별 집계 데이터 생성
             od_carrier_df = filtered_tab1.groupby([od_col_6, al_col_6], observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
             od_totals = filtered_tab1.groupby(od_col_6, observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
-            
-            # TOP O&D 시장 실적순 정렬
             top_ods = od_totals.sort_values(by='Val_num', ascending=False).head(20)[od_col_6].tolist()
 
             c_html = '<div class="carrier-excel-container"><table class="carrier-excel-table"><thead>'
@@ -1134,10 +1147,14 @@ elif selected_group == "🌐 6수송 대시보드":
                 s_ms_diff = s_ms_cy - s_ms_py
                 s_ms_yoy_str = f"▲ {s_ms_diff:.0f}%p" if s_ms_diff >= 0 else f"▼ {abs(s_ms_diff):.0f}%p"
 
-                # KE
+                # KE (f-string 포맷팅 문자열 사전 처리)
                 ke_al_row = od_al_sub[od_al_sub[al_col_6] == 'KE']
                 k_cy = ke_al_row['Val_num'].sum() if not ke_al_row.empty else 0
                 k_py = ke_al_row['Val_PY_num'].sum() if not ke_al_row.empty else 0
+                
+                k_cy_display = f"{k_cy:,.0f}" if k_cy > 0 else "-"
+                k_py_display = f"{k_py:,.0f}" if k_py > 0 else "-"
+
                 k_yoy = ((k_cy - k_py) / k_py * 100) if k_py > 0 else 0
                 k_yoy_str = (f"▲ {k_yoy:.0f}%" if k_yoy >= 0 else f"▼ {abs(k_yoy):.0f}%") if k_py > 0 else "-"
 
@@ -1150,7 +1167,7 @@ elif selected_group == "🌐 6수송 대시보드":
                 c_html += f'<td>{m_cy:,.0f}</td><td>{m_py:,.0f}</td><td>{m_yoy_str if m_py>0 else "-"}</td>'
                 c_html += f'<td>{s_cy:,.0f}</td><td>{s_py:,.0f}</td><td>{s_yoy_str if s_py>0 else "-"}</td>'
                 c_html += f'<td>{s_ms_cy:.0f}%</td><td>{s_ms_py:.0f}%</td><td>{s_ms_yoy_str if m_py>0 else "-"}</td>'
-                c_html += f'<td>{k_cy:,.0f if k_cy>0 else "-"}</td><td>{k_py:,.0f if k_py>0 else "-"}</td><td>{k_yoy_str}</td>'
+                c_html += f'<td>{k_cy_display}</td><td>{k_py_display}</td><td>{k_yoy_str}</td>'
                 c_html += f'<td>{k_ms_cy:.1f}%</td><td>{k_ms_py:.1f}%</td><td>{k_ms_yoy_str}</td></tr>'
 
             # 금년 요약 행
