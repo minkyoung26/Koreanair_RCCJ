@@ -233,7 +233,6 @@ def render_slicer_box(container, label, full_list, key_name):
     container.markdown(f"<b>{label}</b>", unsafe_allow_html=True)
     return container.selectbox(label, options=opts, index=0, key=key_name, label_visibility="collapsed")
 
-# 💡 NameError 수정을 포함한 함수
 def get_dynamic_date_ranges_34(df_iss):
     if df_iss is None or df_iss.empty: return issue_range_str, dep_range_str
     m_col = '출발월' if '출발월' in df_iss.columns else ('출발 월' if '출발 월' in df_iss.columns else 'Trip Month')
@@ -1174,6 +1173,9 @@ elif selected_group == "🌐 6수송 대시보드":
                         s_cy = top_al_row['Val_num'] if top_al_row is not None else 0
                         s_py = top_al_row['Val_PY_num'] if top_al_row is not None else 0
 
+                    s_cy_display = f"{s_cy:,.0f}" if s_cy > 0 else "-"
+                    s_py_display = f"{s_py:,.0f}" if s_py > 0 else "-"
+
                     s_yoy = ((s_cy - s_py) / s_py * 100) if s_py > 0 else 0
                     s_yoy_str = (f"▲ {s_yoy:.0f}%" if s_yoy >= 0 else f"▼ {abs(s_yoy):.0f}%") if s_py > 0 else "-"
 
@@ -1200,7 +1202,7 @@ elif selected_group == "🌐 6수송 대시보드":
 
                     c_html += f'<tr><td>{rank_idx}</td><td style="font-weight:700;">{od_code}</td>'
                     c_html += f'<td>{m_cy:,.0f}</td><td>{m_py:,.0f}</td><td>{m_yoy_str if m_py>0 else "-"}</td>'
-                    c_html += f'<td>{s_cy:,.0f if s_cy>0 else "-"}</td><td>{s_py:,.0f if s_py>0 else "-"}</td><td>{s_yoy_str}</td>'
+                    c_html += f'<td>{s_cy_display}</td><td>{s_py_display}</td><td>{s_yoy_str}</td>'
                     c_html += f'<td>{s_ms_cy:.0f}%</td><td>{s_ms_py:.0f}%</td><td>{s_ms_yoy_str}</td>'
                     c_html += f'<td>{k_cy_display}</td><td>{k_py_display}</td><td>{k_yoy_str}</td>'
                     c_html += f'<td>{k_ms_cy:.1f}%</td><td>{k_ms_py:.1f}%</td><td>{k_ms_yoy_str}</td></tr>'
