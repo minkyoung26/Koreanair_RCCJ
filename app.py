@@ -1,15 +1,4 @@
-# 📌 KE 취항 노선 엄격 추출 (대소문자/공백 완벽 방어)
-            ke_mask = merged_df['Dominant Marketing Airline'].astype(str).str.strip().str.upper() == 'KE'
-            ke_routes_raw = merged_df[ke_mask]['노선'].dropna().astype(str).str.strip().unique().tolist()
-            
-            # KE 취항 노선 목록이 추출된 경우에만 해당 노선들로 제한
-            if ke_routes_raw:
-                merged_df_ke = merged_df[merged_df['노선'].astype(str).str.strip().isin(ke_routes_raw)]
-                full_route_sum = merged_df_ke.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
-                route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
-            else:
-                full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
-                route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']# app.py
+# app.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
