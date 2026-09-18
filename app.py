@@ -80,7 +80,7 @@ st.markdown("""
     .custom-piv-container, .yoy-table-container { width: 100%; overflow-x: auto; margin-bottom: 20px; border-radius: 8px; border: 1px solid #cbd5e1 !important; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
     .custom-piv-table, .yoy-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background-color: #ffffff; text-align: center !important; }
     .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header { background-color: #cfe2f3 !important; color: #0f172a !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-weight: 700; text-align: center !important; white-space: nowrap; }
-    .yoy-table th.ke-header { background-color: #dcfce7 !important; color: #15803d !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 800 !important; text-align: center !important; white-space: nowrap; }
+    .yoy-table th.ke-header { background-color: #6fa8dc !important; color: #ffffff !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 800 !important; text-align: center !important; white-space: nowrap; }
     .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; color: #334155 !important; background-color: #ffffff !important; text-align: center !important; }
     .yoy-table tr:hover { background-color: #f8fafc !important; }
     .yoy-table tr.row-title { background-color: #f8fafc !important; font-weight: bold; color: #0f172a; }
@@ -679,7 +679,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_timeline)
                     st.plotly_chart(fig_timeline, width='stretch')
 
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (KE 취항 노선 전용 필터 적용)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (KE 취항 노선 전용 필터 보정 완수)
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
@@ -1075,7 +1075,9 @@ elif selected_group == "🌐 6수송 대시보드":
 
             html_table = '<div class="yoy-table-container"><table class="yoy-table"><thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             for al_code in airline_rank_list:
-                if al_code == 'KE': html_table += f'<th class="ke-header" style="width:130px;">KE (대한항공 - {ke_rank}위)</th>'
+                if al_code == 'KE':
+                    # 📌 KE 컬럼 '대한항공' 텍스트 제외 및 #6fa8dc 적용
+                    html_table += f'<th class="ke-header" style="width:130px; background-color:#6fa8dc !important; color:#ffffff !important;">KE ({ke_rank}위)</th>'
                 else:
                     rank_num = full_al_ranking.index(al_code) + 1 if al_code in full_al_ranking else "-"
                     html_table += f'<th class="carrier-header" style="width:110px;"><div style="font-size:10px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
