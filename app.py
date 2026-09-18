@@ -94,7 +94,9 @@ st.markdown("""
     .custom-piv-table, .yoy-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background-color: #ffffff; text-align: center !important; }
     .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header { background-color: #cfe2f3 !important; color: #0f172a !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-weight: 600; text-align: center !important; white-space: nowrap; }
     .yoy-table th.ke-header { background-color: #6fa8dc !important; color: #ffffff !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 700 !important; text-align: center !important; white-space: nowrap; }
-    .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; color: #334155 !important; background-color: #ffffff !important; text-align: center !important; }
+    
+    /* 📌 자식 인라인 span 색상을 덮어쓰지 않도록 !important 제거 */
+    .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; color: #334155; background-color: #ffffff !important; text-align: center !important; }
     .yoy-table tr:hover { background-color: #f8fafc !important; }
     .yoy-table tr.row-title { background-color: #f8fafc !important; font-weight: 600; color: #0f172a; }
     
@@ -102,11 +104,6 @@ st.markdown("""
     .carrier-excel-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Noto Sans KR', sans-serif; }
     .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 600; }
     .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-size: 12px !important; }
-    
-    /* 📌 6수송 TOP20 O&D 테이블 YOY span 크기 및 굵기 강제 오버라이드 설정 */
-    .carrier-excel-table td span.yoy-up-txt { color: #1d4ed8 !important; font-size: 10.5px !important; font-weight: 500 !important; display: inline-block; }
-    .carrier-excel-table td span.yoy-down-txt { color: #dc2626 !important; font-size: 10.5px !important; font-weight: 500 !important; display: inline-block; }
-    .carrier-excel-table td span.yoy-zero-txt { color: #475569 !important; font-size: 10.5px !important; font-weight: 500 !important; display: inline-block; }
 
     .th-dark-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-mkt-blue { background-color: #cfe2f3; color: #0f172a; }
@@ -259,15 +256,15 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 YOY 텍스트 크기(10.5px) 및 색상(양수 파랑 #1d4ed8 / 음수 빨강 #dc2626) 전용 매핑 함수
+# 📌 YOY 텍스트 크기(10px) 및 색상(양수 파랑 #1d4ed8 / 음수 빨강 #dc2626) 인라인 스타일 강제 주입
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
-        return f'<span class="yoy-up-txt">▲ {val:.0f}{unit}</span>'
+        return f'<span style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 600 !important; display: inline-block;">▲ {val:.0f}{unit}</span>'
     elif val < 0:
-        return f'<span class="yoy-down-txt">▼ {abs(val):.0f}{unit}</span>'
+        return f'<span style="color: #dc2626 !important; font-size: 10px !important; font-weight: 600 !important; display: inline-block;">▼ {abs(val):.0f}{unit}</span>'
     else:
-        return f'<span class="yoy-zero-txt">▲ 0{unit}</span>'
+        return f'<span style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ 0{unit}</span>'
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
