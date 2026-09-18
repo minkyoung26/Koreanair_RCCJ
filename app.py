@@ -254,7 +254,7 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 YOY 텍스트 크기 10.5px, 굵기 500으로 일반 수치와 크기 균형 정밀 맞춤
+# 📌 6수송 TOP 20 O&D 인라인 스타일로 YOY 텍스트 크기(10.5px) 정밀 맞춤
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
@@ -521,35 +521,55 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
-            
-            # 📌 AL_clean 표 KE 행(Row) #cfe2f3 배경색 + 어두운 텍스트 지정
-            def highlight_ke_row(row):
-                if str(row.name).upper() == 'KE':
-                    return ['background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold !important;'] * len(row)
-                return [''] * len(row)
-
-            # 📌 노선_clean 표 KE 열(Column) #cfe2f3 배경색 + 어두운 텍스트 지정
-            def highlight_ke_col(col):
-                if str(col.name).upper() == 'KE':
-                    return ['background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold !important;'] * len(col)
-                return [''] * len(col)
-
             t1, t2 = st.columns([1.1, 1])
+            
+            # 📌 1. st.dataframe 테마 간섭을 방지하기 위해 정교한 커스텀 HTML 테이블 조립
             with t1:
                 if week_col and week_col in filtered_df.columns:
                     piv_w = filtered_df.pivot_table(index='AL_clean', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
                     piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
                     al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
-                    
-                    piv_w_display = piv_w_ms.loc[al_sorted].head(100).map(lambda x: f"{x:.1f}%")
-                    st.dataframe(piv_w_display.style.apply(highlight_ke_row, axis=1), width='stretch')
+                    piv_w_ms = piv_w_ms.loc[al_sorted].head(100)
+
+                    piv_w_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:100px;">AL_clean</th>'
+                    for col_wk in piv_w_ms.columns:
+                        piv_w_html += f'<th class="header-main">{col_wk}</th>'
+                    piv_w_html += '</tr></thead><tbody>'
+
+                    for al_idx, row_item in piv_w_ms.iterrows():
+                        is_ke_r = (str(al_idx).upper() == 'KE')
+                        row_style = ' style="background-color: #cfe2f3 !important;"' if is_ke_r else ''
+                        td_style = ' style="background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold;"' if is_ke_r else ''
+
+                        piv_w_html += f'<tr{row_style}><td{td_style} style="font-weight:700;">{al_idx}</td>'
+                        for val_ms in row_item:
+                            piv_w_html += f'<td{td_style}>{val_ms:.1f}%</td>'
+                        piv_w_html += '</tr>'
+                    piv_w_html += '</tbody></table></div>'
+                    st.markdown(piv_w_html, unsafe_allow_html=True)
+
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선_clean', columns='AL_clean', values=val_col, aggfunc='sum', fill_value=0, observed=False)
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
                 piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
-                
-                piv_r_display = piv_r_ms.head(100).map(lambda x: f"{x:.1f}%")
-                st.dataframe(piv_r_display.style.apply(highlight_ke_col, axis=0), width='stretch')
+                piv_r_ms = piv_r_ms.head(100)
+
+                piv_r_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:100px;">노선_clean</th>'
+                for col_al in piv_r_ms.columns:
+                    is_ke_c = (str(col_al).upper() == 'KE')
+                    th_style = ' style="background-color: #9fc5e8 !important; color: #0f172a !important; font-weight: bold;"' if is_ke_c else ''
+                    piv_r_html += f'<th class="header-main"{th_style}>{col_al}</th>'
+                piv_r_html += '</tr></thead><tbody>'
+
+                for route_idx, row_item in piv_r_ms.iterrows():
+                    piv_r_html += f'<tr><td style="font-weight:700;">{route_idx}</td>'
+                    for al_col_name, val_ms in row_item.items():
+                        is_ke_c = (str(al_col_name).upper() == 'KE')
+                        td_style = ' style="background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold;"' if is_ke_c else ''
+                        piv_r_html += f'<td{td_style}>{val_ms:.1f}%</td>'
+                    piv_r_html += '</tr>'
+                piv_r_html += '</tbody></table></div>'
+                st.markdown(piv_r_html, unsafe_allow_html=True)
 
         with tab3:
             st.subheader("🔒 관리자 전용 Raw Data 조회 및 다운로드")
@@ -691,7 +711,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     s_ms = row['공급 M/S (%)']
                     is_ke = (al_name == 'KE')
                     
-                    # 📌 모든 <td> 셀에 직접 #d9d9d9 배경색 지정하여 확실히 음영 표출
+                    # 📌 모든 <td> 셀에 직접 #d9d9d9 배경색 주입하여 완벽 음영 처리
                     if is_ke:
                         td_style = ' style="background-color: #d9d9d9 !important; color: #0f172a !important;"'
                     else:
