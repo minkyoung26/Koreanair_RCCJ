@@ -91,7 +91,6 @@ st.markdown("""
     .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; }
     .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; }
     
-    /* 사용자 지정 테마 색상 적용 */
     .th-dark-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-mkt-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-sel-blue { background-color: #9fc5e8; color: #0f172a; }
@@ -244,7 +243,6 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# YOY 전년비 파란색/빨간색 서식 헬퍼 함수
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
@@ -681,7 +679,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_timeline)
                     st.plotly_chart(fig_timeline, width='stretch')
 
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (KE 취항 노선 전용 필터 적용)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (KE 취항 노선 전용 필터 보정 완수)
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
@@ -690,9 +688,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
             bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
             time_col_a = '출발시간대' if '출발시간대' in df_agency.columns else None
             
-            # 📌 22개 마스터 노선 중 실적(Value > 0)이 있는 KE 취항 노선으로 정확히 설정
-            df_ag_has_val = df_agency[(df_agency['노선'].astype(str).str.strip().isin(EXCEL_KE_ROUTES_MASTER)) & (df_agency['Value'] > 0)]
-            ag_route_sum = df_ag_has_val.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
+            # 📌 22개 마스터 노선 중 실적(Value > 0)이 존재하는 KE 취항 노선만 추출
+            df_agency['노선_clean'] = df_agency['노선'].astype(str).str.strip()
+            df_ag_has_val = df_agency[(df_agency['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (df_agency['Value'] > 0)]
+            ag_route_sum = df_ag_has_val.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
             all_routes_a = [str(x).strip() for x in ag_route_sum.index.tolist() if str(x) != 'nan']
             
             all_months_a = sorted([str(x) for x in df_agency[month_col_a].dropna().unique()]) if month_col_a else []
@@ -716,9 +715,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
             mask_ag = pd.Series(True, index=df_agency.index)
             if sel_route_ag_str != ALL_OPTION:
-                mask_ag &= (df_agency['노선'].astype(str).str.strip() == sel_route_ag_str)
+                mask_ag &= (df_agency['노선_clean'] == sel_route_ag_str)
             else:
-                mask_ag &= (df_agency['노선'].astype(str).str.strip().isin(all_routes_a))
+                mask_ag &= (df_agency['노선_clean'].isin(all_routes_a))
 
             if sel_al_ag_str != ALL_OPTION: mask_ag &= (df_agency['Dominant Marketing Airline'].astype(str) == sel_al_ag_str)
             if month_col_a and sel_month_ag_str != ALL_OPTION: mask_ag &= (df_agency[month_col_a].astype(str) == sel_month_ag_str)
@@ -809,15 +808,16 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     ag_html += '</tbody></table></div>'
                     st.markdown(ag_html, unsafe_allow_html=True)
 
-    # 4. 👥 단체실적 탭 (KE 취항 노선 전용 필터 적용)
+    # 4. 👥 단체실적 탭 (KE 취항 노선 전용 필터 보정 완수)
     with tab_34_4:
         st.subheader("👥 발매 - 항공사별/대리점별 단체 발매 현황")
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
             
-            # 📌 22개 마스터 노선 중 실적(Value > 0)이 있는 KE 취항 노선으로 정확히 설정
-            df_g_has_val = df_grp_raw[(df_grp_raw['노선'].astype(str).str.strip().isin(EXCEL_KE_ROUTES_MASTER)) & (df_grp_raw['Value'] > 0)]
-            g_route_sum = df_g_has_val.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
+            # 📌 22개 마스터 노선 중 실적(Value > 0)이 있는 KE 취항 노선으로 정확히 제한
+            df_grp_raw['노선_clean'] = df_grp_raw['노선'].astype(str).str.strip()
+            df_g_has_val = df_grp_raw[(df_grp_raw['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (df_grp_raw['Value'] > 0)]
+            g_route_sum = df_g_has_val.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
             g_routes = [str(x).strip() for x in g_route_sum.index.tolist() if str(x) != 'nan']
 
             g_m_col = '출발월' if '출발월' in df_grp_raw.columns else ('출발 월' if '출발 월' in df_grp_raw.columns else None)
@@ -842,9 +842,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
             mask_grp = pd.Series(True, index=df_grp_raw.index)
             if sel_g_route != ALL_OPTION:
-                mask_grp &= (df_grp_raw['노선'].astype(str).str.strip() == sel_g_route)
+                mask_grp &= (df_grp_raw['노선_clean'] == sel_g_route)
             else:
-                mask_grp &= (df_grp_raw['노선'].astype(str).str.strip().isin(g_routes))
+                mask_grp &= (df_grp_raw['노선_clean'].isin(g_routes))
 
             if g_m_col and sel_g_month != ALL_OPTION: mask_grp &= (df_grp_raw[g_m_col].astype(str) == sel_g_month)
             if g_b_col and sel_g_bound != ALL_OPTION: mask_grp &= (df_grp_raw[g_b_col].astype(str) == sel_g_bound)
