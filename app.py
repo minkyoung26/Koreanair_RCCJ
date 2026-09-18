@@ -139,7 +139,7 @@ def apply_weighted_calculation(df):
         
     return df
 
-@st.cache_data(max_entries=5, show_spinner=False)
+# @st.cache_data(max_entries=5, show_spinner=False)
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_34_data.parquet')
