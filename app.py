@@ -104,6 +104,12 @@ st.markdown("""
     .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 600; }
     .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-size: 12px !important; }
 
+    /* 📌 TOP20 O&D 테이블 내부 span 오버라이드 최우선 순위 규격 지정 */
+    .carrier-excel-table td span { font-size: 10px !important; font-weight: 500 !important; display: inline-block; }
+    .carrier-excel-table td span.yoy-up-txt { color: #1d4ed8 !important; }
+    .carrier-excel-table td span.yoy-down-txt { color: #dc2626 !important; }
+    .carrier-excel-table td span.yoy-zero-txt { color: #475569 !important; }
+
     .th-dark-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-mkt-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-sel-blue { background-color: #d9d9d9; color: #0f172a; }
@@ -259,11 +265,11 @@ def get_dynamic_date_ranges_34(df_iss):
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
-        return f'<span style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ {val:.0f}{unit}</span>'
+        return f'<span class="yoy-up-txt" style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ {val:.0f}{unit}</span>'
     elif val < 0:
-        return f'<span style="color: #dc2626 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▼ {abs(val):.0f}{unit}</span>'
+        return f'<span class="yoy-down-txt" style="color: #dc2626 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▼ {abs(val):.0f}{unit}</span>'
     else:
-        return f'<span style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ 0{unit}</span>'
+        return f'<span class="yoy-zero-txt" style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ 0{unit}</span>'
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
@@ -1166,7 +1172,7 @@ elif selected_group == "🌐 6수송 대시보드":
                 html_table += f'<td><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            # 📌 6수송 상단 표 YOY에도 format_yoy_html 파란색/빨간색 적용
+            # 📌 6수송 상단 요약 표 YOY 전체 format_yoy_html 파란색/빨간색 적용 완수
             html_table += f'<tr><td style="color:#64748b; font-weight:600;">YOY</td><td>{format_yoy_html(t_yoy_pct) if t_prev>0 else "-"}</td>'
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
