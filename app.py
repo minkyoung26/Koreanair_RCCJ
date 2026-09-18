@@ -86,18 +86,21 @@ st.markdown("""
     .yoy-table tr.row-title { background-color: #f8fafc !important; font-weight: bold; color: #0f172a; }
     
     /* 6수송 Carrier별 M/S 엑셀 커스텀 테이블 전용 CSS */
-    .carrier-excel-container { width: 100%; overflow-x: auto; margin-top: 15px; margin-bottom: 25px; border: 1px solid #1e3a8a; border-radius: 4px; }
-    .carrier-excel-table { width: 100%; border-collapse: collapse; font-size: 11.5px; font-family: 'Segoe UI', Malgun Gothic, sans-serif; }
-    .carrier-excel-table th { padding: 5px 6px; border: 1px solid #94a3b8; text-align: center; font-weight: 700; }
-    .carrier-excel-table td { padding: 4px 6px; border: 1px solid #cbd5e1; text-align: center; }
-    .th-dark-blue { background-color: #0f172a; color: #ffffff; }
-    .th-mkt-blue { background-color: #1e40af; color: #ffffff; }
-    .th-sel-blue { background-color: #1d4ed8; color: #ffffff; }
-    .th-sel-light { background-color: #2563eb; color: #ffffff; }
-    .th-ke-green { background-color: #15803d; color: #ffffff; }
-    .th-ke-light { background-color: #16a34a; color: #ffffff; }
-    .tr-summary-footer { background-color: #334155; color: #ffffff; font-weight: 800; }
-    .tr-summary-footer td { border-top: 2px solid #0f172a !important; background-color: #334155; color: #ffffff; }
+    .carrier-excel-container { width: 100%; overflow-x: auto; margin-top: 15px; margin-bottom: 25px; border: 1px solid #cbd5e1; border-radius: 6px; }
+    .carrier-excel-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Segoe UI', Malgun Gothic, sans-serif; }
+    .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; }
+    .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; }
+    
+    /* 사용자 지정 테마 색상 적용 */
+    .th-dark-blue { background-color: #cfe2f3; color: #0f172a; }
+    .th-mkt-blue { background-color: #cfe2f3; color: #0f172a; }
+    .th-sel-blue { background-color: #9fc5e8; color: #0f172a; }
+    .th-sel-light { background-color: #9fc5e8; color: #0f172a; }
+    .th-ke-green { background-color: #6fa8dc; color: #ffffff; }
+    .th-ke-light { background-color: #6fa8dc; color: #ffffff; }
+    
+    .tr-summary-footer { background-color: #efefef; color: #0f172a; font-weight: 800; }
+    .tr-summary-footer td { border-top: 2px solid #94a3b8 !important; background-color: #efefef; color: #0f172a; font-weight: 800; }
     
     details.rbd-details-group { width: 100%; margin: 0; padding: 0; }
     details.rbd-details-group summary { list-style: none; cursor: pointer; outline: none; }
@@ -240,6 +243,16 @@ def get_dynamic_date_ranges_34(df_iss):
     w_col = '발매주차_일자' if '발매주차_일자' in df_iss.columns else ('발매 주차' if '발매 주차' in df_iss.columns else 'Purchase Month')
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
+
+# YOY 전년비 파란색/빨간색 서식 헬퍼 함수
+def format_yoy_html(val, is_percentage_point=False):
+    unit = "%p" if is_percentage_point else "%"
+    if val > 0:
+        return f'<span class="yoy-up">▲ {val:.0f}{unit}</span>'
+    elif val < 0:
+        return f'<span class="yoy-down">▼ {abs(val):.0f}{unit}</span>'
+    else:
+        return f'▲ 0{unit}'
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
@@ -1011,7 +1024,8 @@ elif selected_group == "🌐 6수송 대시보드":
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        st.markdown('<div class="unified-sub-header">1. 항공사/O&D별 발매 M/S</div>', unsafe_allow_html=True)
+        # 📌 1. 제목 명칭 변경 (✈️ 6수송 발매 M/S 현황)
+        st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
         f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
         sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer1_m_fixed")
         sel_1_region = render_slicer_box(f1_col2, "2. OD Region", all_reg_6, "slicer1_reg_fixed")
@@ -1073,13 +1087,12 @@ elif selected_group == "🌐 6수송 대시보드":
                 html_table += f'<td><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            html_table += f'<tr><td style="color:#64748b; font-weight:600;">YOY</td><td>{(f"<span class=yoy-up>▲ {t_yoy_pct:.0f}%</span>" if t_yoy_pct >= 0 else f"<span class=yoy-down>▼ {abs(t_yoy_pct):.0f}%</span>") if t_prev>0 else "-"}</td>'
+            html_table += f'<tr><td style="color:#64748b; font-weight:600;">YOY</td><td>{format_yoy_html(t_yoy_pct) if t_prev>0 else "-"}</td>'
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
                 p_val = al_agg[al_agg[al_col_6] == al_code]['Val_PY_num'].sum()
                 indiv_yoy = ((c_val - p_val) / p_val * 100) if p_val > 0 else 0
-                icon_str = f'<span class="yoy-up">▲ {indiv_yoy:.0f}%</span>' if indiv_yoy >= 0 else f'<span class="yoy-down">▼ {abs(indiv_yoy):.0f}%</span>'
-                html_table += f'<td>{icon_str if p_val>0 else "-"}</td>'
+                html_table += f'<td>{format_yoy_html(indiv_yoy) if p_val>0 else "-"}</td>'
             html_table += '</tr>'
 
             html_table += '<tr class="row-title"><td>전체 M/S</td><td><b>100%</b></td>'
@@ -1090,8 +1103,7 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table += '</tr>'
 
             diff_total_ms = 0
-            icon_tot_p = f'<span class="yoy-up">▲ {diff_total_ms:.0f}%p</span>' if diff_total_ms >= 0 else f'<span class="yoy-down">▼ {abs(diff_total_ms):.0f}%p</span>'
-            html_table += f'<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td><td>{icon_tot_p if t_prev>0 else "-"}</td>'
+            html_table += f'<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td><td>{format_yoy_html(diff_total_ms, True) if t_prev>0 else "-"}</td>'
             
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
@@ -1099,16 +1111,15 @@ elif selected_group == "🌐 6수송 대시보드":
                 ms_c = (c_val / t_curr * 100) if t_curr > 0 else 0
                 ms_p = (p_val / t_prev * 100) if t_prev > 0 else 0
                 diff_p = ms_c - ms_p
-                icon_p = f'<span class="yoy-up">▲ {diff_p:.0f}%p</span>' if diff_p >= 0 else f'<span class="yoy-down">▼ {abs(diff_p):.0f}%p</span>'
-                html_table += f'<td>{icon_p if t_prev>0 and p_val>0 else "-"}</td>'
+                html_table += f'<td>{format_yoy_html(diff_p, True) if t_prev>0 and p_val>0 else "-"}</td>'
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
 
-            # 📌 하단 [Carrier별 M/S 상세 종합 테이블] 전용 독립 슬라이서 영역 생성
+            # 📌 2. 하단 제목 명칭 변경 (📊 항공사별 TOP20 O&D)
             st.markdown("---")
-            st.markdown('<div class="unified-sub-header">📊 Carrier별 M/S 상세 종합 실적 테이블</div>', unsafe_allow_html=True)
+            st.markdown('<div class="unified-sub-header">📊 항공사별 TOP20 O&D</div>', unsafe_allow_html=True)
             
-            with st.expander("🔍 **Carrier별 M/S 상세 테이블 전용 슬라이서 필터 설정**", expanded=True):
+            with st.expander("🔍 **항공사별 TOP20 O&D 분석 슬라이서 필터 설정**", expanded=True):
                 c_f_col1, c_f_col2, c_f_col3, c_f_col4 = st.columns(4)
                 sel_2_month = render_slicer_box(c_f_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer2_m_carrier")
                 sel_2_region = render_slicer_box(c_f_col2, "2. OD Region", all_reg_6, "slicer2_reg_carrier")
@@ -1133,13 +1144,20 @@ elif selected_group == "🌐 6수송 대시보드":
             filtered_carrier_df = df_6[mask_carrier_tab].copy()
 
             if not filtered_carrier_df.empty:
+                # 📌 3. 항공사 선택 시 해당 항공사 실적이 있는 O&D 기반 상위 20개 추출 로직
+                if sel_2_carrier != ALL_OPTION:
+                    carrier_only_df = filtered_carrier_df[filtered_carrier_df[al_col_6] == sel_2_carrier]
+                    top_ods = carrier_only_df.groupby(od_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False).head(20).index.tolist()
+                else:
+                    od_totals_all = filtered_carrier_df.groupby(od_col_6, observed=False)['Val_num'].sum()
+                    top_ods = od_totals_all.sort_values(ascending=False).head(20).index.tolist()
+
                 od_carrier_df = filtered_carrier_df.groupby([od_col_6, al_col_6], observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
                 od_totals = filtered_carrier_df.groupby(od_col_6, observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
-                top_ods = od_totals.sort_values(by='Val_num', ascending=False).head(20)[od_col_6].tolist()
 
-                # 선택 항공사 타이틀 명시
                 target_carrier = sel_2_carrier if sel_2_carrier != ALL_OPTION else "1위 항공사"
 
+                # 📌 4. 테이블 헤더 디자인 및 테마 색상 (#cfe2f3, #9fc5e8, #6fa8dc) 반영
                 c_html = '<div class="carrier-excel-container"><table class="carrier-excel-table"><thead>'
                 c_html += '<tr><th rowspan="2" class="th-dark-blue">순위</th><th rowspan="2" class="th-dark-blue">TOP O&D</th>'
                 c_html += '<th colspan="3" class="th-mkt-blue">시장 전체</th>'
@@ -1155,14 +1173,14 @@ elif selected_group == "🌐 6수송 대시보드":
                 c_html += '<th class="th-ke-light">M/S</th><th class="th-ke-light">전년</th><th class="th-ke-light">YOY</th></tr></thead><tbody>'
 
                 for rank_idx, od_code in enumerate(top_ods, 1):
-                    # 시장 전체 (전용 필터 연동)
+                    # 시장 전체
                     mkt_sub = od_totals[od_totals[od_col_6] == od_code]
                     m_cy = mkt_sub['Val_num'].sum() if not mkt_sub.empty else 0
                     m_py = mkt_sub['Val_PY_num'].sum() if not mkt_sub.empty else 0
                     m_yoy = ((m_cy - m_py) / m_py * 100) if m_py > 0 else 0
-                    m_yoy_str = f"▲ {m_yoy:.0f}%" if m_yoy >= 0 else f"▼ {abs(m_yoy):.0f}%"
+                    m_yoy_html = format_yoy_html(m_yoy) if m_py > 0 else "-"
 
-                    # 선택 항공사 (지정 carrier 또는 O&D 내 1위 carrier)
+                    # 선택 항공사
                     od_al_sub = od_carrier_df[od_carrier_df[od_col_6] == od_code]
                     if sel_2_carrier != ALL_OPTION:
                         top_al_row = od_al_sub[od_al_sub[al_col_6] == sel_2_carrier]
@@ -1177,12 +1195,12 @@ elif selected_group == "🌐 6수송 대시보드":
                     s_py_display = f"{s_py:,.0f}" if s_py > 0 else "-"
 
                     s_yoy = ((s_cy - s_py) / s_py * 100) if s_py > 0 else 0
-                    s_yoy_str = (f"▲ {s_yoy:.0f}%" if s_yoy >= 0 else f"▼ {abs(s_yoy):.0f}%") if s_py > 0 else "-"
+                    s_yoy_html = format_yoy_html(s_yoy) if s_py > 0 else "-"
 
                     s_ms_cy = (s_cy / m_cy * 100) if m_cy > 0 else 0
                     s_ms_py = (s_py / m_py * 100) if m_py > 0 else 0
                     s_ms_diff = s_ms_cy - s_ms_py
-                    s_ms_yoy_str = (f"▲ {s_ms_diff:.0f}%p" if s_ms_diff >= 0 else f"▼ {abs(s_ms_diff):.0f}%p") if m_py > 0 else "-"
+                    s_ms_yoy_html = format_yoy_html(s_ms_diff, True) if m_py > 0 else "-"
 
                     # KE
                     ke_al_row = od_al_sub[od_al_sub[al_col_6] == 'KE']
@@ -1193,19 +1211,19 @@ elif selected_group == "🌐 6수송 대시보드":
                     k_py_display = f"{k_py:,.0f}" if k_py > 0 else "-"
 
                     k_yoy = ((k_cy - k_py) / k_py * 100) if k_py > 0 else 0
-                    k_yoy_str = (f"▲ {k_yoy:.0f}%" if k_yoy >= 0 else f"▼ {abs(k_yoy):.0f}%") if k_py > 0 else "-"
+                    k_yoy_html = format_yoy_html(k_yoy) if k_py > 0 else "-"
 
                     k_ms_cy = (k_cy / m_cy * 100) if m_cy > 0 else 0
                     k_ms_py = (k_py / m_py * 100) if m_py > 0 else 0
                     k_ms_diff = k_ms_cy - k_ms_py
-                    k_ms_yoy_str = (f"▲ {k_ms_diff:.0f}%p" if k_ms_diff >= 0 else f"▼ {abs(k_ms_diff):.0f}%p") if m_py > 0 else "-"
+                    k_ms_yoy_html = format_yoy_html(k_ms_diff, True) if m_py > 0 else "-"
 
                     c_html += f'<tr><td>{rank_idx}</td><td style="font-weight:700;">{od_code}</td>'
-                    c_html += f'<td>{m_cy:,.0f}</td><td>{m_py:,.0f}</td><td>{m_yoy_str if m_py>0 else "-"}</td>'
-                    c_html += f'<td>{s_cy_display}</td><td>{s_py_display}</td><td>{s_yoy_str}</td>'
-                    c_html += f'<td>{s_ms_cy:.0f}%</td><td>{s_ms_py:.0f}%</td><td>{s_ms_yoy_str}</td>'
-                    c_html += f'<td>{k_cy_display}</td><td>{k_py_display}</td><td>{k_yoy_str}</td>'
-                    c_html += f'<td>{k_ms_cy:.1f}%</td><td>{k_ms_py:.1f}%</td><td>{k_ms_yoy_str}</td></tr>'
+                    c_html += f'<td>{m_cy:,.0f}</td><td>{m_py:,.0f}</td><td>{m_yoy_html}</td>'
+                    c_html += f'<td>{s_cy_display}</td><td>{s_py_display}</td><td>{s_yoy_html}</td>'
+                    c_html += f'<td>{s_ms_cy:.0f}%</td><td>{s_ms_py:.0f}%</td><td>{s_ms_yoy_html}</td>'
+                    c_html += f'<td>{k_cy_display}</td><td>{k_py_display}</td><td>{k_yoy_html}</td>'
+                    c_html += f'<td>{k_ms_cy:.1f}%</td><td>{k_ms_py:.1f}%</td><td>{k_ms_yoy_html}</td></tr>'
 
                 # 필터 연동 총합계 요약 행
                 tot_m_cy = od_totals['Val_num'].sum()
@@ -1232,11 +1250,11 @@ elif selected_group == "🌐 6수송 대시보드":
                 ke_tot_ms_diff = ke_tot_ms_cy - ke_tot_ms_py
 
                 c_html += f'<tr class="tr-summary-footer"><td colspan="2">금년 요약</td>'
-                c_html += f'<td>{tot_m_cy:,.0f}</td><td>{tot_m_py:,.0f}</td><td>▲ {tot_m_yoy:.0f}%</td>'
-                c_html += f'<td>{sel_tot_cy:,.0f}</td><td>{sel_tot_py:,.0f}</td><td>▲ {sel_tot_yoy:.0f}%</td>'
-                c_html += f'<td>{sel_tot_ms_cy:.0f}%</td><td>{sel_tot_ms_py:.0f}%</td><td>▲ {sel_tot_ms_diff:.0f}%p</td>'
-                c_html += f'<td>{ke_tot_cy:,.0f}</td><td>{ke_tot_py:,.0f}</td><td>▲ {ke_tot_yoy:.0f}%</td>'
-                c_html += f'<td>{ke_tot_ms_cy:.0f}%</td><td>{ke_tot_ms_py:.0f}%</td><td>▲ {ke_tot_ms_diff:.0f}%p</td></tr>'
+                c_html += f'<td>{tot_m_cy:,.0f}</td><td>{tot_m_py:,.0f}</td><td>{format_yoy_html(tot_m_yoy)}</td>'
+                c_html += f'<td>{sel_tot_cy:,.0f}</td><td>{sel_tot_py:,.0f}</td><td>{format_yoy_html(sel_tot_yoy)}</td>'
+                c_html += f'<td>{sel_tot_ms_cy:.0f}%</td><td>{sel_tot_ms_py:.0f}%</td><td>{format_yoy_html(sel_tot_ms_diff, True)}</td>'
+                c_html += f'<td>{ke_tot_cy:,.0f}</td><td>{ke_tot_py:,.0f}</td><td>{format_yoy_html(ke_tot_yoy)}</td>'
+                c_html += f'<td>{ke_tot_ms_cy:.0f}%</td><td>{ke_tot_ms_py:.0f}%</td><td>{format_yoy_html(ke_tot_ms_diff, True)}</td></tr>'
 
                 c_html += '</tbody></table></div>'
                 st.markdown(c_html, unsafe_allow_html=True)
