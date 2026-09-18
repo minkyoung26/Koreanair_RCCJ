@@ -286,19 +286,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
             val_col = 'Weighted_Value' if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else 'Value'
 
-            # 📌 엑셀 수식의 22개 마스터 노선 리스트에 들어있는 노선만 100% 한정
-            valid_ke_routes = EXCEL_KE_ROUTES_MASTER
-
-            GLOBAL_VALID_KE_ROUTES = valid_ke_routes
-
-            # 슬라이서 노선 순서를 발매량 순으로 정리 (22개 마스터 노선 한정)
-            merged_df_ke = merged_df[merged_df['노선_clean'].isin(valid_ke_routes)]
-            full_route_sum = merged_df_ke.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
+            # 💡 수정: 22개 마스터 노선 중 실적(Value > 0)이 실제 존재하는 노선만 드롭다운에 노출!
+            df_has_value = merged_df[(merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (merged_df['Value'] > 0)]
+            full_route_sum = df_has_value.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
+            route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
             
-            # 22개 마스터 노선 중 데이터에 존재하는 노선 + 아직 실적이 잡히지 않은 마스터 노선 포함
-            existing_routes = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
-            missing_routes = [r for r in valid_ke_routes if r not in existing_routes]
-            route_order_list = existing_routes + missing_routes
+            valid_ke_routes = route_order_list
+            GLOBAL_VALID_KE_ROUTES = valid_ke_routes
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_fixed")
