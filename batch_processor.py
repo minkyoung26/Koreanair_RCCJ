@@ -46,7 +46,7 @@ def process_34_transport_data():
         df['AL_join'] = df[al_col].astype(str).str.strip().str.upper() if al_col in df.columns else ''
         df['Route_norm'] = df[route_col].apply(normalize_route_code) if route_col in df.columns else ''
 
-        # 3. 가중치 매핑
+        # 3. 가중치 매핑 및 나눗셈 보정 연산
         if wt_file:
             print(f"📂 가중치 파일 로딩: {os.path.basename(wt_file)}")
             df_wt = pd.read_excel(wt_file) if wt_file.endswith('.xlsx') else pd.read_csv(wt_file)
@@ -73,18 +73,20 @@ def process_34_transport_data():
             df = pd.merge(df, df_wt_sub, on=['Route_norm', 'AL_join'], how='left')
             df['Weight'] = df['Weight_num'].fillna(1.0)
             df.drop(columns=['Weight_num', 'AL_join', 'Route_norm'], inplace=True, errors='ignore')
-            print("✅ 노선 코드 규격화 및 가중치 매핑 완료!")
+            print("✅ 가중치 매핑 연산 성공!")
         else:
             df['Weight'] = 1.0
 
-        df['Weighted_Value'] = df['Value'] * df['Weight']
+        # 💡 가중치 보정 연산: Value / Weight (Weight가 0 이하일 경우 예외 처리)
+        weight_safe = np.where(df['Weight'] > 0, df['Weight'], 1.0)
+        df['Weighted_Value'] = df['Value'] / weight_safe
 
         b_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
         if b_col: df['수송'] = df[b_col].astype(str).str.strip()
 
         output_parquet = os.path.join(base_dir, 'cache_34_data.parquet')
         df.to_parquet(output_parquet, index=False, compression='snappy')
-        print(f"🎉 가중치 매핑 파켓 생성 완료: {os.path.basename(output_parquet)} (행 수: {len(df):,}개)")
+        print(f"🎉 정상 가중치 나눗셈 보정 파켓 생성 완료: {os.path.basename(output_parquet)} (행 수: {len(df):,}개)")
         return True
 
     except Exception as e:
