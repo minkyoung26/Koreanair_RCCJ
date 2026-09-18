@@ -105,7 +105,7 @@ st.markdown("""
     .carrier-excel-container { width: 100%; overflow-x: auto; margin-top: 15px; margin-bottom: 25px; border: 1px solid #cbd5e1; border-radius: 6px; }
     .carrier-excel-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Noto Sans KR', sans-serif; }
     .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 600; }
-    .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; }
+    .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-size: 12px !important; }
     
     .th-dark-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-mkt-blue { background-color: #cfe2f3; color: #0f172a; }
@@ -125,8 +125,11 @@ st.markdown("""
     .rbd-child-row td { background-color: #ffffff !important; font-size: 12px; }
     .custom-piv-table tr.row-group-header, .yoy-table tr.row-summary, .yoy-table tr.row-summary td { background-color: #efefef !important; font-weight: 600; color: #0f172a; }
     .row-group-header-custom, .row-group-header-custom td { background-color: #cccccc !important; color: #0f172a !important; font-weight: 700 !important; }
-    .yoy-up { color: #1d4ed8 !important; font-weight: 600; }
-    .yoy-down { color: #dc2626 !important; font-weight: 600; }
+    
+    /* 📌 YOY 텍스트 크기 셀 본문과 완전 동일(12px)하게 조정 */
+    .yoy-up { color: #1d4ed8 !important; font-weight: 600; font-size: 12px !important; }
+    .yoy-down { color: #dc2626 !important; font-weight: 600; font-size: 12px !important; }
+    
     .ke-timeline-box { background-color: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 12px 18px; margin-bottom: 15px; color: #0369a1; font-weight: 500; font-size: 13.5px; }
 </style>
 """, unsafe_allow_html=True)
@@ -273,7 +276,6 @@ def format_yoy_html(val, is_percentage_point=False):
 # ==========================================
 if selected_group == "✈️ 3/4수송 대시보드":
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
-    # 📌 3/4수송 날짜 괄호 설명 문구 추가 (과거 5주), (향후 6개월)
     st.markdown(f"""
     <div class="source-header-box">
         <b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; 
@@ -329,7 +331,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
             val_col = 'Weighted_Value' if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else 'Value'
 
-            # 💡 22개 마스터 노선 중 실적(Value > 0)이 실제 존재하는 KE 취항 노선만 드롭다운에 노출
             df_has_value = merged_df[(merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (merged_df['Value'] > 0)]
             full_route_sum = df_has_value.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
             route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
@@ -390,11 +391,20 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 c1, c2 = st.columns([1.6, 1])
                 with c1:
                     pie_al = filtered_df.groupby('AL_clean', observed=False)[val_col].sum().reset_index()
+                    
+                    # 📌 1. KE 파이를 돌출(pull=[0.08])시켜 시각적으로 입체 강조
+                    pull_list = [0.08 if al == 'KE' else 0 for al in pie_al['AL_clean']]
+                    
                     fig1 = px.pie(
                         pie_al, values=val_col, names='AL_clean',
                         hole=0.4, category_orders={'AL_clean': al_order}
                     )
-                    fig1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                    fig1.update_traces(
+                        pull=pull_list,
+                        textposition='inside', 
+                        textinfo='percent+label', 
+                        hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>"
+                    )
                     apply_bottom_legend(fig1)
                     st.plotly_chart(fig1, width='stretch')
 
@@ -432,7 +442,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig_week.update_traces(textposition='inside', hovertemplate="<b>항공사: %{customdata[0]}</b><br>발매 실적: %{customdata[1]:,.0f}<br>점유비: %{customdata[2]:.1f}%<extra></extra>")
 
                         valid_weeks = [w for w in all_issue_weeks if w in week_totals_dict]
-                        top_bar_labels = [f"<b>{week_totals_dict.get(w, 0):,.0f}</b><br><span style='color:#16a34a;'>(★KE {(ke_week_grp.get(w, 0)/week_totals_dict.get(w,0)*100) if week_totals_dict.get(w,0)>0 else 0:.1f}%)</span>" for w in valid_weeks]
+                        
+                        # 📌 2. 발매 주차별 KE M/S 숫자 볼드(<b>) 처리
+                        top_bar_labels = [f"<b>{week_totals_dict.get(w, 0):,.0f}</b><br><span style='color:#16a34a;'>(★KE <b>{(ke_week_grp.get(w, 0)/week_totals_dict.get(w,0)*100) if week_totals_dict.get(w,0)>0 else 0:.1f}%</b>)</span>" for w in valid_weeks]
 
                         fig_week.add_trace(go.Scatter(x=valid_weeks, y=[week_totals_dict[w] for w in valid_weeks], mode='text', text=top_bar_labels, textposition='top center', showlegend=False, hoverinfo='skip'))
                         fig_week.update_layout(yaxis_title=f"발매 실적{status_wt_label}")
@@ -517,13 +529,22 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
+            
+            # 📌 3. M/S 피벗 테이블 KE 행 #d9d9d9 회색 배경 하이라이트 스타일러
+            def highlight_ke_row(row):
+                if row.name == 'KE':
+                    return ['background-color: #d9d9d9; font-weight: bold; color: #0f172a;'] * len(row)
+                return [''] * len(row)
+
             t1, t2 = st.columns([1.1, 1])
             with t1:
                 if week_col and week_col in filtered_df.columns:
                     piv_w = filtered_df.pivot_table(index='AL_clean', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
                     piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
                     al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
-                    st.dataframe(piv_w_ms.loc[al_sorted].head(100).map(lambda x: f"{x:.1f}%"), width='stretch')
+                    
+                    piv_w_display = piv_w_ms.loc[al_sorted].head(100).map(lambda x: f"{x:.1f}%")
+                    st.dataframe(piv_w_display.style.apply(highlight_ke_row, axis=1), width='stretch')
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선_clean', columns='AL_clean', values=val_col, aggfunc='sum', fill_value=0, observed=False)
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
@@ -637,8 +658,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
             with cs1:
                 st.markdown(f'<div class="unified-sub-header">1. 항공사별 전체 공급 M/S 점유비 ({metric_mode})</div>', unsafe_allow_html=True)
                 pie_sup_al = filtered_sup.groupby('Airline', observed=False)[target_val].sum().reset_index()
+                
+                # 📌 4. 공급 M/S KE 파이 조각 돌출 강조 적용
+                sup_pull_list = [0.08 if al == 'KE' else 0 for al in pie_sup_al['Airline']]
+                
                 fig_s1 = px.pie(pie_sup_al, values=target_val, names='Airline', hole=0.4, category_orders={'Airline': sup_al_order}, color='Airline', color_discrete_map=sup_color_map)
-                fig_s1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>공급량: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                fig_s1.update_traces(pull=sup_pull_list, textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>공급량: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                 apply_bottom_legend(fig_s1)
                 st.plotly_chart(fig_s1, width='stretch')
 
@@ -656,7 +681,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     s_val = row[target_val]
                     s_ms = row['공급 M/S (%)']
                     is_ke = (al_name == 'KE')
-                    row_style = ' class="row-group-header"' if is_ke else ''
+                    
+                    # 📌 5. KE 순위 행 배경색 #d9d9d9 회색 하이라이트 적용
+                    row_style = ' style="background-color: #d9d9d9 !important; font-weight: bold;"' if is_ke else ''
                     sup_pivot_html += f'<tr{row_style}><td style="text-align:center;"><b>{rank_idx}위</b></td><td style="text-align:center; font-weight:700;">{"★ KE" if is_ke else al_name}</td><td style="text-align:center;"><b>{s_val:,.0f}</b></td><td style="text-align:center;"><b>{s_ms:.1f}%</b></td></tr>'
 
                 sup_pivot_html += '</tbody></table></div>'
@@ -705,7 +732,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
             time_col_a = '출발시간대' if '출발시간대' in df_agency.columns else None
             
-            # 📌 22개 마스터 노선 중 실적(Value > 0)이 있는 KE 취항 노선만 정밀하게 필터링
             df_agency['노선_clean'] = df_agency['노선'].astype(str).str.strip()
             df_ag_has_val = df_agency[(df_agency['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (df_agency['Value'] > 0)]
             ag_route_sum = df_ag_has_val.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
@@ -804,7 +830,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         ag_tot_val = ag_sub['Value'].sum()
 
                         if ag_tot_val > 0:
-                            # 💡 대리점 내 하위 항공사 목록을 판매량(총합계) 내림차순으로 정렬
                             ag_al_totals = ag_sub.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
                             sorted_ag_airlines = [al for al in ag_al_totals.index if ag_al_totals[al] > 0]
 
@@ -835,7 +860,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
             
-            # 📌 22개 마스터 노선 중 실적(Value > 0)이 있는 KE 취항 노선만 정밀하게 필터링
             df_grp_raw['노선_clean'] = df_grp_raw['노선'].astype(str).str.strip()
             df_g_has_val = df_grp_raw[(df_grp_raw['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (df_grp_raw['Value'] > 0)]
             g_route_sum = df_g_has_val.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
@@ -1046,7 +1070,6 @@ elif selected_group == "🌐 6수송 대시보드":
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        # 📌 1. 제목 및 필터 라벨 명칭 반영
         st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
         f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
         sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (향후 6개월 출발)", all_raw_m, "slicer1_m_fixed")
@@ -1094,7 +1117,6 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table = '<div class="yoy-table-container"><table class="yoy-table"><thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             for al_code in airline_rank_list:
                 if al_code == 'KE':
-                    # 📌 KE 컬럼 '대한항공' 텍스트 제외 및 #6fa8dc 적용
                     html_table += f'<th class="ke-header" style="width:130px; background-color:#6fa8dc !important; color:#ffffff !important;">KE ({ke_rank}위)</th>'
                 else:
                     rank_num = full_al_ranking.index(al_code) + 1 if al_code in full_al_ranking else "-"
@@ -1139,7 +1161,6 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
 
-            # 📌 2. 하단 제목 명칭 변경 (📊 항공사별 TOP20 O&D)
             st.markdown("---")
             st.markdown('<div class="unified-sub-header">📊 항공사별 TOP20 O&D</div>', unsafe_allow_html=True)
             
@@ -1156,7 +1177,6 @@ elif selected_group == "🌐 6수송 대시보드":
                 sel_2_ov_apo = render_slicer_box(c_f_col7, "7. 해외APO", all_ov_6, "slicer2_ov_carrier")
                 sel_2_carrier = render_slicer_box(c_f_col8, "8. CARRIER (항공사)", sorted_6th_airlines, "slicer2_carrier")
 
-            # 📌 하단 테이블 전용 필터 마스크 생성
             mask_carrier_tab = filter_month_yoy(df_6, sel_2_month)
             if act_reg_c and act_reg_c in df_6.columns and sel_2_region != ALL_OPTION: mask_carrier_tab &= (df_6[act_reg_c].astype(str) == sel_2_region)
             if act_dir_c and act_dir_c in df_6.columns and sel_2_dir != ALL_OPTION: mask_carrier_tab &= (df_6[act_dir_c].astype(str) == sel_2_dir)
@@ -1168,7 +1188,6 @@ elif selected_group == "🌐 6수송 대시보드":
             filtered_carrier_df = df_6[mask_carrier_tab].copy()
 
             if not filtered_carrier_df.empty:
-                # 📌 3. 항공사 선택 시 해당 항공사 실적이 있는 O&D 기반 상위 20개 추출 로직
                 if sel_2_carrier != ALL_OPTION:
                     carrier_only_df = filtered_carrier_df[filtered_carrier_df[al_col_6] == sel_2_carrier]
                     top_ods = carrier_only_df.groupby(od_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False).head(20).index.tolist()
@@ -1181,7 +1200,6 @@ elif selected_group == "🌐 6수송 대시보드":
 
                 target_carrier = sel_2_carrier if sel_2_carrier != ALL_OPTION else "1위 항공사"
 
-                # 📌 4. 테이블 헤더 디자인 및 테마 색상 (#cfe2f3, #9fc5e8, #6fa8dc) 반영
                 c_html = '<div class="carrier-excel-container"><table class="carrier-excel-table"><thead>'
                 c_html += '<tr><th rowspan="2" class="th-dark-blue">순위</th><th rowspan="2" class="th-dark-blue">TOP O&D</th>'
                 c_html += '<th colspan="3" class="th-mkt-blue">시장 전체</th>'
