@@ -39,6 +39,13 @@ issue_end_6th = current_monday - datetime.timedelta(days=1)
 issue_start_6th = current_monday - datetime.timedelta(weeks=13)
 issue_range_str_6th = f"{issue_start_6th.strftime('%Y.%m.%d')} ~ {issue_end_6th.strftime('%Y.%m.%d')}"
 
+# 📌 엑셀 수식 기준 지정 22개 대한항공 정규 취항 노선 마스터 리스트
+EXCEL_KE_ROUTES_MASTER = [
+    "G/HND", "I/NRT", "I/HND", "P/NRT", "C/NRT", "I/KIX", "G/KIX", "I/UKB",
+    "I/OKJ", "I/HIJ", "I/FUK", "I/KOJ", "I/NGS", "I/KMJ", "I/OIT", "I/NGO",
+    "P/NGO", "I/KIJ", "I/KMQ", "I/OKA", "I/CTS", "I/AOJ"
+]
+
 # 3. 항공사별 RBD 계층 정의
 RBD_HIERARCHY = {
     'KE': list('YBMSHEKLUQTX'),
@@ -219,24 +226,6 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 엑셀 수식 기준 원본 KE 취항 노선 추출 함수
-def extract_ke_operated_routes_from_excel(df):
-    if df is None or df.empty: return []
-    
-    ke_service_col = None
-    for c in ['KE취항여부', 'KE 취항여부', 'KE취항노선 여부', 'KE취항', 'KE 취항']:
-        if c in df.columns:
-            ke_service_col = c
-            break
-            
-    if ke_service_col and '노선' in df.columns:
-        df_serv = df[df[ke_service_col].astype(str).str.strip().str.contains('취항', na=False)]
-        routes = sorted([str(r).strip() for r in df_serv['노선'].dropna().unique() if str(r).strip() not in ['nan', 'None', '']])
-        return routes
-    return []
-
-GLOBAL_VALID_KE_ROUTES = []
-
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
@@ -294,23 +283,22 @@ if selected_group == "✈️ 3/4수송 대시보드":
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
-            # 💡 고정된 위젯 key 사용 (세션 초기화 완전 방지)
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
             val_col = 'Weighted_Value' if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else 'Value'
 
-            # 📌 엑셀 수식 결과 'KE취항여부' == '취항' 노선 추출
-            valid_ke_routes = extract_ke_operated_routes_from_excel(merged_df)
-            if not valid_ke_routes:
-                valid_ke_routes = merged_df[merged_df['AL_clean'] == 'KE']['노선_clean'].dropna().unique().tolist()
+            # 📌 엑셀 수식의 22개 마스터 노선 리스트에 들어있는 노선만 100% 한정
+            valid_ke_routes = EXCEL_KE_ROUTES_MASTER
 
             GLOBAL_VALID_KE_ROUTES = valid_ke_routes
 
-            if valid_ke_routes:
-                merged_df_ke = merged_df[merged_df['노선_clean'].isin(valid_ke_routes)]
-                full_route_sum = merged_df_ke.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
-                route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
-            else:
-                route_order_list = []
+            # 슬라이서 노선 순서를 발매량 순으로 정리 (22개 마스터 노선 한정)
+            merged_df_ke = merged_df[merged_df['노선_clean'].isin(valid_ke_routes)]
+            full_route_sum = merged_df_ke.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
+            
+            # 22개 마스터 노선 중 데이터에 존재하는 노선 + 아직 실적이 잡히지 않은 마스터 노선 포함
+            existing_routes = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
+            missing_routes = [r for r in valid_ke_routes if r not in existing_routes]
+            route_order_list = existing_routes + missing_routes
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_fixed")
@@ -552,11 +540,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         if '노선' in df_sup.columns:
             df_sup['노선_clean'] = df_sup['노선'].astype(str).str.strip()
-            sup_valid_ke_routes = extract_ke_operated_routes_from_excel(df_sup)
-            if sup_valid_ke_routes:
-                df_sup = df_sup[df_sup['노선_clean'].isin(sup_valid_ke_routes)]
-            elif GLOBAL_VALID_KE_ROUTES:
-                df_sup = df_sup[df_sup['노선_clean'].isin(GLOBAL_VALID_KE_ROUTES)]
+            df_sup = df_sup[df_sup['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
         df_sup = df_sup.reset_index(drop=True)
 
