@@ -58,7 +58,6 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# CSS 서식
 st.markdown("""
 <style>
     :root { --primary-color: #0ea5e9 !important; --primaryColor: #0ea5e9 !important; }
@@ -120,34 +119,9 @@ def clean_transport_column(df):
 @st.cache_data(max_entries=5, show_spinner=False)
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # 📌 원본 CSV 직접 탐색 및 가중치 실시간 로딩 (100% 원본 수치 보장)
-    iss_files = glob.glob(os.path.join(base_dir, '*34수송*.csv')) + glob.glob('*34수송*.csv')
-    if iss_files:
-        latest_iss = sorted(iss_files, key=os.path.getmtime, reverse=True)[0]
-        try:
-            df = pd.read_csv(latest_iss, low_memory=False)
-            df.columns = [str(c).strip() for c in df.columns]
-            
-            # Value 수치형 변환
-            if 'Value' in df.columns:
-                df['Value'] = pd.to_numeric(df['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
-            
-            # 가중치 계산 (Value * Weight)
-            if 'Weight' in df.columns:
-                w_num = pd.to_numeric(df['Weight'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1.0)
-                df['Weighted_Value'] = df['Value'] * w_num
-            else:
-                df['Weighted_Value'] = df['Value']
-
-            return optimize_df(clean_transport_column(df))
-        except: pass
-
-    # 예외시 기존 파켓 캐시 탐색
     target_path = os.path.join(base_dir, 'cache_34_data.parquet')
     if os.path.exists(target_path):
         return optimize_df(clean_transport_column(pd.read_parquet(target_path)))
-        
     return None
 
 @st.cache_data(max_entries=5, show_spinner=False)
@@ -201,10 +175,24 @@ def load_aux_files():
 
 disk_sup, disk_6th = load_aux_files()
 
+# 📌 업로드 파일 1순위 강제 반영 및 가중치 즉시 보정
 if uploaded_iss is not None:
     df_iss_merged = load_uploaded_parquet(uploaded_iss)
 else:
     df_iss_merged = load_fast_parquet_data_file()
+
+if df_iss_merged is not None:
+    df_iss_merged.columns = [str(c).strip() for c in df_iss_merged.columns]
+    if 'Value' in df_iss_merged.columns:
+        df_iss_merged['Value'] = pd.to_numeric(df_iss_merged['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+    
+    if 'Weight' in df_iss_merged.columns:
+        w_num = pd.to_numeric(df_iss_merged['Weight'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1.0)
+        df_iss_merged['Weighted_Value'] = df_iss_merged['Value'] * w_num
+    elif 'Weighted_Value' in df_iss_merged.columns:
+        df_iss_merged['Weighted_Value'] = pd.to_numeric(df_iss_merged['Weighted_Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+    else:
+        df_iss_merged['Weighted_Value'] = df_iss_merged['Value']
 
 df_sup_raw = None
 if uploaded_sup is not None:
@@ -305,7 +293,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     with tab_34_1:
         if df_iss_merged is None:
-            st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다. 좌측 사이드바 1번에서 파일/캐시를 확인해주세요.")
+            st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다. 좌측 사이드바 1번에서 파일/캐시를 업로드해 주세요.")
             st.stop()
 
         merged_df = df_iss_merged.copy()
@@ -324,7 +312,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # 📌 KE 취항 노선만 선별하여 슬라이서 구성
+        # 📌 KE 취항 노선만 선별하여 노선 필터 생성
         ke_routes_iss = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']['노선'].dropna().unique().tolist()
         if ke_routes_iss:
             full_route_sum = merged_df[merged_df['노선'].isin(ke_routes_iss)].groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
@@ -334,10 +322,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
             route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
-            apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
+            apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="wt_toggle_main")
             
+            # 📌 KeyError 방지 및 실시간 컬럼 선택
             if apply_weight_toggle:
-                val_col = 'Weighted_Value'
+                if 'Weighted_Value' in merged_df.columns:
+                    val_col = 'Weighted_Value'
+                else:
+                    val_col = 'Value'
             else:
                 val_col = 'Value'
 
@@ -1196,4 +1188,3 @@ elif selected_group == "🌐 6수송 대시보드":
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
     st.iframe(EXT_WEB_APP_URL, height=850)
-# Force sync trigger
