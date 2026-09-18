@@ -103,6 +103,11 @@ st.markdown("""
     .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 600; }
     .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-size: 12px !important; }
     
+    /* 📌 6수송 TOP20 O&D 테이블 YOY span 크기 및 굵기 강제 오버라이드 설정 */
+    .carrier-excel-table td span.yoy-up-txt { color: #1d4ed8 !important; font-size: 10.5px !important; font-weight: 500 !important; display: inline-block; }
+    .carrier-excel-table td span.yoy-down-txt { color: #dc2626 !important; font-size: 10.5px !important; font-weight: 500 !important; display: inline-block; }
+    .carrier-excel-table td span.yoy-zero-txt { color: #475569 !important; font-size: 10.5px !important; font-weight: 500 !important; display: inline-block; }
+
     .th-dark-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-mkt-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-sel-blue { background-color: #d9d9d9; color: #0f172a; }
@@ -254,15 +259,15 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 YOY 텍스트 크기 10px로 축소 및 양수 파란색(#1d4ed8), 음수 붉은색(#dc2626) 고정
+# 📌 YOY 텍스트 크기(10.5px) 및 색상(양수 파랑 #1d4ed8 / 음수 빨강 #dc2626) 전용 매핑 함수
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
-        return f'<span style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 500 !important;">▲ {val:.0f}{unit}</span>'
+        return f'<span class="yoy-up-txt">▲ {val:.0f}{unit}</span>'
     elif val < 0:
-        return f'<span style="color: #dc2626 !important; font-size: 10px !important; font-weight: 500 !important;">▼ {abs(val):.0f}{unit}</span>'
+        return f'<span class="yoy-down-txt">▼ {abs(val):.0f}{unit}</span>'
     else:
-        return f'<span style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important;">▲ 0{unit}</span>'
+        return f'<span class="yoy-zero-txt">▲ 0{unit}</span>'
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
