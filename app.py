@@ -136,14 +136,18 @@ def process_any_uploaded_file(file_obj):
 
     df.columns = [str(c).strip() for c in df.columns]
 
+    # 📌 Value & Weight 수치형 강력 변환 (콤마 및 공백 정제)
     if 'Value' in df.columns:
-        df['Value'] = pd.to_numeric(df['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
-    
+        val_clean = df['Value'].astype(str).str.replace(',', '').str.strip()
+        df['Value'] = pd.to_numeric(val_clean, errors='coerce').fillna(0)
+
     if 'Weight' in df.columns:
-        w_num = pd.to_numeric(df['Weight'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1.0)
+        wt_clean = df['Weight'].astype(str).str.replace(',', '').str.strip()
+        w_num = pd.to_numeric(wt_clean, errors='coerce').fillna(1.0)
         df['Weighted_Value'] = df['Value'] * w_num
     elif 'Weighted_Value' in df.columns:
-        df['Weighted_Value'] = pd.to_numeric(df['Weighted_Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+        wv_clean = df['Weighted_Value'].astype(str).str.replace(',', '').str.strip()
+        df['Weighted_Value'] = pd.to_numeric(wv_clean, errors='coerce').fillna(0)
     else:
         df['Weighted_Value'] = df['Value']
 
@@ -181,9 +185,14 @@ else:
 
 if df_iss_merged is not None:
     df_iss_merged.columns = [str(c).strip() for c in df_iss_merged.columns]
-    if 'Value' in df_iss_merged.columns and 'Weighted_Value' not in df_iss_merged.columns:
+    if 'Value' in df_iss_merged.columns:
+        v_clean = df_iss_merged['Value'].astype(str).str.replace(',', '').str.strip()
+        df_iss_merged['Value'] = pd.to_numeric(v_clean, errors='coerce').fillna(0)
+    
+    if 'Weighted_Value' not in df_iss_merged.columns:
         if 'Weight' in df_iss_merged.columns:
-            df_iss_merged['Weighted_Value'] = df_iss_merged['Value'] * pd.to_numeric(df_iss_merged['Weight'], errors='coerce').fillna(1.0)
+            w_clean = df_iss_merged['Weight'].astype(str).str.replace(',', '').str.strip()
+            df_iss_merged['Weighted_Value'] = df_iss_merged['Value'] * pd.to_numeric(w_clean, errors='coerce').fillna(1.0)
         else:
             df_iss_merged['Weighted_Value'] = df_iss_merged['Value']
 
@@ -270,7 +279,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         merged_df = df_iss_merged.copy()
 
-        # 공백 제거 텍스트 정제 (필터 불일치 완벽 방지)
+        # 📌 노선 및 항공사 공백 완전 정제
         merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
         merged_df['AL_clean'] = merged_df['Dominant Marketing Airline'].astype(str).str.strip()
 
@@ -295,7 +304,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
             # 📌 KE 취항 노선만 선별 및 발매량 순 정렬
             ke_only_mask = merged_df['AL_clean'].str.upper() == 'KE'
-            ke_routes_list = merged_df[ke_only_mask]['노선_clean'].unique().tolist()
+            ke_routes_list = sorted(merged_df[ke_only_mask]['노선_clean'].unique().tolist())
             
             if ke_routes_list:
                 merged_df_ke = merged_df[merged_df['노선_clean'].isin(ke_routes_list)]
@@ -315,7 +324,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_iss")
             sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_iss")
 
-        # 📌 100% 동작하는 실시간 동적 필터링 마스크 구축
+        # 📌 동적 필터링 적용 (공백 완전 차단)
         filter_mask = pd.Series(True, index=merged_df.index)
 
         if sel_route_str != ALL_OPTION:
@@ -336,7 +345,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 실시간 M/S 계산
+        # 📌 실시간 수치 재집계
         total_pax = filtered_df[val_col].sum()
         ke_pax = filtered_df[filtered_df['AL_clean'].str.upper() == 'KE'][val_col].sum() if not filtered_df.empty else 0
         ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
@@ -1155,7 +1164,7 @@ elif selected_group == "🌐 6수송 대시보드":
                     carrier_html += f'<td style="text-align:center;">{(f"{k_cy:,.0f}" if k_cy > 0 else "-")}</td><td style="text-align:center;">{k_yoy_str if k_cy>0 and k_py>0 else "-"}</td>'
                     carrier_html += f'<td style="text-align:center;"><b>{k_ms_cy:.1f}%</b></td><td style="text-align:center;">{k_ms_diff_str if m_py>0 and k_py>0 else "-"}</td></tr>'
 
-                carrier_html += '</tbody></table> me>'
+                carrier_html += '</tbody></table></div>'
                 st.markdown(carrier_html, unsafe_allow_html=True)
 
     with tab6_2:
