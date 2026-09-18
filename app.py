@@ -84,6 +84,21 @@ st.markdown("""
     .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; color: #334155 !important; background-color: #ffffff !important; text-align: center !important; }
     .yoy-table tr:hover { background-color: #f8fafc !important; }
     .yoy-table tr.row-title { background-color: #f8fafc !important; font-weight: bold; color: #0f172a; }
+    
+    /* 6수송 Carrier별 M/S 엑셀 커스텀 테이블 전용 CSS */
+    .carrier-excel-container { width: 100%; overflow-x: auto; margin-top: 15px; margin-bottom: 25px; border: 1px solid #1e3a8a; border-radius: 4px; }
+    .carrier-excel-table { width: 100%; border-collapse: collapse; font-size: 11.5px; font-family: 'Segoe UI', Malgun Gothic, sans-serif; }
+    .carrier-excel-table th { padding: 5px 6px; border: 1px solid #94a3b8; text-align: center; font-weight: 700; }
+    .carrier-excel-table td { padding: 4px 6px; border: 1px solid #cbd5e1; text-align: center; }
+    .th-dark-blue { background-color: #0f172a; color: #ffffff; }
+    .th-mkt-blue { background-color: #1e40af; color: #ffffff; }
+    .th-sel-blue { background-color: #1d4ed8; color: #ffffff; }
+    .th-sel-light { background-color: #2563eb; color: #ffffff; }
+    .th-ke-green { background-color: #15803d; color: #ffffff; }
+    .th-ke-light { background-color: #16a34a; color: #ffffff; }
+    .tr-summary-footer { background-color: #334155; color: #ffffff; font-weight: 800; }
+    .tr-summary-footer td { border-top: 2px solid #0f172a !important; background-color: #334155; color: #ffffff; }
+    
     details.rbd-details-group { width: 100%; margin: 0; padding: 0; }
     details.rbd-details-group summary { list-style: none; cursor: pointer; outline: none; }
     details.rbd-details-group summary::-webkit-details-marker { display: none; }
@@ -1057,7 +1072,6 @@ elif selected_group == "🌐 6수송 대시보드":
                 html_table += f'<td><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # 💡 YOY 문법 구문 수정 (f-string 변수 정상 적용)
             diff_total_ms = 0
             icon_tot_p = f'<span class="yoy-up">▲ {diff_total_ms:.0f}%p</span>' if diff_total_ms >= 0 else f'<span class="yoy-down">▼ {abs(diff_total_ms):.0f}%p</span>'
             html_table += f'<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td><td>{icon_tot_p if t_prev>0 else "-"}</td>'
@@ -1073,28 +1087,93 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
 
-            # 📌 [완전 복원] CARRIER(항공사)별 월별/노선별 상세 M/S 피벗 테이블
+            # 📌 2번째 엑셀 서식 이미지 원본 그대로의 Carrier별 M/S 2단계 커스텀 HTML 데이터 테이블 복원
             st.markdown("---")
-            st.markdown('<div class="unified-sub-header">2. CARRIER(항공사)별 월별 및 O&D 시장 M/S 상세 피벗 테이블</div>', unsafe_allow_html=True)
+            st.markdown('<div class="unified-sub-header">📊 Carrier별 M/S 상세 종합 실적 테이블</div>', unsafe_allow_html=True)
+
+            # O&D별 집계 데이터 생성
+            od_carrier_df = filtered_tab1.groupby([od_col_6, al_col_6], observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
+            od_totals = filtered_tab1.groupby(od_col_6, observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
             
-            t6_col1, t6_col2 = st.columns([1.1, 1])
-            with t6_col1:
-                st.markdown("##### 🗓️ 월별 CARRIER 발매 M/S (%)")
-                if month_col_6 and month_col_6 in filtered_tab1.columns:
-                    piv_m6 = filtered_tab1.pivot_table(index=al_col_6, columns=month_col_6, values='Val_num', aggfunc='sum', fill_value=0, observed=False)
-                    if not piv_m6.empty:
-                        piv_m6_ms = piv_m6.divide(piv_m6.sum(axis=0), axis=1) * 100
-                        al_order_6_piv = ['KE'] + [x for x in piv_m6_ms.index if x != 'KE'] if 'KE' in piv_m6_ms.index else piv_m6_ms.index
-                        st.dataframe(piv_m6_ms.loc[al_order_6_piv].head(100).map(lambda x: f"{x:.1f}%"), width='stretch')
+            # TOP O&D 시장 실적순 정렬
+            top_ods = od_totals.sort_values(by='Val_num', ascending=False).head(20)[od_col_6].tolist()
+
+            c_html = '<div class="carrier-excel-container"><table class="carrier-excel-table"><thead>'
+            c_html += '<tr><th rowspan="2" class="th-dark-blue">순위</th><th rowspan="2" class="th-dark-blue">TOP O&D</th>'
+            c_html += '<th colspan="3" class="th-mkt-blue">시장 전체</th>'
+            c_html += '<th colspan="3" class="th-sel-blue">선택 항공사 발매량</th>'
+            c_html += '<th colspan="3" class="th-sel-light">선택 항공사 M/S</th>'
+            c_html += '<th colspan="3" class="th-ke-green">KE 발매량</th>'
+            c_html += '<th colspan="3" class="th-ke-light">KE M/S</th></tr>'
             
-            with t6_col2:
-                st.markdown("##### ✈️ O&D Market별 CARRIER 발매 M/S (%)")
-                if od_col_6 and od_col_6 in filtered_tab1.columns:
-                    piv_o6 = filtered_tab1.pivot_table(index=od_col_6, columns=al_col_6, values='Val_num', aggfunc='sum', fill_value=0, observed=False)
-                    if not piv_o6.empty:
-                        cols_ke_6 = ['KE'] + [x for x in piv_o6.columns if x != 'KE'] if 'KE' in piv_o6.columns else piv_o6.columns
-                        piv_o6_ms = piv_o6[cols_ke_6].divide(piv_o6.sum(axis=1), axis=0) * 100
-                        st.dataframe(piv_o6_ms.head(100).map(lambda x: f"{x:.1f}%"), width='stretch')
+            c_html += '<tr><th class="th-mkt-blue">금년</th><th class="th-mkt-blue">전년</th><th class="th-mkt-blue">YOY</th>'
+            c_html += '<th class="th-sel-blue">금년</th><th class="th-sel-blue">전년</th><th class="th-sel-blue">YOY</th>'
+            c_html += '<th class="th-sel-light">M/S</th><th class="th-sel-light">전년</th><th class="th-sel-light">YOY</th>'
+            c_html += '<th class="th-ke-green">금년</th><th class="th-ke-green">전년</th><th class="th-ke-green">YOY</th>'
+            c_html += '<th class="th-ke-light">M/S</th><th class="th-ke-light">전년</th><th class="th-ke-light">YOY</th></tr></thead><tbody>'
+
+            for rank_idx, od_code in enumerate(top_ods, 1):
+                # 시장 전체
+                mkt_sub = od_totals[od_totals[od_col_6] == od_code]
+                m_cy = mkt_sub['Val_num'].sum() if not mkt_sub.empty else 0
+                m_py = mkt_sub['Val_PY_num'].sum() if not mkt_sub.empty else 0
+                m_yoy = ((m_cy - m_py) / m_py * 100) if m_py > 0 else 0
+                m_yoy_str = f"▲ {m_yoy:.0f}%" if m_yoy >= 0 else f"▼ {abs(m_yoy):.0f}%"
+
+                # 선택 항공사 (O&D 내 1위 Carrier)
+                od_al_sub = od_carrier_df[od_carrier_df[od_col_6] == od_code]
+                top_al_row = od_al_sub.sort_values(by='Val_num', ascending=False).iloc[0] if not od_al_sub.empty else None
+                
+                s_cy = top_al_row['Val_num'] if top_al_row is not None else 0
+                s_py = top_al_row['Val_PY_num'] if top_al_row is not None else 0
+                s_yoy = ((s_cy - s_py) / s_py * 100) if s_py > 0 else 0
+                s_yoy_str = f"▲ {s_yoy:.0f}%" if s_yoy >= 0 else f"▼ {abs(s_yoy):.0f}%"
+
+                s_ms_cy = (s_cy / m_cy * 100) if m_cy > 0 else 0
+                s_ms_py = (s_py / m_py * 100) if m_py > 0 else 0
+                s_ms_diff = s_ms_cy - s_ms_py
+                s_ms_yoy_str = f"▲ {s_ms_diff:.0f}%p" if s_ms_diff >= 0 else f"▼ {abs(s_ms_diff):.0f}%p"
+
+                # KE
+                ke_al_row = od_al_sub[od_al_sub[al_col_6] == 'KE']
+                k_cy = ke_al_row['Val_num'].sum() if not ke_al_row.empty else 0
+                k_py = ke_al_row['Val_PY_num'].sum() if not ke_al_row.empty else 0
+                k_yoy = ((k_cy - k_py) / k_py * 100) if k_py > 0 else 0
+                k_yoy_str = (f"▲ {k_yoy:.0f}%" if k_yoy >= 0 else f"▼ {abs(k_yoy):.0f}%") if k_py > 0 else "-"
+
+                k_ms_cy = (k_cy / m_cy * 100) if m_cy > 0 else 0
+                k_ms_py = (k_py / m_py * 100) if m_py > 0 else 0
+                k_ms_diff = k_ms_cy - k_ms_py
+                k_ms_yoy_str = (f"▲ {k_ms_diff:.0f}%p" if k_ms_diff >= 0 else f"▼ {abs(k_ms_diff):.0f}%p") if m_py > 0 else "-"
+
+                c_html += f'<tr><td>{rank_idx}</td><td style="font-weight:700;">{od_code}</td>'
+                c_html += f'<td>{m_cy:,.0f}</td><td>{m_py:,.0f}</td><td>{m_yoy_str if m_py>0 else "-"}</td>'
+                c_html += f'<td>{s_cy:,.0f}</td><td>{s_py:,.0f}</td><td>{s_yoy_str if s_py>0 else "-"}</td>'
+                c_html += f'<td>{s_ms_cy:.0f}%</td><td>{s_ms_py:.0f}%</td><td>{s_ms_yoy_str if m_py>0 else "-"}</td>'
+                c_html += f'<td>{k_cy:,.0f if k_cy>0 else "-"}</td><td>{k_py:,.0f if k_py>0 else "-"}</td><td>{k_yoy_str}</td>'
+                c_html += f'<td>{k_ms_cy:.1f}%</td><td>{k_ms_py:.1f}%</td><td>{k_ms_yoy_str}</td></tr>'
+
+            # 금년 요약 행
+            tot_m_cy = od_totals['Val_num'].sum()
+            tot_m_py = od_totals['Val_PY_num'].sum()
+            tot_m_yoy = ((tot_m_cy - tot_m_py) / tot_m_py * 100) if tot_m_py > 0 else 0
+            
+            ke_tot_cy = filtered_tab1[filtered_tab1[al_col_6] == 'KE']['Val_num'].sum()
+            ke_tot_py = filtered_tab1[filtered_tab1[al_col_6] == 'KE']['Val_PY_num'].sum()
+            ke_tot_yoy = ((ke_tot_cy - ke_tot_py) / ke_tot_py * 100) if ke_tot_py > 0 else 0
+            ke_tot_ms_cy = (ke_tot_cy / tot_m_cy * 100) if tot_m_cy > 0 else 0
+            ke_tot_ms_py = (ke_tot_py / tot_m_py * 100) if tot_m_py > 0 else 0
+            ke_tot_ms_diff = ke_tot_ms_cy - ke_tot_ms_py
+
+            c_html += f'<tr class="tr-summary-footer"><td colspan="2">금년 요약</td>'
+            c_html += f'<td>{tot_m_cy:,.0f}</td><td>{tot_m_py:,.0f}</td><td>▲ {tot_m_yoy:.0f}%</td>'
+            c_html += f'<td>{tot_m_cy:,.0f}</td><td>{tot_m_py:,.0f}</td><td>▲ {tot_m_yoy:.0f}%</td>'
+            c_html += f'<td>100%</td><td>100%</td><td>▲ 0%p</td>'
+            c_html += f'<td>{ke_tot_cy:,.0f}</td><td>{ke_tot_py:,.0f}</td><td>▲ {ke_tot_yoy:.0f}%</td>'
+            c_html += f'<td>{ke_tot_ms_cy:.0f}%</td><td>{ke_tot_ms_py:.0f}%</td><td>▲ {ke_tot_ms_diff:.0f}%p</td></tr>'
+
+            c_html += '</tbody></table></div>'
+            st.markdown(c_html, unsafe_allow_html=True)
 
         st.markdown("---")
 
