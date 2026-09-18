@@ -270,6 +270,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         merged_df = df_iss_merged.copy()
 
+        # 공백 제거 텍스트 정제 (필터 불일치 완벽 방지)
+        merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
+        merged_df['AL_clean'] = merged_df['Dominant Marketing Airline'].astype(str).str.strip()
+
         week_col = '발매주차_일자' if '발매주차_일자' in merged_df.columns else ('발매 주차' if '발매 주차' in merged_df.columns else '발매주차')
         all_issue_weeks = sorted([str(x).strip() for x in merged_df[week_col].dropna().unique()]) if week_col else []
 
@@ -281,27 +285,24 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         all_ticket_types = sorted([str(x).strip() for x in merged_df['Ticket Type'].dropna().unique()]) if 'Ticket Type' in merged_df.columns else []
 
-        raw_airlines = sorted([str(x).strip() for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
+        raw_airlines = sorted([str(x).strip() for x in merged_df['AL_clean'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="wt_toggle_main")
             
-            if apply_weight_toggle and 'Weighted_Value' in merged_df.columns:
-                val_col = 'Weighted_Value'
-            else:
-                val_col = 'Value'
+            val_col = 'Weighted_Value' if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else 'Value'
 
-            # 📌 KE 취항 노선 선별 및 발매량순 정렬
-            ke_only_mask = merged_df['Dominant Marketing Airline'].astype(str).str.strip().str.upper() == 'KE'
-            ke_routes_list = merged_df[ke_only_mask]['노선'].dropna().astype(str).str.strip().unique().tolist()
+            # 📌 KE 취항 노선만 선별 및 발매량 순 정렬
+            ke_only_mask = merged_df['AL_clean'].str.upper() == 'KE'
+            ke_routes_list = merged_df[ke_only_mask]['노선_clean'].unique().tolist()
             
             if ke_routes_list:
-                merged_df_ke = merged_df[merged_df['노선'].astype(str).str.strip().isin(ke_routes_list)]
-                full_route_sum = merged_df_ke.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
+                merged_df_ke = merged_df[merged_df['노선_clean'].isin(ke_routes_list)]
+                full_route_sum = merged_df_ke.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
                 route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
             else:
-                full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
+                full_route_sum = merged_df.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
                 route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
@@ -314,58 +315,54 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_iss")
             sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_iss")
 
-        # 📌 실시간 노선/슬라이서 동적 필터링 적용 (공백 완전 정제)
-        filter_conditions = []
-        
+        # 📌 100% 동작하는 실시간 동적 필터링 마스크 구축
+        filter_mask = pd.Series(True, index=merged_df.index)
+
         if sel_route_str != ALL_OPTION:
-            filter_conditions.append(merged_df['노선'].astype(str).str.strip() == str(sel_route_str).strip())
+            filter_mask &= (merged_df['노선_clean'] == str(sel_route_str).strip())
         elif ke_routes_list:
-            filter_conditions.append(merged_df['노선'].astype(str).str.strip().isin(ke_routes_list))
+            filter_mask &= (merged_df['노선_clean'].isin(ke_routes_list))
 
         if sel_al_str != ALL_OPTION:
-            filter_conditions.append(merged_df['Dominant Marketing Airline'].astype(str).str.strip() == str(sel_al_str).strip())
+            filter_mask &= (merged_df['AL_clean'] == str(sel_al_str).strip())
         if month_col and sel_month_str != ALL_OPTION:
-            filter_conditions.append(merged_df[month_col].astype(str).str.strip() == str(sel_month_str).strip())
+            filter_mask &= (merged_df[month_col].astype(str).str.strip() == str(sel_month_str).strip())
         if bound_col and sel_bound_str != ALL_OPTION:
-            filter_conditions.append(merged_df[bound_col].astype(str).str.strip() == str(sel_bound_str).strip())
+            filter_mask &= (merged_df[bound_col].astype(str).str.strip() == str(sel_bound_str).strip())
         if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION:
-            filter_conditions.append(merged_df['Ticket Type'].astype(str).str.strip() == str(sel_tt_str).strip())
+            filter_mask &= (merged_df['Ticket Type'].astype(str).str.strip() == str(sel_tt_str).strip())
         if week_col and sel_week_str != ALL_OPTION:
-            filter_conditions.append(merged_df[week_col].astype(str).str.strip() == str(sel_week_str).strip())
+            filter_mask &= (merged_df[week_col].astype(str).str.strip() == str(sel_week_str).strip())
 
-        if filter_conditions:
-            final_mask = np.logical_and.reduce(filter_conditions)
-            filtered_df = merged_df[final_mask]
-        else:
-            filtered_df = merged_df
+        filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 동적 집계 수치 산출
+        # 📌 실시간 M/S 계산
         total_pax = filtered_df[val_col].sum()
-        ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'].astype(str).str.strip().str.upper() == 'KE'][val_col].sum() if not filtered_df.empty else 0
+        ke_pax = filtered_df[filtered_df['AL_clean'].str.upper() == 'KE'][val_col].sum() if not filtered_df.empty else 0
         ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
 
         top_al = "-"
         top_ms = 0.0
         if not filtered_df.empty and total_pax > 0:
-            al_sum = filtered_df.groupby('Dominant Marketing Airline', observed=False)[val_col].sum()
+            al_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
             top_al = str(al_sum.idxmax())
             top_ms = (al_sum.max() / total_pax) * 100
 
-        top_route = str(filtered_df.groupby('노선', observed=False)[val_col].sum().idxmax()) if not filtered_df.empty and total_pax > 0 else "-"
+        top_route = str(filtered_df.groupby('노선_clean', observed=False)[val_col].sum().idxmax()) if not filtered_df.empty and total_pax > 0 else "-"
         status_wt_label = " (가중치)" if apply_weight_toggle else " (Raw)"
 
         tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "🔒 Raw Data View (관리자 전용)"])
         with tab1:
             if not filtered_df.empty:
-                al_order = [al for al in all_airlines if al in filtered_df['Dominant Marketing Airline'].unique()]
+                al_order = [al for al in all_airlines if al in filtered_df['AL_clean'].unique()]
                 
                 st.markdown('<div class="unified-sub-header">1. 항공사별 M/S 점유비</div>', unsafe_allow_html=True)
                 c1, c2 = st.columns([1.6, 1])
                 with c1:
-                    pie_al = filtered_df.groupby('Dominant Marketing Airline', observed=False)[val_col].sum().reset_index()
+                    pie_al = filtered_df.groupby('AL_clean', observed=False)[val_col].sum().reset_index()
                     fig1 = px.pie(
-                        pie_al, values=val_col, names='Dominant Marketing Airline',
-                        hole=0.4, category_orders={'Dominant Marketing Airline': al_order}
+                        pie_al, values=val_col, names='AL_clean',
+                        hole=0.4, category_orders={'AL_clean': al_order}
                     )
                     fig1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                     apply_bottom_legend(fig1)
@@ -385,10 +382,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     df_no_week = filtered_df
 
                     if not df_no_week.empty:
-                        week_al_grp = df_no_week.groupby([week_col, 'Dominant Marketing Airline'], observed=False)[val_col].sum().reset_index()
+                        week_al_grp = df_no_week.groupby([week_col, 'AL_clean'], observed=False)[val_col].sum().reset_index()
                         week_totals = week_al_grp.groupby(week_col, observed=False)[val_col].sum().reset_index()
                         week_totals_dict = dict(zip(week_totals[week_col].astype(str), week_totals[val_col]))
-                        ke_week_grp = week_al_grp[week_al_grp['Dominant Marketing Airline'] == 'KE'].set_index(week_col)[val_col].to_dict()
+                        ke_week_grp = week_al_grp[week_al_grp['AL_clean'] == 'KE'].set_index(week_col)[val_col].to_dict()
 
                         week_al_grp['Week_Total'] = week_al_grp[week_col].map(week_totals_dict)
                         week_tot_num = pd.to_numeric(week_al_grp['Week_Total'], errors='coerce').fillna(0)
@@ -397,10 +394,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         week_al_grp['Text_Display'] = week_al_grp['MS_Percent'].map(lambda x: f"{x:.1f}%" if x >= 3.0 else "")
 
                         fig_week = px.bar(
-                            week_al_grp, x=week_col, y=val_col, color='Dominant Marketing Airline',
+                            week_al_grp, x=week_col, y=val_col, color='AL_clean',
                             barmode='stack', text='Text_Display',
-                            category_orders={'Dominant Marketing Airline': al_order, week_col: all_issue_weeks},
-                            custom_data=['Dominant Marketing Airline', val_col, 'MS_Percent']
+                            category_orders={'AL_clean': al_order, week_col: all_issue_weeks},
+                            custom_data=['AL_clean', val_col, 'MS_Percent']
                         )
                         fig_week.update_traces(textposition='inside', hovertemplate="<b>항공사: %{customdata[0]}</b><br>발매 실적: %{customdata[1]:,.0f}<br>점유비: %{customdata[2]:.1f}%<extra></extra>")
 
@@ -419,7 +416,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     df_dep_al = filtered_df
 
                     if not df_dep_al.empty:
-                        dep_al_grp = df_dep_al.groupby([month_col, 'Dominant Marketing Airline'], observed=False)[val_col].sum().reset_index()
+                        dep_al_grp = df_dep_al.groupby([month_col, 'AL_clean'], observed=False)[val_col].sum().reset_index()
                         dep_mkt_tot = df_dep_al.groupby(month_col, observed=False)[val_col].sum().reset_index()
                         
                         dep_al_grp[month_col] = dep_al_grp[month_col].astype(str)
@@ -429,15 +426,15 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         dep_merged[val_col] = dep_merged[val_col].fillna(0)
                         dep_merged['MS_Percent'] = np.where(dep_merged[f'{val_col}_Mkt'] > 0, (dep_merged[val_col] / dep_merged[f'{val_col}_Mkt']) * 100, 0)
 
-                        top_al_in_dep = df_dep_al.groupby('Dominant Marketing Airline', observed=False)[val_col].sum().sort_values(ascending=False).index.tolist()
+                        top_al_in_dep = df_dep_al.groupby('AL_clean', observed=False)[val_col].sum().sort_values(ascending=False).index.tolist()
                         top_al_display = ['KE'] + [al for al in top_al_in_dep if al != 'KE'][:5]
 
-                        dep_merged_top = dep_merged[dep_merged['Dominant Marketing Airline'].isin(top_al_display)].copy()
+                        dep_merged_top = dep_merged[dep_merged['AL_clean'].isin(top_al_display)].copy()
 
                         fig_ke_dep = go.Figure()
 
                         for al_code in top_al_display:
-                            al_data = dep_merged_top[dep_merged_top['Dominant Marketing Airline'] == al_code]
+                            al_data = dep_merged_top[dep_merged_top['AL_clean'] == al_code]
                             if al_data.empty: continue
 
                             is_ke = (al_code == 'KE')
@@ -466,7 +463,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.markdown("---")
                 
                 c3, c4 = st.columns(2)
-                ke_only_df = filtered_df[filtered_df['Dominant Marketing Airline'] == 'KE']
+                ke_only_df = filtered_df[filtered_df['AL_clean'] == 'KE']
                 
                 with c3:
                     if bound_col:
@@ -493,12 +490,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
             t1, t2 = st.columns([1.1, 1])
             with t1:
                 if week_col and week_col in filtered_df.columns:
-                    piv_w = filtered_df.pivot_table(index='Dominant Marketing Airline', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
+                    piv_w = filtered_df.pivot_table(index='AL_clean', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
                     piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
                     al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
                     st.dataframe(piv_w_ms.loc[al_sorted].head(100).map(lambda x: f"{x:.1f}%"), width='stretch')
             with t2:
-                piv_r = filtered_df.pivot_table(index='노선', columns='Dominant Marketing Airline', values=val_col, aggfunc='sum', fill_value=0, observed=False)
+                piv_r = filtered_df.pivot_table(index='노선_clean', columns='AL_clean', values=val_col, aggfunc='sum', fill_value=0, observed=False)
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
                 piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
                 st.dataframe(piv_r_ms.head(100).map(lambda x: f"{x:.1f}%"), width='stretch')
@@ -1158,7 +1155,7 @@ elif selected_group == "🌐 6수송 대시보드":
                     carrier_html += f'<td style="text-align:center;">{(f"{k_cy:,.0f}" if k_cy > 0 else "-")}</td><td style="text-align:center;">{k_yoy_str if k_cy>0 and k_py>0 else "-"}</td>'
                     carrier_html += f'<td style="text-align:center;"><b>{k_ms_cy:.1f}%</b></td><td style="text-align:center;">{k_ms_diff_str if m_py>0 and k_py>0 else "-"}</td></tr>'
 
-                carrier_html += '</tbody></table></div>'
+                carrier_html += '</tbody></table> me>'
                 st.markdown(carrier_html, unsafe_allow_html=True)
 
     with tab6_2:
@@ -1171,4 +1168,3 @@ elif selected_group == "🌐 6수송 대시보드":
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
     st.iframe(EXT_WEB_APP_URL, height=850)
-    # update force commit
