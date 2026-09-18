@@ -26,7 +26,7 @@ def process_34_transport_data():
     main_csv_file = csv_candidates[0]
     print(f"📂 3/4수송 원본 CSV 로딩: {os.path.basename(main_csv_file)}")
     
-    # 2. 가중치 파일 탐색
+    # 2. 가중치 파일 탐색 (가중치 파일_7월.csv 등)
     wt_candidates = glob.glob(os.path.join(base_dir, "*가중치*.csv")) + glob.glob(os.path.join(base_dir, "*가중치*.xlsx"))
     wt_file = wt_candidates[0] if wt_candidates else None
     
@@ -46,9 +46,9 @@ def process_34_transport_data():
         df['AL_join'] = df[al_col].astype(str).str.strip().str.upper() if al_col in df.columns else ''
         df['Route_norm'] = df[route_col].apply(normalize_route_code) if route_col in df.columns else ''
 
-        # 3. 가중치 매핑 및 나눗셈 보정 연산
+        # 3. 가중치 매핑 및 역수(1 / Weight) 처리
         if wt_file:
-            print(f"📂 가중치 파일 로딩: {os.path.basename(wt_file)}")
+            print(f"📂 가중치 파일 매핑 중: {os.path.basename(wt_file)}")
             df_wt = pd.read_excel(wt_file) if wt_file.endswith('.xlsx') else pd.read_csv(wt_file)
             df_wt.columns = [str(c).strip() for c in df_wt.columns]
             
@@ -59,34 +59,34 @@ def process_34_transport_data():
             df_wt['Route_norm'] = df_wt[wt_route_col].apply(normalize_route_code)
             df_wt['AL_join'] = df_wt[wt_al_col].astype(str).str.strip().str.upper()
             
-            def parse_weight_pct(val):
+            def parse_weight_to_inv(val):
                 v_str = str(val).replace('%', '').strip()
                 try:
                     num = float(v_str)
-                    return num / 100.0 if num > 5.0 else num
+                    w = num / 100.0 if num > 5.0 else num
+                    return (1.0 / w) if w > 0 else 1.0
                 except:
                     return 1.0
 
-            df_wt['Weight_num'] = df_wt[wt_val_col].apply(parse_weight_pct)
-            df_wt_sub = df_wt[['Route_norm', 'AL_join', 'Weight_num']].drop_duplicates(subset=['Route_norm', 'AL_join'])
+            df_wt['Weight_inv'] = df_wt[wt_val_col].apply(parse_weight_to_inv)
+            df_wt_sub = df_wt[['Route_norm', 'AL_join', 'Weight_inv']].drop_duplicates(subset=['Route_norm', 'AL_join'])
             
             df = pd.merge(df, df_wt_sub, on=['Route_norm', 'AL_join'], how='left')
-            df['Weight'] = df['Weight_num'].fillna(1.0)
-            df.drop(columns=['Weight_num', 'AL_join', 'Route_norm'], inplace=True, errors='ignore')
-            print("✅ 가중치 매핑 연산 성공!")
+            df['Weight_factor'] = df['Weight_inv'].fillna(1.0)
+            df.drop(columns=['Weight_inv', 'AL_join', 'Route_norm'], inplace=True, errors='ignore')
+            print("✅ 가중치 역수 비율(1 / Weight) 적용 성공!")
         else:
-            df['Weight'] = 1.0
+            df['Weight_factor'] = 1.0
 
-        # 💡 가중치 보정 연산: Value / Weight (Weight가 0 이하일 경우 예외 처리)
-        weight_safe = np.where(df['Weight'] > 0, df['Weight'], 1.0)
-        df['Weighted_Value'] = df['Value'] / weight_safe
+        # 핵심: 가중치 실시간 비중 계산용 Weighted_Value 생성
+        df['Weighted_Value'] = df['Value'] * df['Weight_factor']
 
         b_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
         if b_col: df['수송'] = df[b_col].astype(str).str.strip()
 
         output_parquet = os.path.join(base_dir, 'cache_34_data.parquet')
         df.to_parquet(output_parquet, index=False, compression='snappy')
-        print(f"🎉 정상 가중치 나눗셈 보정 파켓 생성 완료: {os.path.basename(output_parquet)} (행 수: {len(df):,}개)")
+        print(f"🎉 가중치 역수 비율 보정 파켓 생성 완료: {os.path.basename(output_parquet)} (행 수: {len(df):,}개)")
         return True
 
     except Exception as e:
