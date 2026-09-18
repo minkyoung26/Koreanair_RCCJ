@@ -254,15 +254,15 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 6수송 TOP 20 O&D 인라인 스타일로 YOY 텍스트 크기(10.5px) 정밀 맞춤
+# 📌 YOY 텍스트 크기 10px로 축소 및 양수 파란색(#1d4ed8), 음수 붉은색(#dc2626) 고정
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
-        return f'<span style="color: #1d4ed8 !important; font-size: 10.5px !important; font-weight: 500 !important;">▲ {val:.0f}{unit}</span>'
+        return f'<span style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 500 !important;">▲ {val:.0f}{unit}</span>'
     elif val < 0:
-        return f'<span style="color: #dc2626 !important; font-size: 10.5px !important; font-weight: 500 !important;">▼ {abs(val):.0f}{unit}</span>'
+        return f'<span style="color: #dc2626 !important; font-size: 10px !important; font-weight: 500 !important;">▼ {abs(val):.0f}{unit}</span>'
     else:
-        return f'<span style="color: #475569 !important; font-size: 10.5px !important; font-weight: 500 !important;">▲ 0{unit}</span>'
+        return f'<span style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important;">▲ 0{unit}</span>'
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
@@ -523,7 +523,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
             t1, t2 = st.columns([1.1, 1])
             
-            # 📌 1. st.dataframe 테마 간섭을 방지하기 위해 정교한 커스텀 HTML 테이블 조립
+            # 📌 1. AL_clean 표 KE 행 파란색 글씨 적용 (#1d4ed8)
             with t1:
                 if week_col and week_col in filtered_df.columns:
                     piv_w = filtered_df.pivot_table(index='AL_clean', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
@@ -539,15 +539,16 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     for al_idx, row_item in piv_w_ms.iterrows():
                         is_ke_r = (str(al_idx).upper() == 'KE')
                         row_style = ' style="background-color: #cfe2f3 !important;"' if is_ke_r else ''
-                        td_style = ' style="background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold;"' if is_ke_r else ''
+                        td_style = ' style="background-color: #cfe2f3 !important; color: #1d4ed8 !important; font-weight: bold;"' if is_ke_r else ''
 
-                        piv_w_html += f'<tr{row_style}><td{td_style} style="font-weight:700;">{al_idx}</td>'
+                        piv_w_html += f'<tr{row_style}><td{td_style} style="font-weight:700; color: #1d4ed8 !important;">{al_idx}</td>'
                         for val_ms in row_item:
                             piv_w_html += f'<td{td_style}>{val_ms:.1f}%</td>'
                         piv_w_html += '</tr>'
                     piv_w_html += '</tbody></table></div>'
                     st.markdown(piv_w_html, unsafe_allow_html=True)
 
+            # 📌 2. 노선_clean 표 KE 열 파란색 글씨 적용 (#1d4ed8)
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선_clean', columns='AL_clean', values=val_col, aggfunc='sum', fill_value=0, observed=False)
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
@@ -557,7 +558,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 piv_r_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:100px;">노선_clean</th>'
                 for col_al in piv_r_ms.columns:
                     is_ke_c = (str(col_al).upper() == 'KE')
-                    th_style = ' style="background-color: #9fc5e8 !important; color: #0f172a !important; font-weight: bold;"' if is_ke_c else ''
+                    th_style = ' style="background-color: #cfe2f3 !important; color: #1d4ed8 !important; font-weight: bold;"' if is_ke_c else ''
                     piv_r_html += f'<th class="header-main"{th_style}>{col_al}</th>'
                 piv_r_html += '</tr></thead><tbody>'
 
@@ -565,7 +566,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     piv_r_html += f'<tr><td style="font-weight:700;">{route_idx}</td>'
                     for al_col_name, val_ms in row_item.items():
                         is_ke_c = (str(al_col_name).upper() == 'KE')
-                        td_style = ' style="background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold;"' if is_ke_c else ''
+                        td_style = ' style="background-color: #cfe2f3 !important; color: #1d4ed8 !important; font-weight: bold;"' if is_ke_c else ''
                         piv_r_html += f'<td{td_style}>{val_ms:.1f}%</td>'
                     piv_r_html += '</tr>'
                 piv_r_html += '</tbody></table></div>'
@@ -696,6 +697,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 apply_bottom_legend(fig_s1)
                 st.plotly_chart(fig_s1, width='stretch')
 
+            # 📌 3. 공급 요약 테이블 KE 파란색 글자 적용 (#1d4ed8)
             with cs2:
                 st.markdown(f'<div class="unified-sub-header">2. 항공사별 공급 실적 및 M/S 요약</div>', unsafe_allow_html=True)
                 pie_sup_al['공급 M/S (%)'] = (pie_sup_al[target_val] / pie_sup_al[target_val].sum()) * 100
@@ -711,9 +713,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     s_ms = row['공급 M/S (%)']
                     is_ke = (al_name == 'KE')
                     
-                    # 📌 모든 <td> 셀에 직접 #d9d9d9 배경색 주입하여 완벽 음영 처리
                     if is_ke:
-                        td_style = ' style="background-color: #d9d9d9 !important; color: #0f172a !important;"'
+                        td_style = ' style="background-color: #d9d9d9 !important; color: #1d4ed8 !important; font-weight: bold;"'
                     else:
                         td_style = ''
 
