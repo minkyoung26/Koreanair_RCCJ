@@ -1352,4 +1352,7 @@ elif selected_group == "🌐 6수송 대시보드":
 # ==========================================
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
-    st.iframe(EXT_WEB_APP_URL, height=850)
+    
+    st.info("💡 사내 보안 정책(SSO 로그인)으로 인해 대시보드 내부 프레임 출력이 제한될 수 있습니다. 아래 버튼을 눌러 새 탭에서 접속해 주세요.")
+    
+    st.link_button("🔗 W26 연결 네트워크 바로가기 (새 탭에서 열기)", EXT_WEB_APP_URL, use_container_width=True)
