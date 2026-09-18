@@ -679,7 +679,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_timeline)
                     st.plotly_chart(fig_timeline, width='stretch')
 
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (KE 취항 노선 전용 필터 보정 완수)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (KE 취항 노선 전용 필터 적용)
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
@@ -688,7 +688,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
             time_col_a = '출발시간대' if '출발시간대' in df_agency.columns else None
             
-            # 📌 22개 마스터 노선 중 실적(Value > 0)이 존재하는 KE 취항 노선만 추출
+            # 📌 22개 마스터 노선 중 실적(Value > 0)이 있는 KE 취항 노선만 정밀하게 필터링
             df_agency['노선_clean'] = df_agency['노선'].astype(str).str.strip()
             df_ag_has_val = df_agency[(df_agency['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (df_agency['Value'] > 0)]
             ag_route_sum = df_ag_has_val.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
@@ -787,10 +787,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         ag_tot_val = ag_sub['Value'].sum()
 
                         if ag_tot_val > 0:
+                            # 💡 대리점 내 하위 항공사 목록을 판매량(총합계) 내림차순으로 정렬
+                            ag_al_totals = ag_sub.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
+                            sorted_ag_airlines = [al for al in ag_al_totals.index if ag_al_totals[al] > 0]
+
                             piv_ag_sub = ag_sub.pivot_table(index='Dominant Marketing Airline', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
                             piv_ag_sub['총합계'] = piv_ag_sub.sum(axis=1)
                             
-                            piv_ag_sub = piv_ag_sub[piv_ag_sub['총합계'] > 0]
+                            piv_ag_sub = piv_ag_sub.reindex(sorted_ag_airlines).dropna(how='all')
 
                             if not piv_ag_sub.empty:
                                 ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center;">▼ ★ {ag_name} 총계</td>'
@@ -814,7 +818,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
             
-            # 📌 22개 마스터 노선 중 실적(Value > 0)이 있는 KE 취항 노선으로 정확히 제한
+            # 📌 22개 마스터 노선 중 실적(Value > 0)이 있는 KE 취항 노선만 정밀하게 필터링
             df_grp_raw['노선_clean'] = df_grp_raw['노선'].astype(str).str.strip()
             df_g_has_val = df_grp_raw[(df_grp_raw['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (df_grp_raw['Value'] > 0)]
             g_route_sum = df_g_has_val.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
