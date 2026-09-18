@@ -254,15 +254,15 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 6수송 TOP 20 O&D 인라인 스타일로 YOY 텍스트 크기(11px) 축소 정밀 보정
+# 📌 YOY 텍스트 크기 10.5px, 굵기 500으로 일반 수치와 크기 균형 정밀 맞춤
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
-        return f'<span style="color: #1d4ed8; font-size: 11px !important; font-weight: 600;">▲ {val:.0f}{unit}</span>'
+        return f'<span style="color: #1d4ed8 !important; font-size: 10.5px !important; font-weight: 500 !important;">▲ {val:.0f}{unit}</span>'
     elif val < 0:
-        return f'<span style="color: #dc2626; font-size: 11px !important; font-weight: 600;">▼ {abs(val):.0f}{unit}</span>'
+        return f'<span style="color: #dc2626 !important; font-size: 10.5px !important; font-weight: 500 !important;">▼ {abs(val):.0f}{unit}</span>'
     else:
-        return f'<span style="color: #475569; font-size: 11px !important; font-weight: 500;">▲ 0{unit}</span>'
+        return f'<span style="color: #475569 !important; font-size: 10.5px !important; font-weight: 500 !important;">▲ 0{unit}</span>'
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
@@ -385,7 +385,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 with c1:
                     pie_al = filtered_df.groupby('AL_clean', observed=False)[val_col].sum().reset_index()
                     
-                    # 📌 go.Pie 기반으로 정확히 KE 파이만 돌출(pull=0.08) 및 KE 텍스트 Bold(<b>KE</b>) 고정
                     labels_list = [f"<b>{x}</b>" if str(x) == 'KE' else str(x) for x in pie_al['AL_clean']]
                     pull_list = [0.08 if str(x) == 'KE' else 0 for x in pie_al['AL_clean']]
                     colors_list = [build_airline_color_map(all_airlines).get(al, '#94a3b8') for al in pie_al['AL_clean']]
@@ -523,13 +522,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
             
-            # 📌 1. AL_clean 표 KE 행(Row) #cfe2f3 배경색 + 어두운 텍스트 가독성 최적화
+            # 📌 AL_clean 표 KE 행(Row) #cfe2f3 배경색 + 어두운 텍스트 지정
             def highlight_ke_row(row):
                 if str(row.name).upper() == 'KE':
                     return ['background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold !important;'] * len(row)
                 return [''] * len(row)
 
-            # 📌 2. 노선_clean 표 KE 열(Column) #cfe2f3 배경색 + 어두운 텍스트 가독성 최적화
+            # 📌 노선_clean 표 KE 열(Column) #cfe2f3 배경색 + 어두운 텍스트 지정
             def highlight_ke_col(col):
                 if str(col.name).upper() == 'KE':
                     return ['background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold !important;'] * len(col)
@@ -660,7 +659,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.markdown(f'<div class="unified-sub-header">1. 항공사별 전체 공급 M/S 점유비 ({metric_mode})</div>', unsafe_allow_html=True)
                 pie_sup_al = filtered_sup.groupby('Airline', observed=False)[target_val].sum().reset_index()
                 
-                # 📌 go.Pie 기반으로 정확히 KE 파이만 돌출(pull=0.08) 및 KE 텍스트 Bold(<b>KE</b>) 고정
                 sup_labels_list = [f"<b>{x}</b>" if str(x) == 'KE' else str(x) for x in pie_sup_al['Airline']]
                 sup_pull_list = [0.08 if str(x) == 'KE' else 0 for x in pie_sup_al['Airline']]
                 sup_colors_list = [build_airline_color_map(sup_airlines).get(al, '#94a3b8') for al in pie_sup_al['Airline']]
@@ -693,10 +691,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     s_ms = row['공급 M/S (%)']
                     is_ke = (al_name == 'KE')
                     
-                    # 📌 KE 순위 행 tr 및 모든 td 셀에 #d9d9d9 회색 배경 직접 주입하여 확실히 수정
-                    row_style = ' style="background-color: #d9d9d9 !important;"' if is_ke else ''
-                    cell_style = ' style="background-color: #d9d9d9 !important; color: #0f172a !important; font-weight: bold;"' if is_ke else ''
-                    sup_pivot_html += f'<tr{row_style}><td{cell_style} style="text-align:center;"><b>{rank_idx}위</b></td><td{cell_style} style="text-align:center; font-weight:700;">{"★ KE" if is_ke else al_name}</td><td{cell_style} style="text-align:center;"><b>{s_val:,.0f}</b></td><td{cell_style} style="text-align:center;"><b>{s_ms:.1f}%</b></td></tr>'
+                    # 📌 모든 <td> 셀에 직접 #d9d9d9 배경색 지정하여 확실히 음영 표출
+                    if is_ke:
+                        td_style = ' style="background-color: #d9d9d9 !important; color: #0f172a !important;"'
+                    else:
+                        td_style = ''
+
+                    sup_pivot_html += f'<tr><td{td_style} style="text-align:center;"><b>{rank_idx}위</b></td><td{td_style} style="text-align:center; font-weight:700;">{"★ KE" if is_ke else al_name}</td><td{td_style} style="text-align:center;"><b>{s_val:,.0f}</b></td><td{td_style} style="text-align:center;"><b>{s_ms:.1f}%</b></td></tr>'
 
                 sup_pivot_html += '</tbody></table></div>'
                 st.markdown(sup_pivot_html, unsafe_allow_html=True)
