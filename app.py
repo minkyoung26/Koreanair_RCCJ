@@ -136,7 +136,6 @@ def process_any_uploaded_file(file_obj):
 
     df.columns = [str(c).strip() for c in df.columns]
 
-    # 📌 필수 수치 및 가중치 자동 계산
     if 'Value' in df.columns:
         df['Value'] = pd.to_numeric(df['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     
@@ -175,7 +174,6 @@ def load_aux_files():
 
 disk_sup, disk_6th = load_aux_files()
 
-# 📌 핵심: 업로드된 파일을 1순위로 즉시 가중치 자동 처리하여 바인딩
 if uploaded_iss is not None:
     df_iss_merged = process_any_uploaded_file(uploaded_iss)
 else:
@@ -231,9 +229,9 @@ def format_dep_time(dep_val):
     except: return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
 def render_slicer_box(container, label, full_list, key_name, default_idx=0):
-    opts = [ALL_OPTION] + (full_list if full_list else [])
+    opts = [ALL_OPTION] + [x for x in full_list if str(x).strip() != ALL_OPTION]
     container.markdown(f"<b>{label}</b>", unsafe_allow_html=True)
-    return container.selectbox(label, options=opts, index=default_idx, key=key_name, label_visibility="collapsed")
+    return container.selectbox(label, options=opts, index=0, key=key_name, label_visibility="collapsed")
 
 def get_dynamic_date_ranges_34(df_iss):
     if df_iss is None or df_iss.empty: return issue_range_str, dep_range_str
@@ -267,23 +265,23 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     with tab_34_1:
         if df_iss_merged is None:
-            st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다. 좌측 사이드바 1번에서 원본 CSV/XLSX 파일을 드래그하여 업로드해 주세요.")
+            st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다. 좌측 사이드바 1번에서 파일을 업로드해 주세요.")
             st.stop()
 
         merged_df = df_iss_merged.copy()
 
         week_col = '발매주차_일자' if '발매주차_일자' in merged_df.columns else ('발매 주차' if '발매 주차' in merged_df.columns else '발매주차')
-        all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
+        all_issue_weeks = sorted([str(x).strip() for x in merged_df[week_col].dropna().unique()]) if week_col else []
 
         month_col = '출발월' if '출발월' in merged_df.columns else ('출발 월' if '출발 월' in merged_df.columns else None)
-        all_dep_months = sorted([str(x) for x in merged_df[month_col].dropna().unique()]) if month_col else []
+        all_dep_months = sorted([str(x).strip() for x in merged_df[month_col].dropna().unique()]) if month_col else []
         
         bound_col = '수송' if '수송' in merged_df.columns else ('Bound' if 'Bound' in merged_df.columns else None)
-        all_bounds = sorted([str(x) for x in merged_df[bound_col].dropna().unique()]) if bound_col else []
+        all_bounds = sorted([str(x).strip() for x in merged_df[bound_col].dropna().unique()]) if bound_col else []
 
-        all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()]) if 'Ticket Type' in merged_df.columns else []
+        all_ticket_types = sorted([str(x).strip() for x in merged_df['Ticket Type'].dropna().unique()]) if 'Ticket Type' in merged_df.columns else []
 
-        raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
+        raw_airlines = sorted([str(x).strip() for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
@@ -294,17 +292,17 @@ if selected_group == "✈️ 3/4수송 대시보드":
             else:
                 val_col = 'Value'
 
-            # 📌 KE 취항 노선만 자동 선별하여 슬라이서 구성
-            ke_only_mask = merged_df['Dominant Marketing Airline'].astype(str).str.upper() == 'KE'
-            ke_routes_list = merged_df[ke_only_mask]['노선'].dropna().unique().tolist()
+            # 📌 KE 취항 노선 선별 및 발매량순 정렬
+            ke_only_mask = merged_df['Dominant Marketing Airline'].astype(str).str.strip().str.upper() == 'KE'
+            ke_routes_list = merged_df[ke_only_mask]['노선'].dropna().astype(str).str.strip().unique().tolist()
             
             if ke_routes_list:
-                merged_df_ke = merged_df[merged_df['노선'].isin(ke_routes_list)]
+                merged_df_ke = merged_df[merged_df['노선'].astype(str).str.strip().isin(ke_routes_list)]
                 full_route_sum = merged_df_ke.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
-                route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
+                route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
             else:
                 full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
-                route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
+                route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_iss")
@@ -316,18 +314,24 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_iss")
             sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_iss")
 
-        # 📌 필터 조건 결합
+        # 📌 실시간 노선/슬라이서 동적 필터링 적용 (공백 완전 정제)
         filter_conditions = []
+        
         if sel_route_str != ALL_OPTION:
-            filter_conditions.append(merged_df['노선'].astype(str) == sel_route_str)
+            filter_conditions.append(merged_df['노선'].astype(str).str.strip() == str(sel_route_str).strip())
         elif ke_routes_list:
-            filter_conditions.append(merged_df['노선'].isin(ke_routes_list))
+            filter_conditions.append(merged_df['노선'].astype(str).str.strip().isin(ke_routes_list))
 
-        if sel_al_str != ALL_OPTION: filter_conditions.append(merged_df['Dominant Marketing Airline'].astype(str) == sel_al_str)
-        if month_col and sel_month_str != ALL_OPTION: filter_conditions.append(merged_df[month_col].astype(str) == sel_month_str)
-        if bound_col and sel_bound_str != ALL_OPTION: filter_conditions.append(merged_df[bound_col].astype(str) == sel_bound_str)
-        if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION: filter_conditions.append(merged_df['Ticket Type'].astype(str) == sel_tt_str)
-        if week_col and sel_week_str != ALL_OPTION: filter_conditions.append(merged_df[week_col].astype(str) == sel_week_str)
+        if sel_al_str != ALL_OPTION:
+            filter_conditions.append(merged_df['Dominant Marketing Airline'].astype(str).str.strip() == str(sel_al_str).strip())
+        if month_col and sel_month_str != ALL_OPTION:
+            filter_conditions.append(merged_df[month_col].astype(str).str.strip() == str(sel_month_str).strip())
+        if bound_col and sel_bound_str != ALL_OPTION:
+            filter_conditions.append(merged_df[bound_col].astype(str).str.strip() == str(sel_bound_str).strip())
+        if 'Ticket Type' in merged_df.columns and sel_tt_str != ALL_OPTION:
+            filter_conditions.append(merged_df['Ticket Type'].astype(str).str.strip() == str(sel_tt_str).strip())
+        if week_col and sel_week_str != ALL_OPTION:
+            filter_conditions.append(merged_df[week_col].astype(str).str.strip() == str(sel_week_str).strip())
 
         if filter_conditions:
             final_mask = np.logical_and.reduce(filter_conditions)
@@ -335,9 +339,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
         else:
             filtered_df = merged_df
 
-        # 📌 실적 계산
+        # 📌 동적 집계 수치 산출
         total_pax = filtered_df[val_col].sum()
-        ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'].astype(str).str.upper() == 'KE'][val_col].sum() if not filtered_df.empty else 0
+        ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'].astype(str).str.strip().str.upper() == 'KE'][val_col].sum() if not filtered_df.empty else 0
         ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
 
         top_al = "-"
