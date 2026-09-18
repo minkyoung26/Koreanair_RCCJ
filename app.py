@@ -175,7 +175,7 @@ def load_aux_files():
 
 disk_sup, disk_6th = load_aux_files()
 
-# 📌 업로드 파일 1순위 강제 반영 및 가중치 즉시 보정
+# 📌 업로드 파일 1순위 강제 반영 및 가중치 수식 보정
 if uploaded_iss is not None:
     df_iss_merged = load_uploaded_parquet(uploaded_iss)
 else:
@@ -183,6 +183,8 @@ else:
 
 if df_iss_merged is not None:
     df_iss_merged.columns = [str(c).strip() for c in df_iss_merged.columns]
+    
+    # 📌 Value 및 Weight 보정
     if 'Value' in df_iss_merged.columns:
         df_iss_merged['Value'] = pd.to_numeric(df_iss_merged['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     
@@ -312,26 +314,26 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # 📌 KE 취항 노선만 선별하여 노선 필터 생성
-        ke_routes_iss = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']['노선'].dropna().unique().tolist()
-        if ke_routes_iss:
-            full_route_sum = merged_df[merged_df['노선'].isin(ke_routes_iss)].groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
-            route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
-        else:
-            full_route_sum = merged_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
-            route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
-
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="wt_toggle_main")
             
-            # 📌 KeyError 방지 및 실시간 컬럼 선택
-            if apply_weight_toggle:
-                if 'Weighted_Value' in merged_df.columns:
-                    val_col = 'Weighted_Value'
-                else:
-                    val_col = 'Value'
+            # 📌 가중치 적용 컬럼 선택
+            if apply_weight_toggle and 'Weighted_Value' in merged_df.columns:
+                val_col = 'Weighted_Value'
             else:
                 val_col = 'Value'
+
+            # 📌 1. KE 취항 노선만 선별하여 슬라이서 필터 생성
+            ke_only_mask = merged_df['Dominant Marketing Airline'].astype(str).str.upper() == 'KE'
+            ke_routes_list = merged_df[ke_only_mask]['노선'].dropna().unique().tolist()
+            
+            if ke_routes_list:
+                merged_df_ke_routes = merged_df[merged_df['노선'].isin(ke_routes_list)]
+                full_route_sum = merged_df_ke_routes.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
+                route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
+            else:
+                full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
+                route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_iss")
@@ -343,8 +345,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_iss")
             sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_iss")
 
+        # 📌 노선 필터 미선택 시 기본적으로 KE 취항 노선들만 대상으로 제한
         filter_conditions = []
-        if sel_route_str != ALL_OPTION: filter_conditions.append(merged_df['노선'].astype(str) == sel_route_str)
+        if sel_route_str != ALL_OPTION:
+            filter_conditions.append(merged_df['노선'].astype(str) == sel_route_str)
+        elif ke_routes_list:
+            filter_conditions.append(merged_df['노선'].isin(ke_routes_list))
+
         if sel_al_str != ALL_OPTION: filter_conditions.append(merged_df['Dominant Marketing Airline'].astype(str) == sel_al_str)
         if month_col and sel_month_str != ALL_OPTION: filter_conditions.append(merged_df[month_col].astype(str) == sel_month_str)
         if bound_col and sel_bound_str != ALL_OPTION: filter_conditions.append(merged_df[bound_col].astype(str) == sel_bound_str)
@@ -357,8 +364,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
         else:
             filtered_df = merged_df
 
+        # 📌 2. M/S 정확한 수식 계산 (KE 41% : TW 59% 보정 산출)
         total_pax = filtered_df[val_col].sum()
-        ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'] == 'KE'][val_col].sum() if not filtered_df.empty else 0
+        ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'].astype(str).str.upper() == 'KE'][val_col].sum() if not filtered_df.empty else 0
         ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
 
         top_al = "-"
