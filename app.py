@@ -233,11 +233,12 @@ def render_slicer_box(container, label, full_list, key_name):
     container.markdown(f"<b>{label}</b>", unsafe_allow_html=True)
     return container.selectbox(label, options=opts, index=0, key=key_name, label_visibility="collapsed")
 
+# 💡 NameError 수정을 포함한 함수
 def get_dynamic_date_ranges_34(df_iss):
     if df_iss is None or df_iss.empty: return issue_range_str, dep_range_str
     m_col = '출발월' if '출발월' in df_iss.columns else ('출발 월' if '출발 월' in df_iss.columns else 'Trip Month')
     dep_str = f"{sorted([str(x).strip() for x in df_iss[m_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[m_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if m_col in df_iss.columns else dep_range_str
-    w_col = '발매주차_일자' if '발매주차_일자' in df_iss.columns else ('발매 주차' if '발매 주차' in df_agency.columns else 'Purchase Month')
+    w_col = '발매주차_일자' if '발매주차_일자' in df_iss.columns else ('발매 주차' if '발매 주차' in df_iss.columns else 'Purchase Month')
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
@@ -677,7 +678,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
             time_col_a = '출발시간대' if '출발시간대' in df_agency.columns else None
             
-            # 📌 22개 마스터 노선 중 실적(Value > 0)이 존재하는 KE 취항 노선으로 정확하게 설정
+            # 📌 22개 마스터 노선 중 실적(Value > 0)이 있는 KE 취항 노선으로 정확히 설정
             df_ag_has_val = df_agency[(df_agency['노선'].astype(str).str.strip().isin(EXCEL_KE_ROUTES_MASTER)) & (df_agency['Value'] > 0)]
             ag_route_sum = df_ag_has_val.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
             all_routes_a = [str(x).strip() for x in ag_route_sum.index.tolist() if str(x) != 'nan']
