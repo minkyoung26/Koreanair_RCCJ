@@ -95,7 +95,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.sidebar.header("📁 실시간 데이터 업로드")
-uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=['parquet', 'csv'], key="sb_uploader_iss")
+uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=['parquet', 'csv', 'xlsx'], key="sb_uploader_iss")
 uploaded_sup = st.sidebar.file_uploader("2. 공급 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_sup")
 uploaded_6th = st.sidebar.file_uploader("3. 6수송 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_6th")
 
@@ -125,12 +125,30 @@ def load_fast_parquet_data_file():
     return None
 
 @st.cache_data(max_entries=5, show_spinner=False)
-def load_uploaded_parquet(file_obj):
+def process_any_uploaded_file(file_obj):
     file_obj.seek(0)
     if file_obj.name.endswith('.parquet'):
-        return optimize_df(clean_transport_column(pd.read_parquet(file_obj)))
+        df = pd.read_parquet(file_obj)
+    elif file_obj.name.endswith('.xlsx'):
+        df = pd.read_excel(file_obj)
     else:
-        return optimize_df(clean_transport_column(pd.read_csv(file_obj, low_memory=False)))
+        df = pd.read_csv(file_obj, low_memory=False)
+
+    df.columns = [str(c).strip() for c in df.columns]
+
+    # 📌 필수 수치 및 가중치 자동 계산
+    if 'Value' in df.columns:
+        df['Value'] = pd.to_numeric(df['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+    
+    if 'Weight' in df.columns:
+        w_num = pd.to_numeric(df['Weight'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1.0)
+        df['Weighted_Value'] = df['Value'] * w_num
+    elif 'Weighted_Value' in df.columns:
+        df['Weighted_Value'] = pd.to_numeric(df['Weighted_Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+    else:
+        df['Weighted_Value'] = df['Value']
+
+    return optimize_df(clean_transport_column(df))
 
 @st.cache_data(max_entries=5, show_spinner=False)
 def load_aux_files():
@@ -145,15 +163,6 @@ def load_aux_files():
                 if df_sup is not None and not df_sup.empty: break
             except: pass
 
-    if df_sup is None:
-        sup_files = glob.glob(os.path.join(base_dir, '*공급*.csv')) + glob.glob('*공급*.csv') + glob.glob('*공급*.xlsx')
-        if sup_files:
-            latest_sup_file = sorted(sup_files, key=os.path.getmtime, reverse=True)[0]
-            try:
-                if latest_sup_file.endswith('.csv'): df_sup = pd.read_csv(latest_sup_file, low_memory=False)
-                else: df_sup = pd.read_excel(latest_sup_file)
-            except: pass
-
     six_paths = [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']
     for sp in six_paths:
         if os.path.exists(sp):
@@ -162,63 +171,26 @@ def load_aux_files():
                 if df_6th is not None and not df_6th.empty: break
             except: pass
 
-    if df_6th is None:
-        six_files = glob.glob(os.path.join(base_dir, '*6수송*.csv')) + glob.glob('*6수송*.csv')
-        if six_files:
-            latest_6th_file = sorted(six_files, key=os.path.getmtime, reverse=True)[0]
-            try:
-                if latest_6th_file.endswith('.csv'): df_6th = pd.read_csv(latest_6th_file, low_memory=False)
-                else: df_6th = pd.read_excel(latest_6th_file)
-            except: pass
-
     return optimize_df(df_sup), optimize_df(df_6th)
 
 disk_sup, disk_6th = load_aux_files()
 
-# 📌 업로드 파일 1순위 강제 반영 및 가중치 수식 보정
+# 📌 핵심: 업로드된 파일을 1순위로 즉시 가중치 자동 처리하여 바인딩
 if uploaded_iss is not None:
-    df_iss_merged = load_uploaded_parquet(uploaded_iss)
+    df_iss_merged = process_any_uploaded_file(uploaded_iss)
 else:
     df_iss_merged = load_fast_parquet_data_file()
 
 if df_iss_merged is not None:
     df_iss_merged.columns = [str(c).strip() for c in df_iss_merged.columns]
-    
-    # 📌 Value 및 Weight 보정
-    if 'Value' in df_iss_merged.columns:
-        df_iss_merged['Value'] = pd.to_numeric(df_iss_merged['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
-    
-    if 'Weight' in df_iss_merged.columns:
-        w_num = pd.to_numeric(df_iss_merged['Weight'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1.0)
-        df_iss_merged['Weighted_Value'] = df_iss_merged['Value'] * w_num
-    elif 'Weighted_Value' in df_iss_merged.columns:
-        df_iss_merged['Weighted_Value'] = pd.to_numeric(df_iss_merged['Weighted_Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
-    else:
-        df_iss_merged['Weighted_Value'] = df_iss_merged['Value']
-
-df_sup_raw = None
-if uploaded_sup is not None:
-    try:
-        uploaded_sup.seek(0)
-        if uploaded_sup.name.endswith('.parquet'):
-            df_sup_raw = optimize_df(pd.read_parquet(uploaded_sup))
+    if 'Value' in df_iss_merged.columns and 'Weighted_Value' not in df_iss_merged.columns:
+        if 'Weight' in df_iss_merged.columns:
+            df_iss_merged['Weighted_Value'] = df_iss_merged['Value'] * pd.to_numeric(df_iss_merged['Weight'], errors='coerce').fillna(1.0)
         else:
-            df_sup_raw = optimize_df(pd.read_csv(uploaded_sup, low_memory=False))
-    except: pass
-if df_sup_raw is None: 
-    df_sup_raw = disk_sup
+            df_iss_merged['Weighted_Value'] = df_iss_merged['Value']
 
-df_6th_raw = None
-if uploaded_6th is not None:
-    try:
-        uploaded_6th.seek(0)
-        if uploaded_6th.name.endswith('.parquet'):
-            df_6th_raw = optimize_df(pd.read_parquet(uploaded_6th))
-        else:
-            df_6th_raw = optimize_df(pd.read_csv(uploaded_6th, low_memory=False))
-    except: pass
-if df_6th_raw is None: 
-    df_6th_raw = disk_6th
+df_sup_raw = disk_sup
+df_6th_raw = disk_6th
 
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
@@ -295,7 +267,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     with tab_34_1:
         if df_iss_merged is None:
-            st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다. 좌측 사이드바 1번에서 파일/캐시를 업로드해 주세요.")
+            st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다. 좌측 사이드바 1번에서 원본 CSV/XLSX 파일을 드래그하여 업로드해 주세요.")
             st.stop()
 
         merged_df = df_iss_merged.copy()
@@ -317,19 +289,18 @@ if selected_group == "✈️ 3/4수송 대시보드":
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="wt_toggle_main")
             
-            # 📌 가중치 적용 컬럼 선택
             if apply_weight_toggle and 'Weighted_Value' in merged_df.columns:
                 val_col = 'Weighted_Value'
             else:
                 val_col = 'Value'
 
-            # 📌 1. KE 취항 노선만 선별하여 슬라이서 필터 생성
+            # 📌 KE 취항 노선만 자동 선별하여 슬라이서 구성
             ke_only_mask = merged_df['Dominant Marketing Airline'].astype(str).str.upper() == 'KE'
             ke_routes_list = merged_df[ke_only_mask]['노선'].dropna().unique().tolist()
             
             if ke_routes_list:
-                merged_df_ke_routes = merged_df[merged_df['노선'].isin(ke_routes_list)]
-                full_route_sum = merged_df_ke_routes.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
+                merged_df_ke = merged_df[merged_df['노선'].isin(ke_routes_list)]
+                full_route_sum = merged_df_ke.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
                 route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
             else:
                 full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
@@ -345,7 +316,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_iss")
             sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_iss")
 
-        # 📌 노선 필터 미선택 시 기본적으로 KE 취항 노선들만 대상으로 제한
+        # 📌 필터 조건 결합
         filter_conditions = []
         if sel_route_str != ALL_OPTION:
             filter_conditions.append(merged_df['노선'].astype(str) == sel_route_str)
@@ -364,7 +335,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         else:
             filtered_df = merged_df
 
-        # 📌 2. M/S 정확한 수식 계산 (KE 41% : TW 59% 보정 산출)
+        # 📌 실적 계산
         total_pax = filtered_df[val_col].sum()
         ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'].astype(str).str.upper() == 'KE'][val_col].sum() if not filtered_df.empty else 0
         ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
