@@ -62,33 +62,49 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 4. Custom CSS
+# 4. Custom CSS (Noto Sans KR 폰트 및 규격 적용)
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
+    
+    html, body, [class*="css"], .stApp {
+        font-family: 'Noto Sans KR', sans-serif !important;
+        color: #0f172a;
+    }
+    
     :root { --primary-color: #0ea5e9 !important; --primaryColor: #0ea5e9 !important; }
-    .main-app-title { font-size: 26px !important; font-weight: 800 !important; color: #0f172a; margin-bottom: 12px; }
-    .unified-sub-header { font-size: 16px !important; font-weight: 700 !important; color: #0f172a; margin-top: 10px; margin-bottom: 10px; }
+    
+    /* Title 규격 (28px Bold) */
+    .main-app-title { font-size: 28px !important; font-weight: 700 !important; color: #0f172a; margin-bottom: 12px; }
+    
+    /* Sub-title 규격 (18px Semi-Bold) */
+    .unified-sub-header { font-size: 18px !important; font-weight: 600 !important; color: #0f172a; margin-top: 10px; margin-bottom: 10px; }
+    .group-section-header { font-size: 18px !important; font-weight: 600 !important; color: #0f172a; padding-bottom: 8px; border-bottom: 2px solid #cbd5e1; margin-top: 10px; margin-bottom: 12px; }
+    
+    /* Body 규격 (13px ~ 14px Regular) */
+    p, span, label, div, select, button, input { font-size: 13.5px !important; font-weight: 400; }
+    
     div[role="radiogroup"] label div[role="radio"][aria-checked="true"] { background-color: #0ea5e9 !important; border-color: #0ea5e9 !important; }
-    button[data-baseweb="tab"][aria-selected="true"] { color: #0ea5e9 !important; border-bottom-color: #0ea5e9 !important; }
+    button[data-baseweb="tab"][aria-selected="true"] { color: #0ea5e9 !important; border-bottom-color: #0ea5e9 !important; font-weight: 600 !important; }
     div[data-testid="stToggle"] input:checked + div { background-color: #0ea5e9 !important; }
-    .source-header-box { background-color: #f0f9ff; border-left: 5px solid #0284c7; padding: 12px 18px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; color: #0f172a; font-weight: 500; }
-    .group-section-header { font-size: 17px !important; font-weight: 700 !important; color: #0f172a; padding-bottom: 8px; border-bottom: 2px solid #cbd5e1; margin-top: 10px; margin-bottom: 12px; }
+    
+    .source-header-box { background-color: #f0f9ff; border-left: 5px solid #0284c7; padding: 12px 18px; border-radius: 6px; margin-bottom: 15px; font-size: 13.5px; color: #0f172a; font-weight: 500; }
     .metric-card { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); margin-bottom: 10px; }
     .metric-card-ke { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); margin-bottom: 10px; }
-    .metric-title { font-size: 13px; color: #64748b; margin-bottom: 4px; font-weight: 600; }
+    .metric-title { font-size: 12.5px; color: #64748b; margin-bottom: 4px; font-weight: 500; }
     .metric-value { font-size: 22px; color: #1e293b; font-weight: 700; }
+    
     .custom-piv-container, .yoy-table-container { width: 100%; overflow-x: auto; margin-bottom: 20px; border-radius: 8px; border: 1px solid #cbd5e1 !important; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
     .custom-piv-table, .yoy-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background-color: #ffffff; text-align: center !important; }
-    .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header { background-color: #cfe2f3 !important; color: #0f172a !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-weight: 700; text-align: center !important; white-space: nowrap; }
-    .yoy-table th.ke-header { background-color: #6fa8dc !important; color: #ffffff !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 800 !important; text-align: center !important; white-space: nowrap; }
+    .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header { background-color: #cfe2f3 !important; color: #0f172a !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-weight: 600; text-align: center !important; white-space: nowrap; }
+    .yoy-table th.ke-header { background-color: #6fa8dc !important; color: #ffffff !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 700 !important; text-align: center !important; white-space: nowrap; }
     .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; color: #334155 !important; background-color: #ffffff !important; text-align: center !important; }
     .yoy-table tr:hover { background-color: #f8fafc !important; }
-    .yoy-table tr.row-title { background-color: #f8fafc !important; font-weight: bold; color: #0f172a; }
+    .yoy-table tr.row-title { background-color: #f8fafc !important; font-weight: 600; color: #0f172a; }
     
-    /* 6수송 Carrier별 M/S 엑셀 커스텀 테이블 전용 CSS */
     .carrier-excel-container { width: 100%; overflow-x: auto; margin-top: 15px; margin-bottom: 25px; border: 1px solid #cbd5e1; border-radius: 6px; }
-    .carrier-excel-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Segoe UI', Malgun Gothic, sans-serif; }
-    .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 700; }
+    .carrier-excel-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'Noto Sans KR', sans-serif; }
+    .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 600; }
     .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; }
     
     .th-dark-blue { background-color: #cfe2f3; color: #0f172a; }
@@ -98,20 +114,20 @@ st.markdown("""
     .th-ke-green { background-color: #6fa8dc; color: #ffffff; }
     .th-ke-light { background-color: #6fa8dc; color: #ffffff; }
     
-    .tr-summary-footer { background-color: #efefef; color: #0f172a; font-weight: 800; }
-    .tr-summary-footer td { border-top: 2px solid #94a3b8 !important; background-color: #efefef; color: #0f172a; font-weight: 800; }
+    .tr-summary-footer { background-color: #efefef; color: #0f172a; font-weight: 700; }
+    .tr-summary-footer td { border-top: 2px solid #94a3b8 !important; background-color: #efefef; color: #0f172a; font-weight: 700; }
     
     details.rbd-details-group { width: 100%; margin: 0; padding: 0; }
     details.rbd-details-group summary { list-style: none; cursor: pointer; outline: none; }
     details.rbd-details-group summary::-webkit-details-marker { display: none; }
-    .row-summary-top-dark { background-color: #cccccc !important; color: #0f172a !important; font-weight: 800 !important; }
-    .row-summary-top-dark td { background-color: #cccccc !important; color: #0f172a !important; font-weight: 800 !important; border: 1px solid #cbd5e1 !important; }
+    .row-summary-top-dark { background-color: #cccccc !important; color: #0f172a !important; font-weight: 700 !important; }
+    .row-summary-top-dark td { background-color: #cccccc !important; color: #0f172a !important; font-weight: 700 !important; border: 1px solid #cbd5e1 !important; }
     .rbd-child-row td { background-color: #ffffff !important; font-size: 12px; }
-    .custom-piv-table tr.row-group-header, .yoy-table tr.row-summary, .yoy-table tr.row-summary td { background-color: #efefef !important; font-weight: bold; color: #0f172a; }
-    .row-group-header-custom, .row-group-header-custom td { background-color: #cccccc !important; color: #0f172a !important; font-weight: 800 !important; }
-    .yoy-up { color: #1d4ed8 !important; font-weight: 700; }
-    .yoy-down { color: #dc2626 !important; font-weight: 700; }
-    .ke-timeline-box { background-color: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 12px 18px; margin-bottom: 15px; color: #0369a1; font-weight: 600; font-size: 14px; }
+    .custom-piv-table tr.row-group-header, .yoy-table tr.row-summary, .yoy-table tr.row-summary td { background-color: #efefef !important; font-weight: 600; color: #0f172a; }
+    .row-group-header-custom, .row-group-header-custom td { background-color: #cccccc !important; color: #0f172a !important; font-weight: 700 !important; }
+    .yoy-up { color: #1d4ed8 !important; font-weight: 600; }
+    .yoy-down { color: #dc2626 !important; font-weight: 600; }
+    .ke-timeline-box { background-color: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 12px 18px; margin-bottom: 15px; color: #0369a1; font-weight: 500; font-size: 13.5px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -321,13 +337,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
             GLOBAL_VALID_KE_ROUTES = valid_ke_routes
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-            sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_fixed")
-            sel_week_str = render_slicer_box(f_col2, "2. 발매 주차 및 일자", all_issue_weeks, "slicer_week_fixed") if week_col else ALL_OPTION
-            sel_month_str = render_slicer_box(f_col3, "3. 출발 월", all_dep_months, "slicer_month_fixed") if month_col else ALL_OPTION
-            sel_bound_str = render_slicer_box(f_col4, "4. 수송 구분 (3TF/4TF/OTHERS)", all_bounds, "slicer_bound_fixed") if bound_col else ALL_OPTION
+            sel_route_str = render_slicer_box(f_col1, "1. KE취항노선", route_order_list, "slicer_route_fixed")
+            sel_week_str = render_slicer_box(f_col2, "2. 발매 주차 (과거 5주)", all_issue_weeks, "slicer_week_fixed") if week_col else ALL_OPTION
+            sel_month_str = render_slicer_box(f_col3, "3. 출발 월 (향후 6개월)", all_dep_months, "slicer_month_fixed") if month_col else ALL_OPTION
+            sel_bound_str = render_slicer_box(f_col4, "4. 수송 구분", all_bounds, "slicer_bound_fixed") if bound_col else ALL_OPTION
 
             f_col5, f_col6, _, _ = st.columns(4)
-            sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_fixed")
+            sel_tt_str = render_slicer_box(f_col5, "5. Trip Type", all_ticket_types, "slicer_tt_fixed")
             sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_fixed")
 
         filter_mask = pd.Series(True, index=merged_df.index)
@@ -705,8 +721,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
             with st.expander("🔍 **대리점 & RBD 분석 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
                 ac1, ac2, ac3 = st.columns(3)
                 sel_route_ag_str = render_slicer_box(ac1, "1. 노선", all_routes_a, "slicer_route_ag_fixed")
-                sel_month_ag_str = render_slicer_box(ac2, "2. 출발 월", all_months_a, "slicer_month_ag_fixed") if month_col_a else ALL_OPTION
-                sel_bound_ag_str = render_slicer_box(ac3, "3. 수송 구분 (3TF/4TF/OTHERS)", all_bounds_a, "slicer_bound_ag_fixed") if bound_col_a else ALL_OPTION
+                sel_month_ag_str = render_slicer_box(ac2, "2. 출발 월 (향후 6개월)", all_months_a, "slicer_month_ag_fixed") if month_col_a else ALL_OPTION
+                sel_bound_ag_str = render_slicer_box(ac3, "3. 수송 구분", all_bounds_a, "slicer_bound_ag_fixed") if bound_col_a else ALL_OPTION
 
                 ac4, ac5, ac6 = st.columns(3)
                 sel_tt_ag_str = render_slicer_box(ac4, "4. TRIP TYPE", all_tt_a, "slicer_tt_ag_fixed") if 'Ticket Type' in df_agency.columns else ALL_OPTION
@@ -836,8 +852,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
             with st.expander("🔍 **단체 실적 분석 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
                 gc1, gc2, gc3 = st.columns(3)
                 sel_g_route = render_slicer_box(gc1, "1. 노선", g_routes, "slicer_g_route_fixed")
-                sel_g_month = render_slicer_box(gc2, "2. 출발 월", g_months, "slicer_g_month_fixed") if g_m_col else ALL_OPTION
-                sel_g_bound = render_slicer_box(gc3, "3. 수송 구분 (3TF/4TF/OTHERS)", g_bounds, "slicer_g_bound_fixed") if g_b_col else ALL_OPTION
+                sel_g_month = render_slicer_box(gc2, "2. 출발 월 (향후 6개월)", g_months, "slicer_g_month_fixed") if g_m_col else ALL_OPTION
+                sel_g_bound = render_slicer_box(gc3, "3. 수송 구분", g_bounds, "slicer_g_bound_fixed") if g_b_col else ALL_OPTION
 
                 gc4, gc5, gc6 = st.columns(3)
                 sel_g_tt = render_slicer_box(gc4, "4. TRIP TYPE", g_tts, "slicer_g_tt_fixed")
@@ -1028,18 +1044,18 @@ elif selected_group == "🌐 6수송 대시보드":
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        # 📌 1. 제목 명칭 변경 (✈️ 6수송 발매 M/S 현황)
+        # 📌 1. 제목 및 필터 라벨 명칭 반영
         st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
         f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
-        sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer1_m_fixed")
+        sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (향후 6개월 출발)", all_raw_m, "slicer1_m_fixed")
         sel_1_region = render_slicer_box(f1_col2, "2. OD Region", all_reg_6, "slicer1_reg_fixed")
         sel_1_dir = render_slicer_box(f1_col3, "3. 일본발/일본행 (Direction)", all_dir_6, "slicer1_dir_fixed")
         sel_1_stop = render_slicer_box(f1_col4, "4. 경유/직항 (Stopover)", all_stop_6, "slicer1_stop_fixed")
 
         f1_col5, f1_col6, f1_col7, f1_col8 = st.columns(4)
         sel_1_onoff = render_slicer_box(f1_col5, "5. Online/Offline", all_onoff_6, "slicer1_onoff_fixed")
-        sel_1_jp_route = render_slicer_box(f1_col6, "6. 일본공항 (Sub-Route)", all_sub_6, "slicer1_sub_fixed")
-        sel_1_ov_apo = render_slicer_box(f1_col7, "7. 해외공항 (해외 APO)", all_ov_6, "slicer1_ov_fixed")
+        sel_1_jp_route = render_slicer_box(f1_col6, "6. 일본 APO", all_sub_6, "slicer1_sub_fixed")
+        sel_1_ov_apo = render_slicer_box(f1_col7, "7. 해외APO", all_ov_6, "slicer1_ov_fixed")
 
         # 📌 상단 첫번째 종합 요약 표용 필터링 마스크
         mask_base_1_to_7 = filter_month_yoy(df_6, sel_1_month)
@@ -1127,15 +1143,15 @@ elif selected_group == "🌐 6수송 대시보드":
             
             with st.expander("🔍 **항공사별 TOP20 O&D 분석 슬라이서 필터 설정**", expanded=True):
                 c_f_col1, c_f_col2, c_f_col3, c_f_col4 = st.columns(4)
-                sel_2_month = render_slicer_box(c_f_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer2_m_carrier")
+                sel_2_month = render_slicer_box(c_f_col1, "1. 출발월 (향후 6개월 출발)", all_raw_m, "slicer2_m_carrier")
                 sel_2_region = render_slicer_box(c_f_col2, "2. OD Region", all_reg_6, "slicer2_reg_carrier")
                 sel_2_dir = render_slicer_box(c_f_col3, "3. 일본발/일본행 (Direction)", all_dir_6, "slicer2_dir_carrier")
                 sel_2_stop = render_slicer_box(c_f_col4, "4. 경유/직항 (Stopover)", all_stop_6, "slicer2_stop_carrier")
 
                 c_f_col5, c_f_col6, c_f_col7, c_f_col8 = st.columns(4)
                 sel_2_onoff = render_slicer_box(c_f_col5, "5. Online/Offline", all_onoff_6, "slicer2_onoff_carrier")
-                sel_2_jp_route = render_slicer_box(c_f_col6, "6. 일본공항 (Sub-Route)", all_sub_6, "slicer2_sub_carrier")
-                sel_2_ov_apo = render_slicer_box(c_f_col7, "7. 해외공항 (해외 APO)", all_ov_6, "slicer2_ov_carrier")
+                sel_2_jp_route = render_slicer_box(c_f_col6, "6. 일본 APO", all_sub_6, "slicer2_sub_carrier")
+                sel_2_ov_apo = render_slicer_box(c_f_col7, "7. 해외APO", all_ov_6, "slicer2_ov_carrier")
                 sel_2_carrier = render_slicer_box(c_f_col8, "8. CARRIER (항공사)", sorted_6th_airlines, "slicer2_carrier")
 
             # 📌 하단 테이블 전용 필터 마스크 생성
