@@ -276,8 +276,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         merged_df = df_iss_merged.copy()
 
+        # 항공사 및 노선 컬럼 완전 정제
+        al_col_target = 'Dominant Marketing Airline' if 'Dominant Marketing Airline' in merged_df.columns else ('AL' if 'AL' in merged_df.columns else '항공사')
+        merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper()
         merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
-        merged_df['AL_clean'] = merged_df['Dominant Marketing Airline'].astype(str).str.strip()
 
         week_col = '발매주차_일자' if '발매주차_일자' in merged_df.columns else ('발매 주차' if '발매 주차' in merged_df.columns else '발매주차')
         all_issue_weeks = sorted([str(x).strip() for x in merged_df[week_col].dropna().unique()]) if week_col else []
@@ -294,13 +296,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
-            apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="wt_toggle_v5")
+            apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="wt_toggle_v6")
             val_col = 'Weighted_Value' if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else 'Value'
 
-            # 📌 KE 취항 노선만 엄격하게 추출 (P/NGO, P/CTS 등 완벽 차단)
-            ke_only_mask = merged_df['AL_clean'].astype(str).str.strip().str.upper() == 'KE'
-            ke_routes_list = sorted(list(set(merged_df[ke_only_mask]['노선_clean'].dropna().tolist())))
-            
+            # 📌 KE 취항 노선만 엄격하게 선별 (C/NGO, CTS/TAE 등 완전 차단)
+            ke_only_mask = merged_df['AL_clean'] == 'KE'
+            ke_routes_list = sorted([str(x).strip() for x in merged_df[ke_only_mask]['노선_clean'].dropna().unique() if str(x).strip() != 'nan'])
+
             if ke_routes_list:
                 merged_df_ke = merged_df[merged_df['노선_clean'].isin(ke_routes_list)]
                 full_route_sum = merged_df_ke.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
@@ -310,14 +312,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-            sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_v5")
-            sel_week_str = render_slicer_box(f_col2, "2. 발매 주차 및 일자", all_issue_weeks, "slicer_week_v5") if week_col else ALL_OPTION
-            sel_month_str = render_slicer_box(f_col3, "3. 출발 월", all_dep_months, "slicer_month_v5") if month_col else ALL_OPTION
-            sel_bound_str = render_slicer_box(f_col4, "4. 수송 구분 (3TF/4TF/OTHERS)", all_bounds, "slicer_bound_v5") if bound_col else ALL_OPTION
+            sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_v6")
+            sel_week_str = render_slicer_box(f_col2, "2. 발매 주차 및 일자", all_issue_weeks, "slicer_week_v6") if week_col else ALL_OPTION
+            sel_month_str = render_slicer_box(f_col3, "3. 출발 월", all_dep_months, "slicer_month_v6") if month_col else ALL_OPTION
+            sel_bound_str = render_slicer_box(f_col4, "4. 수송 구분 (3TF/4TF/OTHERS)", all_bounds, "slicer_bound_v6") if bound_col else ALL_OPTION
 
             f_col5, f_col6, _, _ = st.columns(4)
-            sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_v5")
-            sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_v5")
+            sel_tt_str = render_slicer_box(f_col5, "5. Ticket Type (여정)", all_ticket_types, "slicer_tt_v6")
+            sel_al_str = render_slicer_box(f_col6, "6. 항공사", all_airlines, "slicer_al_v6")
 
         filter_mask = pd.Series(True, index=merged_df.index)
 
@@ -327,7 +329,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             filter_mask &= (merged_df['노선_clean'].isin(ke_routes_list))
 
         if sel_al_str != ALL_OPTION:
-            filter_mask &= (merged_df['AL_clean'] == str(sel_al_str).strip())
+            filter_mask &= (merged_df['AL_clean'] == str(sel_al_str).strip().upper())
         if month_col and sel_month_str != ALL_OPTION:
             filter_mask &= (merged_df[month_col].astype(str).str.strip() == str(sel_month_str).strip())
         if bound_col and sel_bound_str != ALL_OPTION:
@@ -340,7 +342,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         filtered_df = merged_df[filter_mask].copy()
 
         total_pax = filtered_df[val_col].sum()
-        ke_pax = filtered_df[filtered_df['AL_clean'].str.upper() == 'KE'][val_col].sum() if not filtered_df.empty else 0
+        ke_pax = filtered_df[filtered_df['AL_clean'] == 'KE'][val_col].sum() if not filtered_df.empty else 0
         ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
 
         top_al = "-"
@@ -504,7 +506,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         with tab3:
             st.subheader("🔒 관리자 전용 Raw Data 조회 및 다운로드")
-            admin_pw = st.text_input("🔑 관리자 비밀번호를 입력하세요:", type="password", key="admin_pw_v5")
+            admin_pw = st.text_input("🔑 관리자 비밀번호를 입력하세요:", type="password", key="admin_pw_v6")
             if admin_pw == "1234":
                 st.success("✅ 관리자 인증이 완료되었습니다.")
                 csv_data = filtered_df.to_csv(index=False).encode('utf-8-sig')
@@ -565,10 +567,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
         metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
         
         sf_col1, sf_col2, sf_col3, sf_col4 = st.columns(4)
-        selected_sup_route_str = render_slicer_box(sf_col1, "1. 노선 (KE 취항 한정)", sup_routes, "slicer_route_sup_v5")
-        selected_sup_month_str = render_slicer_box(sf_col2, "2. 출발 월", sup_months, "slicer_month_sup_v5") if sup_month_col else ALL_OPTION
-        selected_sup_time_str = render_slicer_box(sf_col3, "3. 출발 시간대", sup_time_cats, "slicer_time_sup_v5")
-        selected_sup_al_str = render_slicer_box(sf_col4, "4. 항공사", sup_airlines, "slicer_al_sup_v5")
+        selected_sup_route_str = render_slicer_box(sf_col1, "1. 노선 (KE 취항 한정)", sup_routes, "slicer_route_sup_v6")
+        selected_sup_month_str = render_slicer_box(sf_col2, "2. 출발 월", sup_months, "slicer_month_sup_v6") if sup_month_col else ALL_OPTION
+        selected_sup_time_str = render_slicer_box(sf_col3, "3. 출발 시간대", sup_time_cats, "slicer_time_sup_v6")
+        selected_sup_al_str = render_slicer_box(sf_col4, "4. 항공사", sup_airlines, "slicer_al_sup_v6")
 
         target_val = 'Seats_num' if "공급석" in metric_mode else 'Flights_num'
 
@@ -680,14 +682,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
             with st.expander("🔍 **대리점 & RBD 분석 피벗 슬라이서 필터 설정**", expanded=True):
                 ac1, ac2, ac3 = st.columns(3)
-                sel_route_ag_str = render_slicer_box(ac1, "1. 노선", all_routes_a, "slicer_route_ag_v5")
-                sel_month_ag_str = render_slicer_box(ac2, "2. 출발 월", all_months_a, "slicer_month_ag_v5") if month_col_a else ALL_OPTION
-                sel_bound_ag_str = render_slicer_box(ac3, "3. 수송 구분 (3TF/4TF/OTHERS)", all_bounds_a, "slicer_bound_ag_v5") if bound_col_a else ALL_OPTION
+                sel_route_ag_str = render_slicer_box(ac1, "1. 노선", all_routes_a, "slicer_route_ag_v6")
+                sel_month_ag_str = render_slicer_box(ac2, "2. 출발 월", all_months_a, "slicer_month_ag_v6") if month_col_a else ALL_OPTION
+                sel_bound_ag_str = render_slicer_box(ac3, "3. 수송 구분 (3TF/4TF/OTHERS)", all_bounds_a, "slicer_bound_ag_v6") if bound_col_a else ALL_OPTION
 
                 ac4, ac5, ac6 = st.columns(3)
-                sel_tt_ag_str = render_slicer_box(ac4, "4. TRIP TYPE", all_tt_a, "slicer_tt_ag_v5") if 'Ticket Type' in df_agency.columns else ALL_OPTION
-                sel_time_ag_str = render_slicer_box(ac5, "5. 출발 시간대", all_time_a, "slicer_time_ag_v5") if time_col_a else ALL_OPTION
-                sel_al_ag_str = render_slicer_box(ac6, "6. 항공사", all_al_a, "slicer_al_ag_v5")
+                sel_tt_ag_str = render_slicer_box(ac4, "4. TRIP TYPE", all_tt_a, "slicer_tt_ag_v6") if 'Ticket Type' in df_agency.columns else ALL_OPTION
+                sel_time_ag_str = render_slicer_box(ac5, "5. 출발 시간대", all_time_a, "slicer_time_ag_v6") if time_col_a else ALL_OPTION
+                sel_al_ag_str = render_slicer_box(ac6, "6. 항공사", all_al_a, "slicer_al_ag_v6")
 
             mask_ag = pd.Series(True, index=df_agency.index)
             if sel_route_ag_str != ALL_OPTION: mask_ag &= (df_agency['노선'].astype(str) == sel_route_ag_str)
@@ -699,7 +701,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
             df_ag_filtered = df_agency[mask_ag]
 
-            expand_toggle_all = st.toggle("📂 전체 항목 펼쳐보기 (열기/닫기)", value=True, key="expand_toggle_all_key_v5")
+            expand_toggle_all = st.toggle("📂 전체 항목 펼쳐보기 (열기/닫기)", value=True, key="expand_toggle_all_key_v6")
             open_attr = "open" if expand_toggle_all else ""
 
             sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매현황", "🏢 대리점별 판매현황 (상위 20개 대리점)"])
@@ -798,14 +800,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
             with st.expander("🔍 **단체 실적 분석 피벗 슬라이서 필터 설정**", expanded=True):
                 gc1, gc2, gc3 = st.columns(3)
-                sel_g_route = render_slicer_box(gc1, "1. 노선", g_routes, "slicer_g_route_v5")
-                sel_g_month = render_slicer_box(gc2, "2. 출발 월", g_months, "slicer_g_month_v5") if g_m_col else ALL_OPTION
-                sel_g_bound = render_slicer_box(gc3, "3. 수송 구분 (3TF/4TF/OTHERS)", g_bounds, "slicer_g_bound_v5") if g_b_col else ALL_OPTION
+                sel_g_route = render_slicer_box(gc1, "1. 노선", g_routes, "slicer_g_route_v6")
+                sel_g_month = render_slicer_box(gc2, "2. 출발 월", g_months, "slicer_g_month_v6") if g_m_col else ALL_OPTION
+                sel_g_bound = render_slicer_box(gc3, "3. 수송 구분 (3TF/4TF/OTHERS)", g_bounds, "slicer_g_bound_v6") if g_b_col else ALL_OPTION
 
                 gc4, gc5, gc6 = st.columns(3)
-                sel_g_tt = render_slicer_box(gc4, "4. TRIP TYPE", g_tts, "slicer_g_tt_v5")
-                sel_g_time = render_slicer_box(gc5, "5. 출발 시간대", g_times, "slicer_g_time_v5") if g_t_col else ALL_OPTION
-                sel_g_al = render_slicer_box(gc6, "6. 항공사", g_als, "slicer_g_al_v5")
+                sel_g_tt = render_slicer_box(gc4, "4. TRIP TYPE", g_tts, "slicer_g_tt_v6")
+                sel_g_time = render_slicer_box(gc5, "5. 출발 시간대", g_times, "slicer_g_time_v6") if g_t_col else ALL_OPTION
+                sel_g_al = render_slicer_box(gc6, "6. 항공사", g_als, "slicer_g_al_v6")
 
             mask_grp = pd.Series(True, index=df_grp_raw.index)
             if sel_g_route != ALL_OPTION: mask_grp &= (df_grp_raw['노선'].astype(str) == sel_g_route)
@@ -989,15 +991,15 @@ elif selected_group == "🌐 6수송 대시보드":
     with tab6_1:
         st.markdown('<div class="unified-sub-header">1. 항공사/O&D별 발매 M/S</div>', unsafe_allow_html=True)
         f1_col1, f1_col2, f1_col3, f1_col4 = st.columns(4)
-        sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer1_m_v5")
-        sel_1_region = render_slicer_box(f1_col2, "2. OD Region", all_reg_6, "slicer1_reg_v5")
-        sel_1_dir = render_slicer_box(f1_col3, "3. 일본발/일본행 (Direction)", all_dir_6, "slicer1_dir_v5")
-        sel_1_stop = render_slicer_box(f1_col4, "4. 경유/직항 (Stopover)", all_stop_6, "slicer1_stop_v5")
+        sel_1_month = render_slicer_box(f1_col1, "1. 출발월 (Trip Month)", all_raw_m, "slicer1_m_v6")
+        sel_1_region = render_slicer_box(f1_col2, "2. OD Region", all_reg_6, "slicer1_reg_v6")
+        sel_1_dir = render_slicer_box(f1_col3, "3. 일본발/일본행 (Direction)", all_dir_6, "slicer1_dir_v6")
+        sel_1_stop = render_slicer_box(f1_col4, "4. 경유/직항 (Stopover)", all_stop_6, "slicer1_stop_v6")
 
         f1_col5, f1_col6, f1_col7, f1_col8 = st.columns(4)
-        sel_1_onoff = render_slicer_box(f1_col5, "5. Online/Offline", all_onoff_6, "slicer1_onoff_v5")
-        sel_1_jp_route = render_slicer_box(f1_col6, "6. 일본공항 (Sub-Route)", all_sub_6, "slicer1_sub_v5")
-        sel_1_ov_apo = render_slicer_box(f1_col7, "7. 해외공항 (해외 APO)", all_ov_6, "slicer1_ov_v5")
+        sel_1_onoff = render_slicer_box(f1_col5, "5. Online/Offline", all_onoff_6, "slicer1_onoff_v6")
+        sel_1_jp_route = render_slicer_box(f1_col6, "6. 일본공항 (Sub-Route)", all_sub_6, "slicer1_sub_v6")
+        sel_1_ov_apo = render_slicer_box(f1_col7, "7. 해외공항 (해외 APO)", all_ov_6, "slicer1_ov_v6")
 
         mask_base_1_to_7 = filter_month_yoy(df_6, sel_1_month)
         if act_reg_c and act_reg_c in df_6.columns and sel_1_region != ALL_OPTION: mask_base_1_to_7 &= (df_6[act_reg_c].astype(str) == sel_1_region)
@@ -1013,7 +1015,7 @@ elif selected_group == "🌐 6수송 대시보드":
             dependent_od_list = [str(x) for x in od_sum_dep.index if pd.notnull(x)]
         else: dependent_od_list = sorted([str(x) for x in df_6[od_col_6].dropna().unique()]) if od_col_6 and od_col_6 in df_6.columns else []
 
-        sel_1_od_mkt = render_slicer_box(f1_col8, "8. Trip O&D Market", dependent_od_list, "slicer1_od_mkt_v5")
+        sel_1_od_mkt = render_slicer_box(f1_col8, "8. Trip O&D Market", dependent_od_list, "slicer1_od_mkt_v6")
 
         mask_tab1 = mask_base_1_to_7.copy()
         if od_col_6 and od_col_6 in df_6.columns and sel_1_od_mkt != ALL_OPTION: mask_tab1 &= (df_6[od_col_6].astype(str) == sel_1_od_mkt)
