@@ -523,16 +523,16 @@ if selected_group == "✈️ 3/4수송 대시보드":
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
             
-            # 📌 왼쪽 표(AL_clean) KE 행(Row) #d9d9d9 배경색 + 어두운 텍스트 지정 (가독성 보정)
+            # 📌 1. AL_clean 표 KE 행(Row) #cfe2f3 배경색 + 어두운 텍스트 가독성 최적화
             def highlight_ke_row(row):
                 if str(row.name).upper() == 'KE':
-                    return ['background-color: #d9d9d9 !important; color: #0f172a !important; font-weight: bold !important;'] * len(row)
+                    return ['background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold !important;'] * len(row)
                 return [''] * len(row)
 
-            # 📌 오른쪽 표(노선_clean) KE 열(Column) #d9d9d9 배경색 + 어두운 텍스트 지정 (가독성 보정)
+            # 📌 2. 노선_clean 표 KE 열(Column) #cfe2f3 배경색 + 어두운 텍스트 가독성 최적화
             def highlight_ke_col(col):
                 if str(col.name).upper() == 'KE':
-                    return ['background-color: #d9d9d9 !important; color: #0f172a !important; font-weight: bold !important;'] * len(col)
+                    return ['background-color: #cfe2f3 !important; color: #0f172a !important; font-weight: bold !important;'] * len(col)
                 return [''] * len(col)
 
             t1, t2 = st.columns([1.1, 1])
@@ -693,9 +693,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     s_ms = row['공급 M/S (%)']
                     is_ke = (al_name == 'KE')
                     
-                    # 📌 KE 순위 행 tr 및 모든 td 셀에 #d9d9d9 회색 배경 직접 지정하여 완벽 보정
-                    row_style = ' style="background-color: #d9d9d9 !important; font-weight: bold; color: #0f172a;"' if is_ke else ''
-                    cell_style = ' style="background-color: #d9d9d9 !important; color: #0f172a !important;"' if is_ke else ''
+                    # 📌 KE 순위 행 tr 및 모든 td 셀에 #d9d9d9 회색 배경 직접 주입하여 확실히 수정
+                    row_style = ' style="background-color: #d9d9d9 !important;"' if is_ke else ''
+                    cell_style = ' style="background-color: #d9d9d9 !important; color: #0f172a !important; font-weight: bold;"' if is_ke else ''
                     sup_pivot_html += f'<tr{row_style}><td{cell_style} style="text-align:center;"><b>{rank_idx}위</b></td><td{cell_style} style="text-align:center; font-weight:700;">{"★ KE" if is_ke else al_name}</td><td{cell_style} style="text-align:center;"><b>{s_val:,.0f}</b></td><td{cell_style} style="text-align:center;"><b>{s_ms:.1f}%</b></td></tr>'
 
                 sup_pivot_html += '</tbody></table></div>'
