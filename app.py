@@ -95,7 +95,6 @@ st.markdown("""
     .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header { background-color: #cfe2f3 !important; color: #0f172a !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-weight: 600; text-align: center !important; white-space: nowrap; }
     .yoy-table th.ke-header { background-color: #6fa8dc !important; color: #ffffff !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 700 !important; text-align: center !important; white-space: nowrap; }
     
-    /* 📌 자식 인라인 span 색상을 덮어쓰지 않도록 !important 제거 */
     .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; color: #334155; background-color: #ffffff !important; text-align: center !important; }
     .yoy-table tr:hover { background-color: #f8fafc !important; }
     .yoy-table tr.row-title { background-color: #f8fafc !important; font-weight: 600; color: #0f172a; }
@@ -256,13 +255,13 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 YOY 텍스트 크기(10px) 및 색상(양수 파랑 #1d4ed8 / 음수 빨강 #dc2626) 인라인 스타일 강제 주입
+# 📌 YOY 텍스트 크기(10px) 및 색상(양수 파랑 #1d4ed8 / 음수 빨강 #dc2626) 인라인 스타일 완전 주입
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
-        return f'<span style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 600 !important; display: inline-block;">▲ {val:.0f}{unit}</span>'
+        return f'<span style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ {val:.0f}{unit}</span>'
     elif val < 0:
-        return f'<span style="color: #dc2626 !important; font-size: 10px !important; font-weight: 600 !important; display: inline-block;">▼ {abs(val):.0f}{unit}</span>'
+        return f'<span style="color: #dc2626 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▼ {abs(val):.0f}{unit}</span>'
     else:
         return f'<span style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ 0{unit}</span>'
 
@@ -1167,6 +1166,7 @@ elif selected_group == "🌐 6수송 대시보드":
                 html_table += f'<td><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
+            # 📌 6수송 상단 표 YOY에도 format_yoy_html 파란색/빨간색 적용
             html_table += f'<tr><td style="color:#64748b; font-weight:600;">YOY</td><td>{format_yoy_html(t_yoy_pct) if t_prev>0 else "-"}</td>'
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
