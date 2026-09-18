@@ -286,7 +286,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
             val_col = 'Weighted_Value' if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else 'Value'
 
-            # 💡 수정: 22개 마스터 노선 중 실적(Value > 0)이 실제 존재하는 노선만 드롭다운에 노출!
+            # 💡 22개 마스터 노선 중 실적(Value > 0)이 실제 존재하는 노선만 드롭다운에 노출
             df_has_value = merged_df[(merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (merged_df['Value'] > 0)]
             full_route_sum = df_has_value.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
             route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
@@ -1057,7 +1057,11 @@ elif selected_group == "🌐 6수송 대시보드":
                 html_table += f'<td><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            html_table += '<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td><td>{"▲ 0%p" if t_prev>0 else "-"}</td>'
+            # 💡 YOY 문법 구문 수정 (f-string 변수 정상 적용)
+            diff_total_ms = 0
+            icon_tot_p = f'<span class="yoy-up">▲ {diff_total_ms:.0f}%p</span>' if diff_total_ms >= 0 else f'<span class="yoy-down">▼ {abs(diff_total_ms):.0f}%p</span>'
+            html_table += f'<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td><td>{icon_tot_p if t_prev>0 else "-"}</td>'
+            
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
                 p_val = al_agg[al_agg[al_col_6] == al_code]['Val_PY_num'].sum()
@@ -1068,6 +1072,29 @@ elif selected_group == "🌐 6수송 대시보드":
                 html_table += f'<td>{icon_p if t_prev>0 and p_val>0 else "-"}</td>'
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
+
+            # 📌 [완전 복원] CARRIER(항공사)별 월별/노선별 상세 M/S 피벗 테이블
+            st.markdown("---")
+            st.markdown('<div class="unified-sub-header">2. CARRIER(항공사)별 월별 및 O&D 시장 M/S 상세 피벗 테이블</div>', unsafe_allow_html=True)
+            
+            t6_col1, t6_col2 = st.columns([1.1, 1])
+            with t6_col1:
+                st.markdown("##### 🗓️ 월별 CARRIER 발매 M/S (%)")
+                if month_col_6 and month_col_6 in filtered_tab1.columns:
+                    piv_m6 = filtered_tab1.pivot_table(index=al_col_6, columns=month_col_6, values='Val_num', aggfunc='sum', fill_value=0, observed=False)
+                    if not piv_m6.empty:
+                        piv_m6_ms = piv_m6.divide(piv_m6.sum(axis=0), axis=1) * 100
+                        al_order_6_piv = ['KE'] + [x for x in piv_m6_ms.index if x != 'KE'] if 'KE' in piv_m6_ms.index else piv_m6_ms.index
+                        st.dataframe(piv_m6_ms.loc[al_order_6_piv].head(100).map(lambda x: f"{x:.1f}%"), width='stretch')
+            
+            with t6_col2:
+                st.markdown("##### ✈️ O&D Market별 CARRIER 발매 M/S (%)")
+                if od_col_6 and od_col_6 in filtered_tab1.columns:
+                    piv_o6 = filtered_tab1.pivot_table(index=od_col_6, columns=al_col_6, values='Val_num', aggfunc='sum', fill_value=0, observed=False)
+                    if not piv_o6.empty:
+                        cols_ke_6 = ['KE'] + [x for x in piv_o6.columns if x != 'KE'] if 'KE' in piv_o6.columns else piv_o6.columns
+                        piv_o6_ms = piv_o6[cols_ke_6].divide(piv_o6.sum(axis=1), axis=0) * 100
+                        st.dataframe(piv_o6_ms.head(100).map(lambda x: f"{x:.1f}%"), width='stretch')
 
         st.markdown("---")
 
