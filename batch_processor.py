@@ -46,7 +46,7 @@ def process_34_transport_data():
         df['AL_join'] = df[al_col].astype(str).str.strip().str.upper() if al_col in df.columns else ''
         df['Route_norm'] = df[route_col].apply(normalize_route_code) if route_col in df.columns else ''
 
-        # 3. 가중 배수 (Multiplier = 1 / Weight) 조인
+        # 3. 가중 배수 (Multiplier = 1 / Weight) 조인 및 항공사별 평균 Fallback 적용
         if wt_file:
             print(f"📂 가중치 파일 로딩 및 가중 배수(1/Weight) 매핑: {os.path.basename(wt_file)}")
             df_wt = pd.read_excel(wt_file) if wt_file.endswith('.xlsx') else pd.read_csv(wt_file)
@@ -59,7 +59,6 @@ def process_34_transport_data():
             df_wt['Route_norm'] = df_wt[wt_route_col].apply(normalize_route_code)
             df_wt['AL_join'] = df_wt[wt_al_col].astype(str).str.strip().str.upper()
             
-            # 가중 배수 파싱 (m = 1 / Weight)
             def parse_weight_to_multiplier(val):
                 v_str = str(val).replace('%', '').strip()
                 try:
@@ -67,19 +66,28 @@ def process_34_transport_data():
                     w = num / 100.0 if num > 5.0 else num
                     return (1.0 / w) if w > 0 else 1.0
                 except:
-                    return 1.0
+                    return np.nan
 
             df_wt['Multiplier'] = df_wt[wt_val_col].apply(parse_weight_to_multiplier)
-            df_wt_sub = df_wt[['Route_norm', 'AL_join', 'Multiplier']].drop_duplicates(subset=['Route_norm', 'AL_join'])
+            df_wt_sub = df_wt[['Route_norm', 'AL_join', 'Multiplier']].dropna().drop_duplicates(subset=['Route_norm', 'AL_join'])
             
+            # 항공사별 평균 가중 배수 사전 생성 (누락 노선 대비)
+            al_avg_multiplier = df_wt_sub.groupby('AL_join')['Multiplier'].mean().to_dict()
+
             df = pd.merge(df, df_wt_sub, on=['Route_norm', 'AL_join'], how='left')
-            df['Weight_mult'] = df['Multiplier'].fillna(1.0)
+            
+            # 노선 가중 배수 누락 시 항공사 평균 배수로 자동 보정
+            df['Weight_mult'] = df['Multiplier']
+            for al_code, avg_m in al_avg_multiplier.items():
+                df.loc[df['Weight_mult'].isna() & (df['AL_join'] == al_code), 'Weight_mult'] = avg_m
+            
+            df['Weight_mult'] = df['Weight_mult'].fillna(1.0)
             df.drop(columns=['Multiplier', 'AL_join', 'Route_norm'], inplace=True, errors='ignore')
-            print("✅ 가중 배수 조인 성공!")
+            print("✅ 항공사 평균 배수 Fallback 보정 포함 조인 성공!")
         else:
             df['Weight_mult'] = 1.0
 
-        # Weighted_Value = Value * Multiplier (배수 곱셈 연산)
+        # Weighted_Value = Value * Multiplier
         df['Weighted_Value'] = df['Value'] * df['Weight_mult']
 
         b_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
@@ -87,7 +95,7 @@ def process_34_transport_data():
 
         output_parquet = os.path.join(base_dir, 'cache_34_data.parquet')
         df.to_parquet(output_parquet, index=False, compression='snappy')
-        print(f"🎉 엑셀 수식 맞춤형 파켓 저장 완료: {os.path.basename(output_parquet)} (행 수: {len(df):,}개)")
+        print(f"🎉 스마트 가중치 매핑 파켓 저장 완료: {os.path.basename(output_parquet)} (행 수: {len(df):,}개)")
         return True
 
     except Exception as e:
