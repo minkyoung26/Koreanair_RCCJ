@@ -104,11 +104,11 @@ st.markdown("""
     .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 600; }
     .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-size: 12px !important; }
 
-    /* 📌 TOP20 O&D 테이블 내부 span 오버라이드 최우선 순위 규격 지정 */
-    .carrier-excel-table td span { font-size: 10px !important; font-weight: 500 !important; display: inline-block; }
-    .carrier-excel-table td span.yoy-up-txt { color: #1d4ed8 !important; }
-    .carrier-excel-table td span.yoy-down-txt { color: #dc2626 !important; }
-    .carrier-excel-table td span.yoy-zero-txt { color: #475569 !important; }
+    /* 📌 TOP20 O&D 및 요약 표 내부 span 오버라이드 최우선 순위 규격 지정 */
+    .carrier-excel-table td span, .yoy-table td span { font-size: 10px !important; font-weight: 500 !important; display: inline-block; }
+    .carrier-excel-table td span.yoy-up-txt, .yoy-table td span.yoy-up-txt { color: #1d4ed8 !important; }
+    .carrier-excel-table td span.yoy-down-txt, .yoy-table td span.yoy-down-txt { color: #dc2626 !important; }
+    .carrier-excel-table td span.yoy-zero-txt, .yoy-table td span.yoy-zero-txt { color: #475569 !important; }
 
     .th-dark-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-mkt-blue { background-color: #cfe2f3; color: #0f172a; }
