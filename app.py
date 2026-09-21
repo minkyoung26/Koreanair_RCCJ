@@ -231,18 +231,25 @@ selected_group = st.radio(
 
 ALL_OPTION = "전체 (All)"
 
+# 📌 [KE 전용 색상 무단 사용 방지 및 Unique 보장 로직]
 def build_airline_color_map(airlines_list):
-    palette = px.colors.qualitative.Plotly + px.colors.qualitative.Bold + px.colors.qualitative.Pastel
-    cmap = {'KE': '#16a34a'}
-    idx = 0
+    KE_COLOR = '#16a34a' # 대한항공 전용 시그니처 초록색
+    palette = px.colors.qualitative.Plotly + px.colors.qualitative.Bold + px.colors.qualitative.Pastel + px.colors.qualitative.Dark24
+    
+    # KE 전용 초록색 및 그와 유사한 색상(초록/연두 계열)을 타 항공사 색상 후보에서 전면 제외
+    FORBIDDEN_COLORS = ['#16a34a', '#16A34A', '#00cc96', '#00CC96', '#2ca02c', '#2CA02C', '#636EFA', '#0ea5e9']
+    
+    cmap = {'KE': KE_COLOR}
+    color_idx = 0
+    
     for al in airlines_list:
-        if al != 'KE':
-            color = palette[idx % len(palette)]
-            if color in ['#636EFA', '#16a34a', '#0ea5e9']:
-                idx += 1
-                color = palette[idx % len(palette)]
-            cmap[al] = color
-            idx += 1
+        if str(al).upper() != 'KE':
+            while True:
+                candidate_color = palette[color_idx % len(palette)]
+                color_idx += 1
+                if candidate_color.upper() not in [c.upper() for c in FORBIDDEN_COLORS]:
+                    cmap[al] = candidate_color
+                    break
     return cmap
 
 def apply_bottom_legend(fig):
@@ -427,7 +434,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 [핵심 연산 보정]: 가중치 토글 켜짐 시 LCC 승수를 직접 곱해서 18% 수치 강제 적용
+        # 📌 [가중치 연산 보정]: 가중치 스위치 작동 시 LCC 승수 1:1 곱셈 연산 적용
         if apply_weight_toggle:
             filtered_df['Mult_map'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
             filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Mult_map']
@@ -586,13 +593,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         dep_merged_top = dep_merged[dep_merged['AL_clean'].isin(top_al_display)].copy()
 
                         fig_ke_dep = go.Figure()
+                        color_map_al = build_airline_color_map(all_airlines)
 
                         for al_code in top_al_display:
                             al_data = dep_merged_top[dep_merged_top['AL_clean'] == al_code]
                             if al_data.empty: continue
 
                             is_ke = (al_code == 'KE')
-                            line_style = dict(color='#16a34a', width=3.5) if is_ke else dict(dash='dot', width=1.5)
+                            line_style = dict(color='#16a34a', width=3.5) if is_ke else dict(color=color_map_al.get(al_code, '#94a3b8'), dash='dot', width=1.5)
                             marker_style = dict(size=8, symbol='circle') if is_ke else dict(size=4)
                             mode_setting = 'lines+markers+text' if is_ke else 'lines+markers'
                             text_labels = [f"<b>{v:.1f}%</b>" for v in al_data['MS_Percent']] if is_ke else None
