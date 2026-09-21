@@ -213,7 +213,6 @@ df_6th_raw = disk_6th
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
 
-# 📌 팀원 접속 시 기본 선택값 index=0 고정 (3/4수송 대시보드가 첫 화면으로 설정됨)
 selected_group = st.radio(
     "분석할 수송 영역을 선택하세요:",
     options=["✈️ 3/4수송 대시보드", "🌐 6수송 대시보드", "🔗 W26 연결 네트워크"],
@@ -379,15 +378,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 엑셀 SUMPRODUCT 재정규화 M/S 산출 계산부
+        # 📌 엑셀 SUMPRODUCT 재정규화 M/S 산출 연동 완수
         if apply_weight_toggle:
             val_col = 'Weighted_Value'
-            # 항공사/노선별 실적 및 가중비율 기반 재정규화 계산
             al_raw = filtered_df.groupby('AL_clean', observed=False)['Value'].sum()
             al_wt = filtered_df.groupby('AL_clean', observed=False)['Weighted_Value'].sum()
             
-            # 엑셀 SUMPRODUCT 정규화 수식: J10 * G25 / SUMPRODUCT(J10:J20, G25:G35)
-            # 가중 비율 산출 (G25 = Weighted / Raw)
+            # 엑셀 SUMPRODUCT 정규화 수식 기반 연산
             ratio = np.where(al_raw > 0, al_wt / al_raw, 1.0)
             wt_product = al_raw * ratio
             sum_product = wt_product.sum()
@@ -399,6 +396,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 
             ke_pax = al_wt.get('KE', 0)
             total_pax = al_wt.sum()
+            # 📌 핵심 요약 카드에 엑셀 SUMPRODUCT 정규화된 M/S 수치가 정확히 연동되도록 수정
             ke_ms = al_ms_normalized.get('KE', 0.0)
         else:
             val_col = 'Value'
