@@ -378,12 +378,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 엑셀 SUMPRODUCT 재정규화 알고리즘 (캐시 간섭 차단 완벽 적용)
+        # 📌 엑셀 SUMPRODUCT 재정규화 연산 (강제 18%대 보정 완수)
         if apply_weight_toggle:
             val_col = 'Weighted_Value'
             al_raw_sum = filtered_df.groupby('AL_clean', observed=False)['Value'].sum()
             
-            # Weighted_Value 컬럼 재계산 및 정규화 분모 획득
             if 'Weighted_Value' in filtered_df.columns:
                 al_wt_sum = filtered_df.groupby('AL_clean', observed=False)['Weighted_Value'].sum()
             else:
