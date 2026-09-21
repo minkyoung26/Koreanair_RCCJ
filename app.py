@@ -357,9 +357,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
         bound_col = '수송' if '수송' in merged_df.columns else ('Bound' if 'Bound' in merged_df.columns else None)
         all_bounds = sorted([str(x).strip() for x in merged_df[bound_col].dropna().unique()]) if bound_col else []
 
-        # 📌 1번 일본 권역 항목 추출
+        # 📌 1번 일본 권역 전체 항목 (OKA 포함) 빠짐없이 추출
         if region_col and region_col in merged_df.columns:
-            all_regions = sorted([str(x).strip() for x in merged_df[region_col].dropna().unique() if str(x).strip() != 'nan'])
+            all_regions = sorted([str(x).strip() for x in merged_df[region_col].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''])
         else:
             all_regions = []
 
