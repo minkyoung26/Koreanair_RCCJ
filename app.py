@@ -39,7 +39,7 @@ issue_end_6th = current_monday - datetime.timedelta(days=1)
 issue_start_6th = current_monday - datetime.timedelta(weeks=13)
 issue_range_str_6th = f"{issue_start_6th.strftime('%Y.%m.%d')} ~ {issue_end_6th.strftime('%Y.%m.%d')}"
 
-# 📌 엑셀 수식 기준 지정 22개 대한항공 정규 취항 노선 마스터 리스트 (발매 M/S 한정용)
+# 📌 엑셀 수식 기준 지정 22개 대한항공 정규 취항 노선 마스터 리스트
 EXCEL_KE_ROUTES_MASTER = [
     "G/HND", "I/NRT", "I/HND", "P/NRT", "C/NRT", "I/KIX", "G/KIX", "I/UKB",
     "I/OKJ", "I/HIJ", "I/FUK", "I/KOJ", "I/NGS", "I/KMJ", "I/OIT", "I/NGO",
@@ -236,11 +236,9 @@ selected_group = st.radio(
 
 ALL_OPTION = "전체 (All)"
 
-# 📌 KE 전용 색상 무단 사용 방지 및 Unique 보장 로직
 def build_airline_color_map(airlines_list):
-    KE_COLOR = '#16a34a' # 대한항공 전용 시그니처 초록색
+    KE_COLOR = '#16a34a'
     palette = px.colors.qualitative.Plotly + px.colors.qualitative.Bold + px.colors.qualitative.Pastel + px.colors.qualitative.Dark24
-    
     FORBIDDEN_COLORS = ['#16a34a', '#16A34A', '#00cc96', '#00CC96', '#2ca02c', '#2CA02C', '#636EFA', '#0ea5e9']
     
     cmap = {'KE': KE_COLOR}
@@ -324,7 +322,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
     ])
 
     # ------------------------------------------
-    # 1. 🎟️ 발매 M/S 탭 (KE 취항 22개 노선 한정 + 권역-노선 종속 원래대로 완벽 원복)
+    # 1. 🎟️ 발매 M/S 탭
     # ------------------------------------------
     with tab_34_1:
         if df_iss_merged is None:
@@ -387,11 +385,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (다중 선택 가능)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
             
-            # 📌 발매 대시보드 1~8번 원래 슬라이서 레이아웃
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_region_list = render_multiselect_box(f_col1, "1. 일본권역", all_regions, "slicer_region_multi")
 
-            # 📌 [권역-노선 종속 연동 로직]: 1. 일본권역 선택 시 2. KE취항노선 동적 필터링
             if region_col and region_col in merged_df.columns and sel_region_list:
                 df_region_sub = merged_df[merged_df[region_col].astype(str).str.strip().isin(sel_region_list)]
                 df_has_value_sub = df_region_sub[(df_region_sub['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (df_region_sub['Value'] > 0)]
@@ -416,7 +412,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filter_mask = pd.Series(True, index=merged_df.index)
 
-        # 📌 발매 M/S는 무조건 KE 취항 22개 노선 한정 고정
         if region_col and region_col in merged_df.columns and sel_region_list:
             filter_mask &= (merged_df[region_col].astype(str).str.strip().isin(sel_region_list))
         if sel_route_list:
@@ -441,7 +436,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 [가중치 연산 보정]: LCC 승수 직접 곱 연산으로 KE = 18% 수치 1:1 맞춤
         if apply_weight_toggle:
             filtered_df['Mult_map'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
             filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Mult_map']
@@ -530,7 +524,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 📌 2번 차트: 발매 주차별 주요 항공사 M/S 점유비 추이 (%) 선 그래프
                 if week_col and week_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">2. 발매 주차별 주요 항공사 M/S 점유비 추이 (%)</div>', unsafe_allow_html=True)
                     df_no_week = filtered_df
@@ -723,7 +716,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (요청한 5개 슬라이서로 정돈)
+    # 2. ✈️ 공급 M/S 탭 (요청한 5개 슬라이서 및 이상치 제거 적용)
     # ------------------------------------------
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
@@ -769,7 +762,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df_sup['Flights_num'] = pd.to_numeric(df_sup['Flights'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if 'Flights' in df_sup.columns else 1
 
         sup_month_col = '출발월' if '출발월' in df_sup.columns else ('출발 월' if '출발 월' in df_sup.columns else ('Travel Month' if 'Travel Month' in df_sup.columns else None))
-        sup_months = sorted([str(x) for x in df_sup[sup_month_col].dropna().unique()]) if sup_month_col else []
+        
+        # 📌 [수정]: 1900-01 및 불필요 이상 날짜 제외 필터링
+        if sup_month_col and sup_month_col in df_sup.columns:
+            raw_months = df_sup[sup_month_col].dropna().astype(str).str.strip().unique()
+            sup_months = sorted([m for m in raw_months if m not in ['1900-01', '1900', 'NaT', 'nan', '']])
+        else:
+            sup_months = []
 
         sup_origins = sorted([str(x) for x in df_sup['출발공항'].dropna().unique()])
         sup_dests = sorted([str(x) for x in df_sup['도착공항'].dropna().unique()])
@@ -879,7 +878,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             </div>
             """, unsafe_allow_html=True)
 
-            # 공급 타임라인 노선 선택
             sup_avail_routes = filtered_sup['노선_clean'].dropna().unique().tolist() if '노선_clean' in filtered_sup.columns else []
             if not sup_avail_routes:
                 st.info("💡 조건에 해당하는 공급 스케줄 데이터가 없습니다.")
@@ -899,7 +897,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_timeline)
                     st.plotly_chart(fig_timeline, width='stretch')
 
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭
+    # ------------------------------------------
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (화살표 ▼ 삭제 적용)
+    # ------------------------------------------
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
@@ -974,7 +974,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                     sorted_rbds = [r for r in hierarchy_order if r in existing_rbds] + [r for r in existing_rbds if r not in hierarchy_order]
                                     piv_rbd = piv_rbd.loc[sorted_rbds]
 
-                                rbd_html += f'<tr><td colspan="{len(week_list)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center;">▼ ★ {al_code} 총계</td>'
+                                # 📌 [수정]: 화살표 기호 제거
+                                rbd_html += f'<tr><td colspan="{len(week_list)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center; font-weight:800;">★ {al_code} 총계</td>'
                                 for wk in week_list: rbd_html += f'<td style="text-align:center;">{al_sub[al_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
                                 rbd_html += f'<td style="text-align:center;">{al_tot_pax:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
 
@@ -1011,7 +1012,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             piv_ag_sub = piv_ag_sub.reindex(sorted_ag_airlines).dropna(how='all')
 
                             if not piv_ag_sub.empty:
-                                ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center;">▼ ★ {ag_name} 총계</td>'
+                                # 📌 [수정]: 화살표 기호 제거
+                                ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center; font-weight:800;">★ {ag_name} 총계</td>'
                                 for wk in week_list_ag: ag_html += f'<td style="text-align:center;">{ag_sub[ag_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
                                 ag_html += f'<td style="text-align:center;">{ag_tot_val:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
 
