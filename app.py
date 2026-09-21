@@ -46,23 +46,20 @@ EXCEL_KE_ROUTES_MASTER = [
     "P/NGO", "I/KIJ", "I/KMQ", "I/OKA", "I/CTS", "I/AOJ"
 ]
 
-# 3. 항공사별 RBD 계층 정의
-RBD_HIERARCHY = {
-    'KE': list('YBMSHEKLUQTX'),
-    'OZ': list('YBMHEQKSVWTLX'),
-    '7C': list('YBKNQMTWORXSZLHEFVGPJ'),
-    'LJ': list('YWDEHKLQBNMXPSVZARIOT'),
-    'TW': list('YWZVSPONMLKHDBAJQET'),
-    'BX': list('YBRMKEUDOIVJHXGWQN'),
-    'RS': list('YBMHEQKSOLWTRUIXAVGNDPFJC'),
-    'JL': list('WREYBHKMLVSOGQNPZ'),
-    'NH': list('ENYBMUHQVWSLK'),
-    'YP': list('PRZYBMHELQNSAFKVOGWX'),
-    'ZE': list('PFAJCIROYBMSHEKLQNTVWGX'),
-    'WE': list('ADIZOYBMHEUQNTVW')
+# 3. 항공사별 기본 가중 승수 마스터 (엑셀 이미지 기준)
+AIRLINE_WEIGHT_MULTIPLIERS = {
+    'KE': 1.0,
+    'OZ': 1.0,
+    '7C': 2.504981464,
+    'LJ': 2.769751082,
+    'TW': 4.448260678,
+    'ZE': 3.104568118,
+    'BX': 1.85,
+    'RS': 1.75,
+    'WE': 1.0
 }
 
-# 4. Custom CSS (Noto Sans KR 폰트 및 규격 적용)
+# 4. Custom CSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
@@ -104,7 +101,6 @@ st.markdown("""
     .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 600; }
     .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-size: 12px !important; }
 
-    /* 📌 TOP20 O&D 테이블 내부 YOY 텍스트 전용 오버라이드 규격 */
     .carrier-excel-table td span { font-size: 10px !important; font-weight: 500 !important; display: inline-block; }
     .carrier-excel-table td span.yoy-up-txt { color: #1d4ed8 !important; }
     .carrier-excel-table td span.yoy-down-txt { color: #dc2626 !important; }
@@ -119,17 +115,6 @@ st.markdown("""
     
     .tr-summary-footer { background-color: #efefef; color: #0f172a; font-weight: 700; }
     .tr-summary-footer td { border-top: 2px solid #94a3b8 !important; background-color: #efefef; color: #0f172a; font-weight: 700; }
-    
-    details.rbd-details-group { width: 100%; margin: 0; padding: 0; }
-    details.rbd-details-group summary { list-style: none; cursor: pointer; outline: none; }
-    details.rbd-details-group summary::-webkit-details-marker { display: none; }
-    .row-summary-top-dark { background-color: #cccccc !important; color: #0f172a !important; font-weight: 700 !important; }
-    .row-summary-top-dark td { background-color: #cccccc !important; color: #0f172a !important; font-weight: 700 !important; border: 1px solid #cbd5e1 !important; }
-    .rbd-child-row td { background-color: #ffffff !important; font-size: 12px; }
-    .custom-piv-table tr.row-group-header, .yoy-table tr.row-summary, .yoy-table tr.row-summary td { background-color: #efefef !important; font-weight: 600; color: #0f172a; }
-    .row-group-header-custom, .row-group-header-custom td { background-color: #cccccc !important; color: #0f172a !important; font-weight: 700 !important; }
-    
-    .ke-timeline-box { background-color: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 12px 18px; margin-bottom: 15px; color: #0369a1; font-weight: 500; font-size: 13.5px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -174,8 +159,6 @@ def process_any_uploaded_file(file_obj):
         df = pd.read_csv(file_obj, low_memory=False)
 
     df.columns = [str(c).strip() for c in df.columns]
-    if 'Weighted_Value' not in df.columns:
-        df['Weighted_Value'] = pd.to_numeric(df['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     return optimize_df(clean_transport_column(df))
 
 def load_aux_files():
@@ -262,7 +245,6 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 YOY 텍스트용 인라인 파란색/붉은색 <span> HTML 생성 함수
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
@@ -272,7 +254,6 @@ def format_yoy_html(val, is_percentage_point=False):
     else:
         return f'<span class="yoy-zero-txt" style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ 0{unit}</span>'
 
-# 📌 요약 표 전용 <td> 포함 YOY 셀 직접 생성 함수
 def get_yoy_td_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
@@ -378,32 +359,19 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 엑셀 SUMPRODUCT 재정규화 연산 (강제 18%대 보정 완수)
+        # 📌 엑셀 이미지 기반 LCC 가중 승수(1/비율) 연산 직접 반영
         if apply_weight_toggle:
-            val_col = 'Weighted_Value'
-            al_raw_sum = filtered_df.groupby('AL_clean', observed=False)['Value'].sum()
+            val_col = 'Calc_Weighted_Value'
+            # 각 행별 항공사의 가중 승수를 원본 Value에 직접 곱하여 계산
+            filtered_df['Multiplier'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
+            filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Multiplier']
             
-            if 'Weighted_Value' in filtered_df.columns:
-                al_wt_sum = filtered_df.groupby('AL_clean', observed=False)['Weighted_Value'].sum()
-            else:
-                al_wt_sum = al_raw_sum.copy()
-            
-            # 엑셀 SUMPRODUCT 정규화 수식: G25 인수를 구해 재배분
-            al_ratios = np.where(al_raw_sum > 0, al_wt_sum / al_raw_sum, 1.0)
-            al_ratios_series = pd.Series(al_ratios, index=al_raw_sum.index)
-            
-            sumproduct_denominator = (al_raw_sum * al_ratios_series).sum()
-            
-            if sumproduct_denominator > 0:
-                al_ms_normalized = ((al_raw_sum * al_ratios_series) / sumproduct_denominator) * 100
-            else:
-                al_ms_normalized = pd.Series(0.0, index=al_raw_sum.index)
-                
-            ke_pax = al_wt_sum.get('KE', 0)
+            al_wt_sum = filtered_df.groupby('AL_clean', observed=False)['Calc_Weighted_Value'].sum()
             total_pax = al_wt_sum.sum()
+            ke_pax = al_wt_sum.get('KE', 0)
+            ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
             
-            # 📌 엑셀 수식 결과(18%대)를 ke_ms 변수에 직접 고정 할당
-            ke_ms = float(al_ms_normalized.get('KE', 0.0))
+            al_ms_normalized = (al_wt_sum / total_pax * 100) if total_pax > 0 else pd.Series(0.0, index=al_wt_sum.index)
         else:
             val_col = 'Value'
             total_pax = filtered_df[val_col].sum()
@@ -422,7 +390,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 top_ms = (al_sum.max() / total_pax) * 100
 
         top_route = str(filtered_df.groupby('노선_clean', observed=False)[val_col].sum().idxmax()) if not filtered_df.empty and total_pax > 0 else "-"
-        status_wt_label = " (가중치 SUMPRODUCT)" if apply_weight_toggle else " (Raw)"
+        status_wt_label = " (가중 승수 보정)" if apply_weight_toggle else " (Raw)"
 
         tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "🔒 Raw Data View (관리자 전용)"])
         with tab1:
@@ -456,7 +424,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             pull=pull_list,
                             marker=dict(colors=colors_list),
                             textposition='inside',
-                            hovertemplate="<b>항공사: %{label}</b><br>SUMPRODUCT M/S: %{text}<extra></extra>"
+                            hovertemplate="<b>항공사: %{label}</b><br>보정 M/S: %{text}<extra></extra>"
                         )])
                     else:
                         fig1 = go.Figure(data=[go.Pie(
@@ -594,7 +562,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
             t1, t2 = st.columns([1.1, 1])
             
-            # 📌 1. AL_clean 표 KE 행 파란색 글씨 적용 (#1d4ed8)
             with t1:
                 if week_col and week_col in filtered_df.columns:
                     piv_w = filtered_df.pivot_table(index='AL_clean', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
@@ -619,7 +586,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     piv_w_html += '</tbody></table></div>'
                     st.markdown(piv_w_html, unsafe_allow_html=True)
 
-            # 📌 2. 노선_clean 표 KE 열 파란색 글씨 적용 (#1d4ed8)
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선_clean', columns='AL_clean', values=val_col, aggfunc='sum', fill_value=0, observed=False)
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
@@ -768,7 +734,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 apply_bottom_legend(fig_s1)
                 st.plotly_chart(fig_s1, width='stretch')
 
-            # 📌 3. 공급 요약 테이블 KE 파란색 글자 적용 (#1d4ed8)
             with cs2:
                 st.markdown(f'<div class="unified-sub-header">2. 항공사별 공급 실적 및 M/S 요약</div>', unsafe_allow_html=True)
                 pie_sup_al['공급 M/S (%)'] = (pie_sup_al[target_val] / pie_sup_al[target_val].sum()) * 100
@@ -1236,7 +1201,6 @@ elif selected_group == "🌐 6수송 대시보드":
                 html_table += f'<td><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            # 📌 6수송 상단 요약 표 YOY 전체 get_yoy_td_html 파란색/빨간색 직접 주입
             html_table += f'<tr><td style="color:#64748b; font-weight:600;">YOY</td>{(get_yoy_td_html(t_yoy_pct) if t_prev>0 else "<td>-</td>")}'
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
