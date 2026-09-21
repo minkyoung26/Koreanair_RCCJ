@@ -46,17 +46,20 @@ EXCEL_KE_ROUTES_MASTER = [
     "P/NGO", "I/KIJ", "I/KMQ", "I/OKA", "I/CTS", "I/AOJ"
 ]
 
-# 3. 항공사별 기본 가중 승수 마스터 (엑셀 이미지 기준)
-AIRLINE_WEIGHT_MULTIPLIERS = {
-    'KE': 1.0,
-    'OZ': 1.0,
-    '7C': 2.504981464,
-    'LJ': 2.769751082,
-    'TW': 4.448260678,
-    'ZE': 3.104568118,
-    'BX': 1.85,
-    'RS': 1.75,
-    'WE': 1.0
+# 3. 항공사별 RBD 계층 정의
+RBD_HIERARCHY = {
+    'KE': list('YBMSHEKLUQTX'),
+    'OZ': list('YBMHEQKSVWTLX'),
+    '7C': list('YBKNQMTWORXSZLHEFVGPJ'),
+    'LJ': list('YWDEHKLQBNMXPSVZARIOT'),
+    'TW': list('YWZVSPONMLKHDBAJQET'),
+    'BX': list('YBRMKEUDOIVJHXGWQN'),
+    'RS': list('YBMHEQKSOLWTRUIXAVGNDPFJC'),
+    'JL': list('WREYBHKMLVSOGQNPZ'),
+    'NH': list('ENYBMUHQVWSLK'),
+    'YP': list('PRZYBMHELQNSAFKVOGWX'),
+    'ZE': list('PFAJCIROYBMSHEKLQNTVWGX'),
+    'WE': list('ADIZOYBMHEUQNTVW')
 }
 
 # 4. Custom CSS
@@ -359,13 +362,24 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 엑셀 이미지 기반 LCC 가중 승수(1/비율) 연산 직접 반영
+        # 📌 노선별 실제 승수(Weighted_Value / Value) 자동 계산 로직 적용
         if apply_weight_toggle:
             val_col = 'Calc_Weighted_Value'
-            # 각 행별 항공사의 가중 승수를 원본 Value에 직접 곱하여 계산
-            filtered_df['Multiplier'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
-            filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Multiplier']
             
+            # 파이프라인 내부 노선-항공사별 실제 승수 산출
+            if 'Weighted_Value' in filtered_df.columns and 'Value' in filtered_df.columns:
+                rt_al_raw = filtered_df.groupby(['노선_clean', 'AL_clean'], observed=False)['Value'].sum()
+                rt_al_wt = filtered_df.groupby(['노선_clean', 'AL_clean'], observed=False)['Weighted_Value'].sum()
+                rt_al_mult = np.where(rt_al_raw > 0, rt_al_wt / rt_al_raw, 1.0)
+                
+                # 각 노선-항공사별 실제 승수 매핑
+                mult_df = rt_al_raw.reset_index()
+                mult_df['Mult_calc'] = rt_al_mult
+                filtered_df = pd.merge(filtered_df, mult_df[['노선_clean', 'AL_clean', 'Mult_calc']], on=['노선_clean', 'AL_clean'], how='left')
+                filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Mult_calc'].fillna(1.0)
+            else:
+                filtered_df['Calc_Weighted_Value'] = filtered_df['Value']
+
             al_wt_sum = filtered_df.groupby('AL_clean', observed=False)['Calc_Weighted_Value'].sum()
             total_pax = al_wt_sum.sum()
             ke_pax = al_wt_sum.get('KE', 0)
@@ -793,7 +807,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_timeline)
                     st.plotly_chart(fig_timeline, width='stretch')
 
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (KE 취항 노선 전용 필터 보정 완수)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
@@ -1283,14 +1297,12 @@ elif selected_group == "🌐 6수송 대시보드":
                 c_html += '<th class="th-ke-light">M/S</th><th class="th-ke-light">전년</th><th class="th-ke-light">YOY</th></tr></thead><tbody>'
 
                 for rank_idx, od_code in enumerate(top_ods, 1):
-                    # 시장 전체
                     mkt_sub = od_totals[od_totals[od_col_6] == od_code]
                     m_cy = mkt_sub['Val_num'].sum() if not mkt_sub.empty else 0
                     m_py = mkt_sub['Val_PY_num'].sum() if not mkt_sub.empty else 0
                     m_yoy = ((m_cy - m_py) / m_py * 100) if m_py > 0 else 0
                     m_yoy_html = format_yoy_html(m_yoy) if m_py > 0 else "-"
 
-                    # 선택 항공사
                     od_al_sub = od_carrier_df[od_carrier_df[od_col_6] == od_code]
                     if sel_2_carrier != ALL_OPTION:
                         top_al_row = od_al_sub[od_al_sub[al_col_6] == sel_2_carrier]
@@ -1312,7 +1324,6 @@ elif selected_group == "🌐 6수송 대시보드":
                     s_ms_diff = s_ms_cy - s_ms_py
                     s_ms_yoy_html = format_yoy_html(s_ms_diff, True) if m_py > 0 else "-"
 
-                    # KE
                     ke_al_row = od_al_sub[od_al_sub[al_col_6] == 'KE']
                     k_cy = ke_al_row['Val_num'].sum() if not ke_al_row.empty else 0
                     k_py = ke_al_row['Val_PY_num'].sum() if not ke_al_row.empty else 0
@@ -1335,7 +1346,6 @@ elif selected_group == "🌐 6수송 대시보드":
                     c_html += f'<td>{k_cy_display}</td><td>{k_py_display}</td><td>{k_yoy_html}</td>'
                     c_html += f'<td>{k_ms_cy:.1f}%</td><td>{k_ms_py:.1f}%</td><td>{k_ms_yoy_html}</td></tr>'
 
-                # 필터 연동 총합계 요약 행
                 tot_m_cy = od_totals['Val_num'].sum()
                 tot_m_py = od_totals['Val_PY_num'].sum()
                 tot_m_yoy = ((tot_m_cy - tot_m_py) / tot_m_py * 100) if tot_m_py > 0 else 0
