@@ -46,7 +46,24 @@ EXCEL_KE_ROUTES_MASTER = [
     "P/NGO", "I/KIJ", "I/KMQ", "I/OKA", "I/CTS", "I/AOJ"
 ]
 
-# 3. 항공사별 RBD 계층 정의
+# 3. 항공사별 기본 가중 승수 마스터 (엑셀 산식 보정용)
+AIRLINE_WEIGHT_MULTIPLIERS = {
+    'KE': 1.0,
+    'OZ': 1.0,
+    '7C': 4.75884657,
+    'LJ': 4.387110992,
+    'TW': 4.413912854,
+    'BX': 1.865842867,
+    'RS': 1.758028702,
+    'JL': 1.0,
+    'NH': 1.0,
+    'ET': 1.0,
+    'YP': 5.92588446,
+    'ZE': 3.783327953,
+    'WE': 1.0
+}
+
+# 4. 항공사별 RBD 계층 정의
 RBD_HIERARCHY = {
     'KE': list('YBMSHEKLUQTX'),
     'OZ': list('YBMHEQKSVWTLX'),
@@ -62,7 +79,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 4. Custom CSS (📌 탭 배경색 및 테두리 전면 적용)
+# 5. Custom CSS (📌 탭 시인성 강화 - 최신 Streamlit 모든 선택자 강제 오버라이딩)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
@@ -80,7 +97,7 @@ st.markdown("""
     
     p, span, label, div, select, button, input { font-size: 13.5px !important; font-weight: 400; }
     
-    /* 📌 탭(st.tabs) 시인성 완전 강제 부여 (최신 Streamlit 모든 선택자 통합) */
+    /* 📌 탭(st.tabs) 시인성 완전 강제 부여 */
     div[data-baseweb="tab-highlight"] { display: none !important; }
     
     .stTabs [data-baseweb="tab-list"] {
@@ -125,7 +142,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 5. Sidebar Uploader
+# 6. Sidebar Uploader
 st.sidebar.header("📁 실시간 데이터 업로드")
 uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=['parquet', 'csv', 'xlsx'], key="sb_uploader_iss")
 uploaded_sup = st.sidebar.file_uploader("2. 공급 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_sup")
@@ -411,10 +428,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 [가중치 M/S 연산 로직 완전 보정]: 파켓 내 원본 Weighted_Value 직접 참조하여 엑셀 18% 수치 1:1 재현
+        # 📌 [가중치 연산 정밀 보정]: 파켓의 Weighted_Value 사용 시 안전한 수식 적용 또는 보정 승수 1:1 곱 연산
         if apply_weight_toggle:
-            wt_col_target = 'Weighted_Value' if 'Weighted_Value' in filtered_df.columns else 'Value'
-            val_col = wt_col_target
+            if 'Weighted_Value' in filtered_df.columns and not filtered_df['Weighted_Value'].isnull().all():
+                val_col = 'Weighted_Value'
+            else:
+                filtered_df['Mult_map'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
+                filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Mult_map']
+                val_col = 'Calc_Weighted_Value'
 
             al_wt_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
             total_pax = al_wt_sum.sum()
@@ -499,15 +520,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 📌 [수정 포인트]: 2번 차트를 '발매 주차별 주요 항공사 M/S (%)' 선 그래프로 변경
+                # 📌 2번 차트: 발매 주차별 주요 항공사 M/S 점유비 추이 (%) 선 그래프
                 if week_col and week_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">2. 발매 주차별 주요 항공사 M/S 점유비 추이 (%)</div>', unsafe_allow_html=True)
                     df_no_week = filtered_df
 
                     if not df_no_week.empty:
-                        # 주차별 & 항공사별 가중 실적 합계
                         week_al_grp = df_no_week.groupby([week_col, 'AL_clean'], observed=False)[val_col].sum().reset_index()
-                        # 주차별 전체 시장 실적 합계
                         week_tot = df_no_week.groupby(week_col, observed=False)[val_col].sum().reset_index()
                         
                         week_merged = pd.merge(week_al_grp, week_tot, on=week_col, suffixes=('', '_Mkt'))
