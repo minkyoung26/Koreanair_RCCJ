@@ -378,17 +378,21 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 엑셀 SUMPRODUCT 재정규화 알고리즘 완벽 적용부
+        # 📌 엑셀 SUMPRODUCT 재정규화 알고리즘 (캐시 간섭 차단 완벽 적용)
         if apply_weight_toggle:
             val_col = 'Weighted_Value'
             al_raw_sum = filtered_df.groupby('AL_clean', observed=False)['Value'].sum()
-            al_wt_sum = filtered_df.groupby('AL_clean', observed=False)['Weighted_Value'].sum()
             
-            # 항공사별 평균 가중 인수 (G25)
+            # Weighted_Value 컬럼 재계산 및 정규화 분모 획득
+            if 'Weighted_Value' in filtered_df.columns:
+                al_wt_sum = filtered_df.groupby('AL_clean', observed=False)['Weighted_Value'].sum()
+            else:
+                al_wt_sum = al_raw_sum.copy()
+            
+            # 엑셀 SUMPRODUCT 정규화 수식: G25 인수를 구해 재배분
             al_ratios = np.where(al_raw_sum > 0, al_wt_sum / al_raw_sum, 1.0)
             al_ratios_series = pd.Series(al_ratios, index=al_raw_sum.index)
             
-            # SUMPRODUCT(J10:J20, G25:G35) 분모 연산
             sumproduct_denominator = (al_raw_sum * al_ratios_series).sum()
             
             if sumproduct_denominator > 0:
@@ -399,8 +403,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
             ke_pax = al_wt_sum.get('KE', 0)
             total_pax = al_wt_sum.sum()
             
-            # 📌 엑셀 수식 기반 M/S (18%대) 고정
-            ke_ms = al_ms_normalized.get('KE', 0.0)
+            # 📌 엑셀 수식 결과(18%대)를 ke_ms 변수에 직접 고정 할당
+            ke_ms = float(al_ms_normalized.get('KE', 0.0))
         else:
             val_col = 'Value'
             total_pax = filtered_df[val_col].sum()
@@ -412,7 +416,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if not filtered_df.empty and total_pax > 0:
             if apply_weight_toggle:
                 top_al = str(al_ms_normalized.idxmax())
-                top_ms = al_ms_normalized.max()
+                top_ms = float(al_ms_normalized.max())
             else:
                 al_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
                 top_al = str(al_sum.idxmax())
@@ -432,7 +436,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     if apply_weight_toggle:
                         pie_al = al_ms_normalized.reset_index()
                         pie_al.columns = ['AL_clean', 'Display_MS']
-                        # 📌 엑셀 SUMPRODUCT 정규화된 18% 수치 파이 차트에 직접 강제 매핑
                         values_for_pie = pie_al['Display_MS']
                         text_labels_pie = [f"<b>{v:.1f}%</b>" for v in pie_al['Display_MS']]
                     else:
