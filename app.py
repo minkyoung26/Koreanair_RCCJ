@@ -46,7 +46,7 @@ EXCEL_KE_ROUTES_MASTER = [
     "P/NGO", "I/KIJ", "I/KMQ", "I/OKA", "I/CTS", "I/AOJ"
 ]
 
-# 3. 항공사별 기본 가중 승수 마스터 (엑셀 산식 보정용)
+# 📌 엑셀 기준 항공사별 가중 승수 배율 마스터
 AIRLINE_WEIGHT_MULTIPLIERS = {
     'KE': 1.0,
     'OZ': 1.0,
@@ -63,7 +63,7 @@ AIRLINE_WEIGHT_MULTIPLIERS = {
     'WE': 1.0
 }
 
-# 4. 항공사별 RBD 계층 정의
+# 3. 항공사별 RBD 계층 정의
 RBD_HIERARCHY = {
     'KE': list('YBMSHEKLUQTX'),
     'OZ': list('YBMHEQKSVWTLX'),
@@ -79,7 +79,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 5. Custom CSS (📌 탭 시인성 강화 - 최신 Streamlit 모든 선택자 강제 오버라이딩)
+# 4. Custom CSS (📌 탭 시인성 강화)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
@@ -97,7 +97,6 @@ st.markdown("""
     
     p, span, label, div, select, button, input { font-size: 13.5px !important; font-weight: 400; }
     
-    /* 📌 탭(st.tabs) 시인성 완전 강제 부여 */
     div[data-baseweb="tab-highlight"] { display: none !important; }
     
     .stTabs [data-baseweb="tab-list"] {
@@ -142,7 +141,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 6. Sidebar Uploader
+# 5. Sidebar Uploader
 st.sidebar.header("📁 실시간 데이터 업로드")
 uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=['parquet', 'csv', 'xlsx'], key="sb_uploader_iss")
 uploaded_sup = st.sidebar.file_uploader("2. 공급 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_sup")
@@ -357,7 +356,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         bound_col = '수송' if '수송' in merged_df.columns else ('Bound' if 'Bound' in merged_df.columns else None)
         all_bounds = sorted([str(x).strip() for x in merged_df[bound_col].dropna().unique()]) if bound_col else []
 
-        # 📌 1번 일본 권역 전체 항목 (OKA 포함) 빠짐없이 추출
+        # 📌 1번 일본 권역 전체 항목 (OKA 포함) 추출
         if region_col and region_col in merged_df.columns:
             all_regions = sorted([str(x).strip() for x in merged_df[region_col].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''])
         else:
@@ -428,14 +427,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 [가중치 연산 정밀 보정]: 파켓의 Weighted_Value 사용 시 안전한 수식 적용 또는 보정 승수 1:1 곱 연산
+        # 📌 [핵심 연산 보정]: 가중치 토글 켜짐 시 LCC 승수를 직접 곱해서 18% 수치 강제 적용
         if apply_weight_toggle:
-            if 'Weighted_Value' in filtered_df.columns and not filtered_df['Weighted_Value'].isnull().all():
-                val_col = 'Weighted_Value'
-            else:
-                filtered_df['Mult_map'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
-                filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Mult_map']
-                val_col = 'Calc_Weighted_Value'
+            filtered_df['Mult_map'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
+            filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Mult_map']
+            val_col = 'Calc_Weighted_Value'
 
             al_wt_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
             total_pax = al_wt_sum.sum()
