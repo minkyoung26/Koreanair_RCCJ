@@ -129,7 +129,7 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
     }
     
-    /* 📌 HTML 아코디언 기본 화살표 스타일 전면 숨김 */
+    /* 📌 HTML 아코디언 기본 화살표 스타일 전면 숨김 및 열 고정 설정 */
     summary::-webkit-details-marker { display: none !important; }
     summary { list-style: none !important; cursor: pointer; }
     
@@ -140,7 +140,7 @@ st.markdown("""
     .metric-value { font-size: 22px; color: #1e293b; font-weight: 700; }
     
     .custom-piv-container, .yoy-table-container { width: 100%; overflow-x: auto; margin-bottom: 20px; border-radius: 8px; border: 1px solid #cbd5e1 !important; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
-    .custom-piv-table, .yoy-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background-color: #ffffff; text-align: center !important; }
+    .custom-piv-table, .yoy-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background-color: #ffffff; text-align: center !important; table-layout: fixed !important; }
     .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header { background-color: #cfe2f3 !important; color: #0f172a !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-weight: 600; text-align: center !important; white-space: nowrap; }
     .yoy-table th.ke-header { background-color: #6fa8dc !important; color: #ffffff !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 700 !important; text-align: center !important; white-space: nowrap; }
     
@@ -720,7 +720,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (요청된 필터 순서 및 종속 연동 전면 반영)
+    # 2. ✈️ 공급 M/S 탭 (요청한 필터 순서 및 종속 연동 전면 반영)
     # ------------------------------------------
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
@@ -906,7 +906,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.plotly_chart(fig_timeline, width='stretch')
 
     # ------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (화살표 ▼ 완전 삭제)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (열 완벽 맞춤 + 화살표 전면 제거)
     # ------------------------------------------
     with tab_34_3:
         if df_iss_merged is not None:
@@ -961,9 +961,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     ag_al_sum = df_ag_filtered.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
                     ag_al_list = ['KE'] + [str(x) for x in ag_al_sum.index if x != 'KE' and ag_al_sum[x] > 0]
 
-                    rbd_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:180px; text-align:center;">항공사 / RBD 클래스</th>'
-                    for wk in week_list: rbd_html += f'<th class="header-main">{wk}</th>'
-                    rbd_html += '<th class="header-main">총합계</th></tr></thead><tbody>'
+                    # 📌 열 너비 완전 일치형 피벗 테이블 생성
+                    col_cnt = len(week_list) + 1
+                    sub_col_w = 80.0 / col_cnt
+
+                    rbd_html = '<div class="custom-piv-container"><table class="custom-piv-table" style="table-layout:fixed; width:100%;"><thead><tr><th class="header-main" style="width:20%;">항공사 / RBD 클래스</th>'
+                    for wk in week_list: rbd_html += f'<th class="header-main" style="width:{sub_col_w:.2f}%;">{wk}</th>'
+                    rbd_html += f'<th class="header-main" style="width:{sub_col_w:.2f}%;">총합계</th></tr></thead><tbody>'
 
                     for al_code in ag_al_list:
                         al_sub = df_ag_filtered[df_ag_filtered['Dominant Marketing Airline'] == al_code]
@@ -982,15 +986,15 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                     sorted_rbds = [r for r in hierarchy_order if r in existing_rbds] + [r for r in existing_rbds if r not in hierarchy_order]
                                     piv_rbd = piv_rbd.loc[sorted_rbds]
 
-                                # 📌 화살표 완전 제거
-                                rbd_html += f'<tr><td colspan="{len(week_list)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center; font-weight:800;">★ {al_code} 총계</td>'
-                                for wk in week_list: rbd_html += f'<td style="text-align:center;">{al_sub[al_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
-                                rbd_html += f'<td style="text-align:center;">{al_tot_pax:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
+                                # 📌 화살표 완전 제거 및 열 너비 강제 고정
+                                rbd_html += f'<tr><td colspan="{len(week_list)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; table-layout:fixed; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:20%; text-align:center; font-weight:800;">★ {al_code} 총계</td>'
+                                for wk in week_list: rbd_html += f'<td style="width:{sub_col_w:.2f}%; text-align:center;">{al_sub[al_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
+                                rbd_html += f'<td style="width:{sub_col_w:.2f}%; text-align:center;">{al_tot_pax:,.0f}</td></tr></table></summary><table style="width:100%; table-layout:fixed; border-collapse:collapse;">'
 
                                 for rbd_code, rbd_row in piv_rbd.iterrows():
-                                    rbd_html += f'<tr class="rbd-child-row"><td style="width:180px; text-align:center; font-weight:700;">{rbd_code}</td>'
-                                    for wk in week_list: rbd_html += f'<td style="text-align:center;">{rbd_row.get(wk, 0):,.0f}</td>'
-                                    rbd_html += f'<td style="text-align:center; font-weight:700;">{rbd_row.get("총합계", 0):,.0f}</td></tr>'
+                                    rbd_html += f'<tr class="rbd-child-row"><td style="width:20%; text-align:center; font-weight:700;">{rbd_code}</td>'
+                                    for wk in week_list: rbd_html += f'<td style="width:{sub_col_w:.2f}%; text-align:center;">{rbd_row.get(wk, 0):,.0f}</td>'
+                                    rbd_html += f'<td style="width:{sub_col_w:.2f}%; text-align:center; font-weight:700;">{rbd_row.get("총합계", 0):,.0f}</td></tr>'
                                 rbd_html += '</table></details></td></tr>'
 
                     rbd_html += '</tbody></table></div>'
@@ -1002,9 +1006,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     agency_totals = df_ag_filtered.groupby('Travel Agency Name', observed=False)['Value'].sum().sort_values(ascending=False)
                     top_20_agencies = [ag for ag in agency_totals.index if agency_totals[ag] > 0][:20]
 
-                    ag_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:180px; text-align:center;">대리점 / 항공사</th>'
-                    for wk in week_list_ag: ag_html += f'<th class="header-main">{wk}</th>'
-                    ag_html += '<th class="header-main">총 판매량</th></tr></thead><tbody>'
+                    col_cnt_ag = len(week_list_ag) + 1
+                    sub_col_w_ag = 80.0 / col_cnt_ag
+
+                    ag_html = '<div class="custom-piv-container"><table class="custom-piv-table" style="table-layout:fixed; width:100%;"><thead><tr><th class="header-main" style="width:20%;">대리점 / 항공사</th>'
+                    for wk in week_list_ag: ag_html += f'<th class="header-main" style="width:{sub_col_w_ag:.2f}%;">{wk}</th>'
+                    ag_html += f'<th class="header-main" style="width:{sub_col_w_ag:.2f}%;">총 판매량</th></tr></thead><tbody>'
 
                     for ag_name in top_20_agencies:
                         ag_sub = df_ag_filtered[df_ag_filtered['Travel Agency Name'] == ag_name]
@@ -1020,17 +1027,17 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             piv_ag_sub = piv_ag_sub.reindex(sorted_ag_airlines).dropna(how='all')
 
                             if not piv_ag_sub.empty:
-                                # 📌 화살표 완전 제거
-                                ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center; font-weight:800;">★ {ag_name} 총계</td>'
-                                for wk in week_list_ag: ag_html += f'<td style="text-align:center;">{ag_sub[ag_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
-                                ag_html += f'<td style="text-align:center;">{ag_tot_val:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
+                                # 📌 화살표 완전 제거 및 열 너비 강제 고정
+                                ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; table-layout:fixed; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:20%; text-align:center; font-weight:800;">★ {ag_name} 총계</td>'
+                                for wk in week_list_ag: ag_html += f'<td style="width:{sub_col_w_ag:.2f}%; text-align:center;">{ag_sub[ag_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
+                                ag_html += f'<td style="width:{sub_col_w_ag:.2f}%; text-align:center;">{ag_tot_val:,.0f}</td></tr></table></summary><table style="width:100%; table-layout:fixed; border-collapse:collapse;">'
 
                                 for al_code, al_row in piv_ag_sub.iterrows():
                                     is_ke_flag = (al_code == 'KE')
                                     cell_style = 'font-weight:700; color:#16a34a;' if is_ke_flag else 'color:#475569;'
-                                    ag_html += f'<tr class="rbd-child-row"><td style="width:180px; text-align:center; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
-                                    for wk in week_list_ag: ag_html += f'<td style="text-align:center; {cell_style}">{al_row.get(wk, 0):,.0f}</td>'
-                                    ag_html += f'<td style="text-align:center; font-weight:700; {cell_style}">{al_row.get("총합계", 0):,.0f}</td></tr>'
+                                    ag_html += f'<tr class="rbd-child-row"><td style="width:20%; text-align:center; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
+                                    for wk in week_list_ag: ag_html += f'<td style="width:{sub_col_w_ag:.2f}%; text-align:center; {cell_style}">{al_row.get(wk, 0):,.0f}</td>'
+                                    ag_html += f'<td style="width:{sub_col_w_ag:.2f}%; text-align:center; font-weight:700; {cell_style}">{al_row.get("총합계", 0):,.0f}</td></tr>'
                                 ag_html += '</table></details></td></tr>'
 
                     ag_html += '</tbody></table></div>'
