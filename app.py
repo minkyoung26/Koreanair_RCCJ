@@ -144,6 +144,8 @@ def clean_transport_column(df):
         df['수송'] = df[b_col].astype(str).str.strip()
     return df
 
+# 📌 캐싱(st.cache_data) 추가로 데이터 로딩 속도 최적화
+@st.cache_data(ttl=3600, show_spinner="데이터 로딩 중...")
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_34_data.parquet')
@@ -152,6 +154,7 @@ def load_fast_parquet_data_file():
         return optimize_df(clean_transport_column(df_p))
     return None
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def process_any_uploaded_file(file_obj):
     file_obj.seek(0)
     if file_obj.name.endswith('.parquet'):
@@ -164,6 +167,7 @@ def process_any_uploaded_file(file_obj):
     df.columns = [str(c).strip() for c in df.columns]
     return optimize_df(clean_transport_column(df))
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_aux_files():
     df_sup, df_6th = None, None
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -366,13 +370,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if apply_weight_toggle:
             val_col = 'Calc_Weighted_Value'
             
-            # 파이프라인 내부 노선-항공사별 실제 승수 산출
             if 'Weighted_Value' in filtered_df.columns and 'Value' in filtered_df.columns:
                 rt_al_raw = filtered_df.groupby(['노선_clean', 'AL_clean'], observed=False)['Value'].sum()
                 rt_al_wt = filtered_df.groupby(['노선_clean', 'AL_clean'], observed=False)['Weighted_Value'].sum()
                 rt_al_mult = np.where(rt_al_raw > 0, rt_al_wt / rt_al_raw, 1.0)
                 
-                # 각 노선-항공사별 실제 승수 매핑
                 mult_df = rt_al_raw.reset_index()
                 mult_df['Mult_calc'] = rt_al_mult
                 filtered_df = pd.merge(filtered_df, mult_df[['노선_clean', 'AL_clean', 'Mult_calc']], on=['노선_clean', 'AL_clean'], how='left')
@@ -938,7 +940,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     ag_html += '</tbody></table></div>'
                     st.markdown(ag_html, unsafe_allow_html=True)
 
-    # 4. 👥 단체실적 탭 (KE 취항 노선 전용 필터 보정 완수)
+    # 4. 👥 단체실적 탭
     with tab_34_4:
         st.subheader("👥 발매 - 항공사별/대리점별 단체 발매 현황")
         if df_iss_merged is not None:
