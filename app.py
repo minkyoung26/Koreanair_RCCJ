@@ -430,24 +430,41 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         pie_al = al_ms_normalized.reset_index()
                         pie_al.columns = ['AL_clean', 'Display_MS']
                         values_for_pie = pie_al['Display_MS']
+                        # 📌 Plotly 파이 차트 재계산 방지를 위해 text 기반 강제 오버라이딩 적용
+                        text_labels_pie = [f"{v:.1f}%" for v in pie_al['Display_MS']]
                     else:
                         pie_al = filtered_df.groupby('AL_clean', observed=False)[val_col].sum().reset_index()
                         values_for_pie = pie_al[val_col]
+                        text_labels_pie = None
                     
                     labels_list = [f"<b>{x}</b>" if str(x) == 'KE' else str(x) for x in pie_al['AL_clean']]
                     pull_list = [0.08 if str(x) == 'KE' else 0 for x in pie_al['AL_clean']]
                     colors_list = [build_airline_color_map(all_airlines).get(al, '#94a3b8') for al in pie_al['AL_clean']]
 
-                    fig1 = go.Figure(data=[go.Pie(
-                        labels=labels_list,
-                        values=values_for_pie,
-                        hole=0.4,
-                        pull=pull_list,
-                        marker=dict(colors=colors_list),
-                        textposition='inside',
-                        textinfo='percent+label',
-                        hovertemplate="<b>항공사: %{label}</b><br>점유율: %{percent:.1%}<extra></extra>"
-                    )])
+                    if apply_weight_toggle:
+                        fig1 = go.Figure(data=[go.Pie(
+                            labels=labels_list,
+                            values=values_for_pie,
+                            text=text_labels_pie,
+                            textinfo='label+text',
+                            hole=0.4,
+                            pull=pull_list,
+                            marker=dict(colors=colors_list),
+                            textposition='inside',
+                            hovertemplate="<b>항공사: %{label}</b><br>SUMPRODUCT M/S: %{text}<extra></extra>"
+                        )])
+                    else:
+                        fig1 = go.Figure(data=[go.Pie(
+                            labels=labels_list,
+                            values=values_for_pie,
+                            hole=0.4,
+                            pull=pull_list,
+                            marker=dict(colors=colors_list),
+                            textposition='inside',
+                            textinfo='percent+label',
+                            hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>"
+                        )])
+
                     apply_bottom_legend(fig1)
                     st.plotly_chart(fig1, width='stretch')
 
