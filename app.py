@@ -95,7 +95,7 @@ st.markdown("""
     .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header { background-color: #cfe2f3 !important; color: #0f172a !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-weight: 600; text-align: center !important; white-space: nowrap; }
     .yoy-table th.ke-header { background-color: #6fa8dc !important; color: #ffffff !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 700 !important; text-align: center !important; white-space: nowrap; }
     
-    .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; color: #334155; background-color: #ffffff !important; text-align: center !important; }
+    .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; background-color: #ffffff !important; text-align: center !important; }
     .yoy-table tr:hover { background-color: #f8fafc !important; }
     .yoy-table tr.row-title { background-color: #f8fafc !important; font-weight: 600; color: #0f172a; }
     
@@ -104,11 +104,11 @@ st.markdown("""
     .carrier-excel-table th { padding: 8px 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: 600; }
     .carrier-excel-table td { padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center; font-size: 12px !important; }
 
-    /* 📌 TOP20 O&D 및 요약 표 내부 span 오버라이드 최우선 순위 규격 지정 */
-    .carrier-excel-table td span, .yoy-table td span { font-size: 10px !important; font-weight: 500 !important; display: inline-block; }
-    .carrier-excel-table td span.yoy-up-txt, .yoy-table td span.yoy-up-txt { color: #1d4ed8 !important; }
-    .carrier-excel-table td span.yoy-down-txt, .yoy-table td span.yoy-down-txt { color: #dc2626 !important; }
-    .carrier-excel-table td span.yoy-zero-txt, .yoy-table td span.yoy-zero-txt { color: #475569 !important; }
+    /* 📌 TOP20 O&D 테이블 내부 YOY 텍스트 전용 오버라이드 규격 */
+    .carrier-excel-table td span { font-size: 10px !important; font-weight: 500 !important; display: inline-block; }
+    .carrier-excel-table td span.yoy-up-txt { color: #1d4ed8 !important; }
+    .carrier-excel-table td span.yoy-down-txt { color: #dc2626 !important; }
+    .carrier-excel-table td span.yoy-zero-txt { color: #475569 !important; }
 
     .th-dark-blue { background-color: #cfe2f3; color: #0f172a; }
     .th-mkt-blue { background-color: #cfe2f3; color: #0f172a; }
@@ -213,9 +213,11 @@ df_6th_raw = disk_6th
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
 
+# 📌 팀원 접속 시 기본 선택값 index=0 고정 (3/4수송 대시보드가 첫 화면으로 설정됨)
 selected_group = st.radio(
     "분석할 수송 영역을 선택하세요:",
     options=["✈️ 3/4수송 대시보드", "🌐 6수송 대시보드", "🔗 W26 연결 네트워크"],
+    index=0,
     horizontal=True
 )
 
@@ -261,15 +263,25 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 YOY 텍스트 크기(10px) 및 색상(양수 파랑 #1d4ed8 / 음수 빨강 #dc2626) 인라인 스타일 완전 주입
+# 📌 YOY 텍스트용 인라인 파란색/붉은색 <span> HTML 생성 함수
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
-        return f'<span class="yoy-up-txt" style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ {val:.0f}{unit}</span>'
+        return f'<span class="yoy-up-txt" style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 600 !important; display: inline-block;">▲ {val:.0f}{unit}</span>'
     elif val < 0:
-        return f'<span class="yoy-down-txt" style="color: #dc2626 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▼ {abs(val):.0f}{unit}</span>'
+        return f'<span class="yoy-down-txt" style="color: #dc2626 !important; font-size: 10px !important; font-weight: 600 !important; display: inline-block;">▼ {abs(val):.0f}{unit}</span>'
     else:
         return f'<span class="yoy-zero-txt" style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ 0{unit}</span>'
+
+# 📌 요약 표 전용 <td> 포함 YOY 셀 직접 생성 함수
+def get_yoy_td_html(val, is_percentage_point=False):
+    unit = "%p" if is_percentage_point else "%"
+    if val > 0:
+        return f'<td style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 600 !important; text-align: center !important;">▲ {val:.0f}{unit}</td>'
+    elif val < 0:
+        return f'<td style="color: #dc2626 !important; font-size: 10px !important; font-weight: 600 !important; text-align: center !important;">▼ {abs(val):.0f}{unit}</td>'
+    else:
+        return f'<td style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important; text-align: center !important;">▲ 0{unit}</td>'
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
@@ -329,10 +341,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
-            val_col = 'Weighted_Value' if (apply_weight_toggle and 'Weighted_Value' in merged_df.columns) else 'Value'
-
+            
             df_has_value = merged_df[(merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (merged_df['Value'] > 0)]
-            full_route_sum = df_has_value.groupby('노선_clean', observed=False)[val_col].sum().sort_values(ascending=False)
+            full_route_sum = df_has_value.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
             route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
             
             valid_ke_routes = route_order_list
@@ -368,19 +379,46 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        total_pax = filtered_df[val_col].sum()
-        ke_pax = filtered_df[filtered_df['AL_clean'] == 'KE'][val_col].sum() if not filtered_df.empty else 0
-        ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
+        # 📌 엑셀 SUMPRODUCT 재정규화 M/S 산출 계산부
+        if apply_weight_toggle:
+            val_col = 'Weighted_Value'
+            # 항공사/노선별 실적 및 가중비율 기반 재정규화 계산
+            al_raw = filtered_df.groupby('AL_clean', observed=False)['Value'].sum()
+            al_wt = filtered_df.groupby('AL_clean', observed=False)['Weighted_Value'].sum()
+            
+            # 엑셀 SUMPRODUCT 정규화 수식: J10 * G25 / SUMPRODUCT(J10:J20, G25:G35)
+            # 가중 비율 산출 (G25 = Weighted / Raw)
+            ratio = np.where(al_raw > 0, al_wt / al_raw, 1.0)
+            wt_product = al_raw * ratio
+            sum_product = wt_product.sum()
+            
+            if sum_product > 0:
+                al_ms_normalized = (wt_product / sum_product) * 100
+            else:
+                al_ms_normalized = pd.Series(0.0, index=al_raw.index)
+                
+            ke_pax = al_wt.get('KE', 0)
+            total_pax = al_wt.sum()
+            ke_ms = al_ms_normalized.get('KE', 0.0)
+        else:
+            val_col = 'Value'
+            total_pax = filtered_df[val_col].sum()
+            ke_pax = filtered_df[filtered_df['AL_clean'] == 'KE'][val_col].sum() if not filtered_df.empty else 0
+            ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
 
         top_al = "-"
         top_ms = 0.0
         if not filtered_df.empty and total_pax > 0:
-            al_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
-            top_al = str(al_sum.idxmax())
-            top_ms = (al_sum.max() / total_pax) * 100
+            if apply_weight_toggle:
+                top_al = str(al_ms_normalized.idxmax())
+                top_ms = al_ms_normalized.max()
+            else:
+                al_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
+                top_al = str(al_sum.idxmax())
+                top_ms = (al_sum.max() / total_pax) * 100
 
         top_route = str(filtered_df.groupby('노선_clean', observed=False)[val_col].sum().idxmax()) if not filtered_df.empty and total_pax > 0 else "-"
-        status_wt_label = " (가중치)" if apply_weight_toggle else " (Raw)"
+        status_wt_label = " (가중치 SUMPRODUCT)" if apply_weight_toggle else " (Raw)"
 
         tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "🔒 Raw Data View (관리자 전용)"])
         with tab1:
@@ -1172,13 +1210,13 @@ elif selected_group == "🌐 6수송 대시보드":
                 html_table += f'<td><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            # 📌 6수송 상단 요약 표 YOY 전체 format_yoy_html 파란색/빨간색 적용 완수
-            html_table += f'<tr><td style="color:#64748b; font-weight:600;">YOY</td><td>{format_yoy_html(t_yoy_pct) if t_prev>0 else "-"}</td>'
+            # 📌 6수송 상단 요약 표 YOY 전체 get_yoy_td_html 파란색/빨간색 직접 주입
+            html_table += f'<tr><td style="color:#64748b; font-weight:600;">YOY</td>{(get_yoy_td_html(t_yoy_pct) if t_prev>0 else "<td>-</td>")}'
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
                 p_val = al_agg[al_agg[al_col_6] == al_code]['Val_PY_num'].sum()
                 indiv_yoy = ((c_val - p_val) / p_val * 100) if p_val > 0 else 0
-                html_table += f'<td>{format_yoy_html(indiv_yoy) if p_val>0 else "-"}</td>'
+                html_table += (get_yoy_td_html(indiv_yoy) if p_val>0 else "<td>-</td>")
             html_table += '</tr>'
 
             html_table += '<tr class="row-title"><td>전체 M/S</td><td><b>100%</b></td>'
@@ -1189,7 +1227,7 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table += '</tr>'
 
             diff_total_ms = 0
-            html_table += f'<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td><td>{format_yoy_html(diff_total_ms, True) if t_prev>0 else "-"}</td>'
+            html_table += f'<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td>{(get_yoy_td_html(diff_total_ms, True) if t_prev>0 else "<td>-</td>")}'
             
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
@@ -1197,7 +1235,7 @@ elif selected_group == "🌐 6수송 대시보드":
                 ms_c = (c_val / t_curr * 100) if t_curr > 0 else 0
                 ms_p = (p_val / t_prev * 100) if t_prev > 0 else 0
                 diff_p = ms_c - ms_p
-                html_table += f'<td>{format_yoy_html(diff_p, True) if t_prev>0 and p_val>0 else "-"}</td>'
+                html_table += (get_yoy_td_html(diff_p, True) if t_prev>0 and p_val>0 else "<td>-</td>")
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
 
@@ -1348,11 +1386,9 @@ elif selected_group == "🌐 6수송 대시보드":
         st.dataframe(df_6.head(100), width="stretch")
 
 # ==========================================
-# GROUP 3: 🔗 W26 연결 네트워크
+# GROUP 3: 🔗 W26 연결 네트워크 (📌 iframe 대신 새 탭 이동 안내 버튼 적용)
 # ==========================================
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
-    
-    st.info("💡 사내 보안 정책(SSO 로그인)으로 인해 대시보드 내부 프레임 출력이 제한될 수 있습니다. 아래 버튼을 눌러 새 탭에서 접속해 주세요.")
-    
+    st.info("💡 사내 보안 정책(SSO 로그인 권한)으로 인해 대시보드 내부 프레임 출력이 제한될 수 있습니다. 아래 버튼을 눌러 새 탭에서 접속해 주세요.")
     st.link_button("🔗 W26 연결 네트워크 바로가기 (새 탭에서 열기)", EXT_WEB_APP_URL, use_container_width=True)
