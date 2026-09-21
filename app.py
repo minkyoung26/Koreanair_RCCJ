@@ -129,6 +129,10 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
     }
     
+    /* 📌 HTML 아코디언 기본 화살표 스타일 전면 숨김 */
+    summary::-webkit-details-marker { display: none !important; }
+    summary { list-style: none !important; cursor: pointer; }
+    
     .source-header-box { background-color: #f0f9ff; border-left: 5px solid #0284c7; padding: 12px 18px; border-radius: 6px; margin-bottom: 15px; font-size: 13.5px; color: #0f172a; font-weight: 500; }
     .metric-card { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); margin-bottom: 10px; }
     .metric-card-ke { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); margin-bottom: 10px; }
@@ -716,7 +720,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (요청한 5개 슬라이서 및 이상치 제거 적용)
+    # 2. ✈️ 공급 M/S 탭 (요청된 필터 순서 및 종속 연동 전면 반영)
     # ------------------------------------------
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
@@ -739,7 +743,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if '노선' in df_sup.columns:
             df_sup['노선_clean'] = df_sup['노선'].astype(str).str.strip()
 
-        # 📌 공급 데이터 내 출발공항/도착공항/KE취항여부 파싱
         df_sup['KE_취항여부'] = np.where(df_sup['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER), '취항', '미취항')
 
         def parse_origin_apo_sup(rt_str):
@@ -763,15 +766,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         sup_month_col = '출발월' if '출발월' in df_sup.columns else ('출발 월' if '출발 월' in df_sup.columns else ('Travel Month' if 'Travel Month' in df_sup.columns else None))
         
-        # 📌 [수정]: 1900-01 및 불필요 이상 날짜 제외 필터링
         if sup_month_col and sup_month_col in df_sup.columns:
             raw_months = df_sup[sup_month_col].dropna().astype(str).str.strip().unique()
             sup_months = sorted([m for m in raw_months if m not in ['1900-01', '1900', 'NaT', 'nan', '']])
         else:
             sup_months = []
-
-        sup_origins = sorted([str(x) for x in df_sup['출발공항'].dropna().unique()])
-        sup_dests = sorted([str(x) for x in df_sup['도착공항'].dropna().unique()])
 
         raw_sup_al = sorted([str(x) for x in df_sup['Airline'].dropna().unique()])
         sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
@@ -780,20 +779,29 @@ if selected_group == "✈️ 3/4수송 대시보드":
         st.markdown('<div class="unified-sub-header">🔍 공급 대시보드 필터 설정 (다중 선택 가능)</div>', unsafe_allow_html=True)
         metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
         
-        # 📌 요청된 5개 공급 전용 슬라이서 레이아웃 [1. 출발공항] [2. 도착공항] [3. KE취항 여부] [4. 출발월] [5. 항공사]
+        # 📌 [요청 반영]: 공급 전용 필터 순서 [1. KE 취항여부] [2. 출발 공항] [3. 도착 공항] [4. 출발 월] [5. 항공사]
         sf_col1, sf_col2, sf_col3, sf_col4, sf_col5 = st.columns(5)
-        selected_sup_origin_list = render_multiselect_box(sf_col1, "1. 출발 공항", sup_origins, "slicer_sup_origin_multi")
-        selected_sup_dest_list = render_multiselect_box(sf_col2, "2. 도착 공항", sup_dests, "slicer_sup_dest_multi")
-        selected_sup_ke_serv_list = render_multiselect_box(sf_col3, "3. KE취항 여부", ["취항", "미취항"], "slicer_sup_ke_serv_multi")
+        selected_sup_ke_serv_list = render_multiselect_box(sf_col1, "1. KE 취항여부", ["취항", "미취항"], "slicer_sup_ke_serv_multi")
+
+        # 📌 [종속 연동 로직]: 1번 KE 취항여부 선택 시 2번 출발공항, 3번 도착공항 옵션 제한
+        df_sup_dyn = df_sup.copy()
+        if selected_sup_ke_serv_list:
+            df_sup_dyn = df_sup_dyn[df_sup_dyn['KE_취항여부'].isin(selected_sup_ke_serv_list)]
+
+        dynamic_origins = sorted([str(x) for x in df_sup_dyn['출발공항'].dropna().unique()])
+        dynamic_dests = sorted([str(x) for x in df_sup_dyn['도착공항'].dropna().unique()])
+
+        selected_sup_origin_list = render_multiselect_box(sf_col2, "2. 출발 공항", dynamic_origins, "slicer_sup_origin_multi")
+        selected_sup_dest_list = render_multiselect_box(sf_col3, "3. 도착 공항", dynamic_dests, "slicer_sup_dest_multi")
         selected_sup_month_list = render_multiselect_box(sf_col4, "4. 출발 월", sup_months, "slicer_month_sup_multi") if sup_month_col else []
         selected_sup_al_list = render_multiselect_box(sf_col5, "5. 항공사", sup_airlines, "slicer_al_sup_multi")
 
         target_val = 'Seats_num' if "공급석" in metric_mode else 'Flights_num'
 
         filter_mask_sup = pd.Series(True, index=df_sup.index)
+        if selected_sup_ke_serv_list: filter_mask_sup &= (df_sup['KE_취항여부'].astype(str).isin(selected_sup_ke_serv_list))
         if selected_sup_origin_list: filter_mask_sup &= (df_sup['출발공항'].astype(str).isin(selected_sup_origin_list))
         if selected_sup_dest_list: filter_mask_sup &= (df_sup['도착공항'].astype(str).isin(selected_sup_dest_list))
-        if selected_sup_ke_serv_list: filter_mask_sup &= (df_sup['KE_취항여부'].astype(str).isin(selected_sup_ke_serv_list))
         if selected_sup_al_list: filter_mask_sup &= (df_sup['Airline'].astype(str).isin(selected_sup_al_list))
         if sup_month_col and selected_sup_month_list: filter_mask_sup &= (df_sup[sup_month_col].astype(str).isin(selected_sup_month_list))
 
@@ -898,7 +906,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.plotly_chart(fig_timeline, width='stretch')
 
     # ------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (화살표 ▼ 삭제 적용)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (화살표 ▼ 완전 삭제)
     # ------------------------------------------
     with tab_34_3:
         if df_iss_merged is not None:
@@ -974,7 +982,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                     sorted_rbds = [r for r in hierarchy_order if r in existing_rbds] + [r for r in existing_rbds if r not in hierarchy_order]
                                     piv_rbd = piv_rbd.loc[sorted_rbds]
 
-                                # 📌 [수정]: 화살표 기호 제거
+                                # 📌 화살표 완전 제거
                                 rbd_html += f'<tr><td colspan="{len(week_list)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center; font-weight:800;">★ {al_code} 총계</td>'
                                 for wk in week_list: rbd_html += f'<td style="text-align:center;">{al_sub[al_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
                                 rbd_html += f'<td style="text-align:center;">{al_tot_pax:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
@@ -1012,7 +1020,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             piv_ag_sub = piv_ag_sub.reindex(sorted_ag_airlines).dropna(how='all')
 
                             if not piv_ag_sub.empty:
-                                # 📌 [수정]: 화살표 기호 제거
+                                # 📌 화살표 완전 제거
                                 ag_html += f'<tr><td colspan="{len(week_list_ag)+2}" style="padding:0; border:none;"><details class="rbd-details-group" {open_attr}><summary><table style="width:100%; border-collapse:collapse;"><tr class="row-summary-top-dark"><td style="width:180px; text-align:center; font-weight:800;">★ {ag_name} 총계</td>'
                                 for wk in week_list_ag: ag_html += f'<td style="text-align:center;">{ag_sub[ag_sub[week_col_a] == wk]["Value"].sum():,.0f}</td>'
                                 ag_html += f'<td style="text-align:center;">{ag_tot_val:,.0f}</td></tr></table></summary><table style="width:100%; border-collapse:collapse;">'
