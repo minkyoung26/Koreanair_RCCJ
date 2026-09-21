@@ -62,7 +62,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 4. Custom CSS (📌 탭 배경색 및 테두리 시인성 대폭 강화)
+# 4. Custom CSS (📌 탭 배경색 및 테두리 전면 적용)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
@@ -80,20 +80,28 @@ st.markdown("""
     
     p, span, label, div, select, button, input { font-size: 13.5px !important; font-weight: 400; }
     
-    /* 📌 탭(st.tabs) 시인성 강화 (기본 탭에 배경색 및 테두리 부여, 선택된 탭은 진한 파란색) */
+    /* 📌 탭(st.tabs) 시인성 완전 강제 부여 (최신 Streamlit 모든 선택자 통합) */
     div[data-baseweb="tab-highlight"] { display: none !important; }
     
-    button[role="tab"], button[data-baseweb="tab"] {
-        background-color: #e2e8f0 !important;
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px !important;
+        background-color: #f1f5f9 !important;
+        padding: 6px !important;
+        border-radius: 8px !important;
         border: 1px solid #cbd5e1 !important;
-        border-radius: 6px 6px 0 0 !important;
-        padding: 8px 20px !important;
-        color: #334155 !important;
-        font-weight: 700 !important;
-        margin-right: 4px !important;
+        margin-bottom: 15px !important;
     }
     
-    button[role="tab"][aria-selected="true"], button[data-baseweb="tab"][aria-selected="true"] {
+    div[role="tab"], button[role="tab"], button[data-baseweb="tab"], div[data-baseweb="tab"] {
+        background-color: #cbd5e1 !important;
+        border: 1px solid #94a3b8 !important;
+        border-radius: 6px !important;
+        padding: 8px 18px !important;
+        color: #1e293b !important;
+        font-weight: 700 !important;
+    }
+    
+    div[role="tab"][aria-selected="true"], button[role="tab"][aria-selected="true"], button[data-baseweb="tab"][aria-selected="true"], div[data-baseweb="tab"][aria-selected="true"] {
         background-color: #0284c7 !important;
         color: #ffffff !important;
         border-color: #0284c7 !important;
@@ -356,7 +364,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_region_list = render_multiselect_box(f_col1, "1. 일본권역", all_regions, "slicer_region_multi")
 
-            # 📌 [핵심 연동 로직]: 1. 일본권역 필터 선택 여부에 따른 2. KE취항노선 목록 동적 종속 제어
+            # 📌 [권역-노선 연동 로직] 1. 일본권역 필터 선택 시 2. KE취항노선 목록 동적 제어
             if region_col and region_col in merged_df.columns and sel_region_list:
                 df_region_sub = merged_df[merged_df[region_col].astype(str).str.strip().isin(sel_region_list)]
                 df_has_value_sub = df_region_sub[(df_region_sub['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (df_region_sub['Value'] > 0)]
@@ -403,22 +411,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 가중치 산출 로직
+        # 📌 [가중치 M/S 연산 로직 완전 보정]: 파켓 내 원본 Weighted_Value 직접 참조하여 엑셀 18% 수치 1:1 재현
         if apply_weight_toggle:
-            val_col = 'Calc_Weighted_Value'
-            if 'Weighted_Value' in filtered_df.columns and 'Value' in filtered_df.columns:
-                rt_al_raw = filtered_df.groupby(['노선_clean', 'AL_clean'], observed=False)['Value'].sum()
-                rt_al_wt = filtered_df.groupby(['노선_clean', 'AL_clean'], observed=False)['Weighted_Value'].sum()
-                rt_al_mult = np.where(rt_al_raw > 0, rt_al_wt / rt_al_raw, 1.0)
-                
-                mult_df = rt_al_raw.reset_index()
-                mult_df['Mult_calc'] = rt_al_mult
-                filtered_df = pd.merge(filtered_df, mult_df[['노선_clean', 'AL_clean', 'Mult_calc']], on=['노선_clean', 'AL_clean'], how='left')
-                filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Mult_calc'].fillna(1.0)
-            else:
-                filtered_df['Calc_Weighted_Value'] = filtered_df['Value']
+            wt_col_target = 'Weighted_Value' if 'Weighted_Value' in filtered_df.columns else 'Value'
+            val_col = wt_col_target
 
-            al_wt_sum = filtered_df.groupby('AL_clean', observed=False)['Calc_Weighted_Value'].sum()
+            al_wt_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
             total_pax = al_wt_sum.sum()
             ke_pax = al_wt_sum.get('KE', 0)
             ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
@@ -441,7 +439,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 top_ms = (al_sum.max() / total_pax) * 100
 
         top_route = str(filtered_df.groupby('노선_clean', observed=False)[val_col].sum().idxmax()) if not filtered_df.empty and total_pax > 0 else "-"
-        status_wt_label = " (가중 승수 보정)" if apply_weight_toggle else " (Raw)"
+        status_wt_label = " (가중치 보정)" if apply_weight_toggle else " (Raw)"
 
         tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "🔒 Raw Data View (관리자 전용)"])
         with tab1:
@@ -501,54 +499,54 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 📌 2. 주차별 추이 그래프 (선 그래프 및 KE 실선 강조)
+                # 📌 [수정 포인트]: 2번 차트를 '발매 주차별 주요 항공사 M/S (%)' 선 그래프로 변경
                 if week_col and week_col in merged_df.columns:
-                    st.markdown('<div class="unified-sub-header">2. 발매/주차별 항공사 발매량 추이 (선 그래프)</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="unified-sub-header">2. 발매 주차별 주요 항공사 M/S 점유비 추이 (%)</div>', unsafe_allow_html=True)
                     df_no_week = filtered_df
 
                     if not df_no_week.empty:
+                        # 주차별 & 항공사별 가중 실적 합계
                         week_al_grp = df_no_week.groupby([week_col, 'AL_clean'], observed=False)[val_col].sum().reset_index()
-                        valid_weeks = [w for w in all_issue_weeks if w in week_al_grp[week_col].unique()]
+                        # 주차별 전체 시장 실적 합계
+                        week_tot = df_no_week.groupby(week_col, observed=False)[val_col].sum().reset_index()
+                        
+                        week_merged = pd.merge(week_al_grp, week_tot, on=week_col, suffixes=('', '_Mkt'))
+                        week_merged['MS_Percent'] = np.where(week_merged[f'{val_col}_Mkt'] > 0, (week_merged[val_col] / week_merged[f'{val_col}_Mkt']) * 100, 0)
 
-                        fig_line = go.Figure()
+                        top_al_in_week = df_no_week.groupby('AL_clean', observed=False)[val_col].sum().sort_values(ascending=False).index.tolist()
+                        top_al_week_display = ['KE'] + [al for al in top_al_in_week if al != 'KE'][:5]
+
+                        week_merged_top = week_merged[week_merged['AL_clean'].isin(top_al_week_display)].copy()
+
+                        fig_week_ms = go.Figure()
                         color_map_al = build_airline_color_map(all_airlines)
 
-                        top_al_list = df_no_week.groupby('AL_clean', observed=False)[val_col].sum().sort_values(ascending=False).index.tolist()
-                        ordered_display_al = ['KE'] + [a for a in top_al_list if a != 'KE']
-
-                        for al_code in ordered_display_al:
-                            al_data = week_al_grp[week_al_grp['AL_clean'] == al_code]
+                        for al_code in top_al_week_display:
+                            al_data = week_merged_top[week_merged_top['AL_clean'] == al_code]
                             if al_data.empty: continue
 
                             is_ke = (al_code == 'KE')
-                            
-                            if is_ke:
-                                line_style = dict(color='#16a34a', width=4)
-                                marker_style = dict(size=9, symbol='circle')
-                                mode_setting = 'lines+markers+text'
-                                text_labels = [f"<b>{v:,.0f}</b>" for v in al_data[val_col]]
-                            else:
-                                line_style = dict(color=color_map_al.get(al_code, '#94a3b8'), dash='dot', width=1.5)
-                                marker_style = dict(size=5)
-                                mode_setting = 'lines+markers'
-                                text_labels = None
+                            line_style = dict(color='#16a34a', width=4) if is_ke else dict(color=color_map_al.get(al_code, '#94a3b8'), dash='dot', width=1.5)
+                            marker_style = dict(size=9, symbol='circle') if is_ke else dict(size=5)
+                            mode_setting = 'lines+markers+text' if is_ke else 'lines+markers'
+                            text_labels = [f"<b>{v:.1f}%</b>" for v in al_data['MS_Percent']] if is_ke else None
 
-                            fig_line.add_trace(go.Scatter(
-                                x=al_data[week_col], y=al_data[val_col],
-                                mode=mode_setting,
+                            fig_week_ms.add_trace(go.Scatter(
+                                x=al_data[week_col], y=al_data['MS_Percent'], mode=mode_setting,
                                 name=f"★ KE (대한항공)" if is_ke else al_code,
-                                line=line_style, marker=marker_style,
-                                text=text_labels, textposition="top center",
-                                hovertemplate=f"<b>항공사: {al_code}</b><br>주차: %{{x}}<br>발매량: %{{y:,.0f}}<extra></extra>"
+                                line=line_style, marker=marker_style, text=text_labels,
+                                textposition="top center",
+                                hovertemplate=f"<b>항공사: {al_code}</b><br>발매주차: %{{x}}<br>M/S 점유율: %{{y:.1f}}%<extra></extra>"
                             ))
 
-                        fig_line.update_layout(
-                            yaxis_title=f"발매 실적{status_wt_label}",
+                        fig_week_ms.update_layout(
+                            yaxis_title="Market Share (%)",
                             xaxis=dict(categoryorder='array', categoryarray=all_issue_weeks),
+                            yaxis=dict(range=[0, max(week_merged_top['MS_Percent'].max() * 1.25, 15)]),
                             height=450
                         )
-                        apply_bottom_legend(fig_line)
-                        st.plotly_chart(fig_line, width='stretch')
+                        apply_bottom_legend(fig_week_ms)
+                        st.plotly_chart(fig_week_ms, width='stretch')
 
                 st.markdown("---")
 
