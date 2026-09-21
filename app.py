@@ -378,13 +378,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 엑셀 SUMPRODUCT 재정규화 M/S 산출 연동 완수
+        # 📌 엑셀 SUMPRODUCT 정규화 연산 및 요약 카드 연동
         if apply_weight_toggle:
             val_col = 'Weighted_Value'
             al_raw = filtered_df.groupby('AL_clean', observed=False)['Value'].sum()
             al_wt = filtered_df.groupby('AL_clean', observed=False)['Weighted_Value'].sum()
             
-            # 엑셀 SUMPRODUCT 정규화 수식 기반 연산
+            # 엑셀 SUMPRODUCT 정규화 수식: J10 * G25 / SUMPRODUCT(J10:J20, G25:G35)
             ratio = np.where(al_raw > 0, al_wt / al_raw, 1.0)
             wt_product = al_raw * ratio
             sum_product = wt_product.sum()
@@ -396,7 +396,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 
             ke_pax = al_wt.get('KE', 0)
             total_pax = al_wt.sum()
-            # 📌 핵심 요약 카드에 엑셀 SUMPRODUCT 정규화된 M/S 수치가 정확히 연동되도록 수정
+            # 📌 핵심 요약 카드 및 파이 차트에 엑셀 SUMPRODUCT M/S 비율 연동
             ke_ms = al_ms_normalized.get('KE', 0.0)
         else:
             val_col = 'Value'
@@ -426,7 +426,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.markdown('<div class="unified-sub-header">1. 항공사별 M/S 점유비</div>', unsafe_allow_html=True)
                 c1, c2 = st.columns([1.6, 1])
                 with c1:
-                    pie_al = filtered_df.groupby('AL_clean', observed=False)[val_col].sum().reset_index()
+                    if apply_weight_toggle:
+                        pie_al = al_ms_normalized.reset_index()
+                        pie_al.columns = ['AL_clean', 'Display_MS']
+                        values_for_pie = pie_al['Display_MS']
+                    else:
+                        pie_al = filtered_df.groupby('AL_clean', observed=False)[val_col].sum().reset_index()
+                        values_for_pie = pie_al[val_col]
                     
                     labels_list = [f"<b>{x}</b>" if str(x) == 'KE' else str(x) for x in pie_al['AL_clean']]
                     pull_list = [0.08 if str(x) == 'KE' else 0 for x in pie_al['AL_clean']]
@@ -434,13 +440,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                     fig1 = go.Figure(data=[go.Pie(
                         labels=labels_list,
-                        values=pie_al[val_col],
+                        values=values_for_pie,
                         hole=0.4,
                         pull=pull_list,
                         marker=dict(colors=colors_list),
                         textposition='inside',
                         textinfo='percent+label',
-                        hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>"
+                        hovertemplate="<b>항공사: %{label}</b><br>점유율: %{percent:.1%}<extra></extra>"
                     )])
                     apply_bottom_legend(fig1)
                     st.plotly_chart(fig1, width='stretch')
