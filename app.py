@@ -62,7 +62,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 4. Custom CSS (📌 탭 시시성 대폭 강화 - 배경색 및 테두리 적용)
+# 4. Custom CSS (📌 탭 배경색 및 테두리 시인성 대폭 강화 - 최신 DOM 선택자 전면 적용)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
@@ -80,36 +80,24 @@ st.markdown("""
     
     p, span, label, div, select, button, input { font-size: 13.5px !important; font-weight: 400; }
     
-    /* 📌 탭 시인성 강화를 위한 커스텀 스타일 (눈에 확 띄는 색상 부여) */
-    div[data-baseweb="tab-list"] {
-        gap: 8px !important;
-        background-color: #f1f5f9;
-        padding: 6px;
-        border-radius: 8px;
-        border: 1px solid #cbd5e1;
-        margin-bottom: 15px;
-    }
+    /* 📌 탭(st.tabs) 시인성 강화 (기본 탭에 배경색 및 테두리 부여, 선택된 탭은 진한 파란색) */
+    div[data-baseweb="tab-highlight"] { display: none !important; }
     
-    button[data-baseweb="tab"] {
+    button[role="tab"], button[data-baseweb="tab"] {
         background-color: #e2e8f0 !important;
         border: 1px solid #cbd5e1 !important;
-        border-radius: 6px !important;
-        padding: 8px 16px !important;
+        border-radius: 6px 6px 0 0 !important;
+        padding: 8px 20px !important;
         color: #334155 !important;
-        font-weight: 600 !important;
-        transition: all 0.2s ease-in-out;
+        font-weight: 700 !important;
+        margin-right: 4px !important;
     }
     
-    button[data-baseweb="tab"]:hover {
-        background-color: #cbd5e1 !important;
-        color: #0f172a !important;
-    }
-    
-    button[data-baseweb="tab"][aria-selected="true"] {
+    button[role="tab"][aria-selected="true"], button[data-baseweb="tab"][aria-selected="true"] {
         background-color: #0284c7 !important;
         color: #ffffff !important;
         border-color: #0284c7 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
     }
     
     .source-header-box { background-color: #f0f9ff; border-left: 5px solid #0284c7; padding: 12px 18px; border-radius: 6px; margin-bottom: 15px; font-size: 13.5px; color: #0f172a; font-weight: 500; }
@@ -217,6 +205,8 @@ selected_group = st.radio(
     horizontal=True
 )
 
+ALL_OPTION = "전체 (All)"
+
 def build_airline_color_map(airlines_list):
     palette = px.colors.qualitative.Plotly + px.colors.qualitative.Bold + px.colors.qualitative.Pastel
     cmap = {'KE': '#16a34a'}
@@ -244,7 +234,6 @@ def format_dep_time(dep_val):
         return f"2026-08-01 {hh:02d}:{mm:02d}:00", f"2026-08-01 {(hh+2)%24:02d}:{mm:02d}:00"
     except: return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
-# 📌 Multi-select 다중 선택 슬라이서 렌더링 함수
 def render_multiselect_box(container, label, full_list, key_name):
     container.markdown(f"<b>{label}</b>", unsafe_allow_html=True)
     opts = [str(x).strip() for x in full_list if str(x).strip() != 'nan']
@@ -319,9 +308,20 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
 
-        # 신규 필드 매핑
-        region_col = '일본권역' if '일본권역' in merged_df.columns else ('권역' if '권역' in merged_df.columns else None)
-        bound_raw_col = 'Bound' if 'Bound' in merged_df.columns else None
+        # 📌 띄어쓰기 유무 상관없이 컬럼 자동 매핑 (예: '일본 권역', '일본권역', '권역')
+        region_col = None
+        for c in merged_df.columns:
+            cleaned_c = str(c).replace(" ", "")
+            if cleaned_c in ['일본권역', '권역', 'JapanRegion', 'Region']:
+                region_col = c
+                break
+
+        bound_raw_col = None
+        for c in merged_df.columns:
+            cleaned_c = str(c).replace(" ", "")
+            if cleaned_c in ['Bound', 'BOUND', '방향', '바운드']:
+                bound_raw_col = c
+                break
 
         week_col = '발매주차_일자' if '발매주차_일자' in merged_df.columns else ('발매 주차' if '발매 주차' in merged_df.columns else '발매주차')
         all_issue_weeks = sorted([str(x).strip() for x in merged_df[week_col].dropna().unique()]) if week_col else []
@@ -332,8 +332,17 @@ if selected_group == "✈️ 3/4수송 대시보드":
         bound_col = '수송' if '수송' in merged_df.columns else ('Bound' if 'Bound' in merged_df.columns else None)
         all_bounds = sorted([str(x).strip() for x in merged_df[bound_col].dropna().unique()]) if bound_col else []
 
-        all_regions = sorted([str(x).strip() for x in merged_df[region_col].dropna().unique()]) if region_col else []
-        all_bound_raws = sorted([str(x).strip() for x in merged_df[bound_raw_col].dropna().unique()]) if bound_raw_col else []
+        # 📌 1번 일본 권역 항목 추출
+        if region_col and region_col in merged_df.columns:
+            all_regions = sorted([str(x).strip() for x in merged_df[region_col].dropna().unique() if str(x).strip() != 'nan'])
+        else:
+            all_regions = []
+
+        # 📌 6번 Bound 항목 추출
+        if bound_raw_col and bound_raw_col in merged_df.columns:
+            all_bound_raws = sorted([str(x).strip() for x in merged_df[bound_raw_col].dropna().unique() if str(x).strip() != 'nan'])
+        else:
+            all_bound_raws = ["IN", "OUT"]
 
         all_ticket_types = sorted([str(x).strip() for x in merged_df['Ticket Type'].dropna().unique()]) if 'Ticket Type' in merged_df.columns else []
 
@@ -348,22 +357,22 @@ if selected_group == "✈️ 3/4수송 대시보드":
             route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
             valid_ke_routes = route_order_list
 
-            # 📌 필터 순서 신규 재정렬: 1.일본권역 -> 2.KE취항노선 -> 3.발매 주차 -> 4.출발 월 -> 5.수송 구분 -> 6.Bound -> 7.Trip Type -> 8.항공사
+            # 📌 1번~8번 슬라이서 무조건 표출
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-            sel_region_list = render_multiselect_box(f_col1, "1. 일본권역", all_regions, "slicer_region_multi") if region_col else []
+            sel_region_list = render_multiselect_box(f_col1, "1. 일본권역", all_regions, "slicer_region_multi")
             sel_route_list = render_multiselect_box(f_col2, "2. KE취항노선", route_order_list, "slicer_route_multi")
-            sel_week_list = render_multiselect_box(f_col3, "3. 발매 주차 (과거 5주)", all_issue_weeks, "slicer_week_multi") if week_col else []
-            sel_month_list = render_multiselect_box(f_col4, "4. 출발 월 (향후 6개월)", all_dep_months, "slicer_month_multi") if month_col else []
+            sel_week_list = render_multiselect_box(f_col3, "3. 발매 주차 (과거 5주)", all_issue_weeks, "slicer_week_multi")
+            sel_month_list = render_multiselect_box(f_col4, "4. 출발 월 (향후 6개월)", all_dep_months, "slicer_month_multi")
 
             f_col5, f_col6, f_col7, f_col8 = st.columns(4)
-            sel_bound_list = render_multiselect_box(f_col5, "5. 수송 구분", all_bounds, "slicer_bound_multi") if bound_col else []
-            sel_bound_raw_list = render_multiselect_box(f_col6, "6. Bound", all_bound_raws, "slicer_bound_raw_multi") if bound_raw_col else []
+            sel_bound_list = render_multiselect_box(f_col5, "5. 수송 구분", all_bounds, "slicer_bound_multi")
+            sel_bound_raw_list = render_multiselect_box(f_col6, "6. Bound", all_bound_raws, "slicer_bound_raw_multi")
             sel_tt_list = render_multiselect_box(f_col7, "7. Trip Type", all_ticket_types, "slicer_tt_multi")
             sel_al_list = render_multiselect_box(f_col8, "8. 항공사", all_airlines, "slicer_al_multi")
 
         filter_mask = pd.Series(True, index=merged_df.index)
 
-        if region_col and sel_region_list:
+        if region_col and region_col in merged_df.columns and sel_region_list:
             filter_mask &= (merged_df[region_col].astype(str).str.strip().isin(sel_region_list))
         if sel_route_list:
             filter_mask &= (merged_df['노선_clean'].isin(sel_route_list))
@@ -376,7 +385,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             filter_mask &= (merged_df[month_col].astype(str).str.strip().isin(sel_month_list))
         if sel_bound_list and bound_col:
             filter_mask &= (merged_df[bound_col].astype(str).str.strip().isin(sel_bound_list))
-        if sel_bound_raw_list and bound_raw_col:
+        if bound_raw_col and bound_raw_col in merged_df.columns and sel_bound_raw_list:
             filter_mask &= (merged_df[bound_raw_col].astype(str).str.strip().isin(sel_bound_raw_list))
         if sel_tt_list and 'Ticket Type' in merged_df.columns:
             filter_mask &= (merged_df['Ticket Type'].astype(str).str.strip().isin(sel_tt_list))
@@ -483,7 +492,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 📌 2. 주차별 추이 그래프: 막대 그래프 -> 선 그래프(Line Chart) 변경 및 KE 두꺼운 실선 강조
+                # 📌 2. 주차별 추이 그래프 (선 그래프 및 KE 실선 강조)
                 if week_col and week_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">2. 발매/주차별 항공사 발매량 추이 (선 그래프)</div>', unsafe_allow_html=True)
                     df_no_week = filtered_df
