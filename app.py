@@ -62,7 +62,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 4. Custom CSS (📌 탭 배경색 및 테두리 시인성 대폭 강화 - 최신 DOM 선택자 전면 적용)
+# 4. Custom CSS (📌 탭 배경색 및 테두리 시인성 대폭 강화)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
@@ -308,7 +308,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
 
-        # 📌 띄어쓰기 유무 상관없이 컬럼 자동 매핑 (예: '일본 권역', '일본권역', '권역')
+        # 📌 띄어쓰기 유무 상관없이 컬럼 자동 매핑
         region_col = None
         for c in merged_df.columns:
             cleaned_c = str(c).replace(" ", "")
@@ -352,15 +352,24 @@ if selected_group == "✈️ 3/4수송 대시보드":
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정** (다중 선택 가능)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
             
-            df_has_value = merged_df[(merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (merged_df['Value'] > 0)]
-            full_route_sum = df_has_value.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
-            route_order_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
-            valid_ke_routes = route_order_list
-
-            # 📌 1번~8번 슬라이서 무조건 표출
+            # 📌 슬라이서 레이아웃 배치
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_region_list = render_multiselect_box(f_col1, "1. 일본권역", all_regions, "slicer_region_multi")
-            sel_route_list = render_multiselect_box(f_col2, "2. KE취항노선", route_order_list, "slicer_route_multi")
+
+            # 📌 [핵심 연동 로직]: 1. 일본권역 필터 선택 여부에 따른 2. KE취항노선 목록 동적 종속 제어
+            if region_col and region_col in merged_df.columns and sel_region_list:
+                df_region_sub = merged_df[merged_df[region_col].astype(str).str.strip().isin(sel_region_list)]
+                df_has_value_sub = df_region_sub[(df_region_sub['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (df_region_sub['Value'] > 0)]
+                route_sum_sub = df_has_value_sub.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
+                dynamic_route_list = [str(x).strip() for x in route_sum_sub.index.tolist() if str(x) != 'nan']
+            else:
+                df_has_value = merged_df[(merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)) & (merged_df['Value'] > 0)]
+                full_route_sum = df_has_value.groupby('노선_clean', observed=False)['Value'].sum().sort_values(ascending=False)
+                dynamic_route_list = [str(x).strip() for x in full_route_sum.index.tolist() if str(x) != 'nan']
+
+            valid_ke_routes = dynamic_route_list
+
+            sel_route_list = render_multiselect_box(f_col2, "2. KE취항노선", dynamic_route_list, "slicer_route_multi")
             sel_week_list = render_multiselect_box(f_col3, "3. 발매 주차 (과거 5주)", all_issue_weeks, "slicer_week_multi")
             sel_month_list = render_multiselect_box(f_col4, "4. 출발 월 (향후 6개월)", all_dep_months, "slicer_month_multi")
 
@@ -936,8 +945,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                                 for rbd_code, rbd_row in piv_rbd.iterrows():
                                     rbd_html += f'<tr class="rbd-child-row"><td style="width:180px; text-align:center; font-weight:700;">{rbd_code}</td>'
-                                    for wk in week_list: rbd_html += f'<td style="text-align:center;">{rbd_row[wk]:,.0f}</td>'
-                                    rbd_html += f'<td style="text-align:center; font-weight:700;">{rbd_row["총합계"]:,.0f}</td></tr>'
+                                    for wk in week_list: rbd_html += f'<td style="text-align:center;">{rbd_row.get(wk, 0):,.0f}</td>'
+                                    rbd_html += f'<td style="text-align:center; font-weight:700;">{rbd_row.get("총합계", 0):,.0f}</td></tr>'
                                 rbd_html += '</table></details></td></tr>'
 
                     rbd_html += '</tbody></table></div>'
@@ -975,8 +984,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                     is_ke_flag = (al_code == 'KE')
                                     cell_style = 'font-weight:700; color:#16a34a;' if is_ke_flag else 'color:#475569;'
                                     ag_html += f'<tr class="rbd-child-row"><td style="width:180px; text-align:center; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
-                                    for wk in week_list_ag: ag_html += f'<td style="text-align:center; {cell_style}">{al_row[wk]:,.0f}</td>'
-                                    ag_html += f'<td style="text-align:center; font-weight:700; {cell_style}">{al_row["총합계"]:,.0f}</td></tr>'
+                                    for wk in week_list_ag: ag_html += f'<td style="text-align:center; {cell_style}">{al_row.get(wk, 0):,.0f}</td>'
+                                    ag_html += f'<td style="text-align:center; font-weight:700; {cell_style}">{al_row.get("총합계", 0):,.0f}</td></tr>'
                                 ag_html += '</table></details></td></tr>'
 
                     ag_html += '</tbody></table></div>'
