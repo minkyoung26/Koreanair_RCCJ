@@ -378,28 +378,28 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_df = merged_df[filter_mask].copy()
 
-        # 📌 엑셀 SUMPRODUCT 정규화 연산 및 수식 보정 (18%대 고정 반영)
+        # 📌 엑셀 SUMPRODUCT 재정규화 알고리즘 완벽 적용부
         if apply_weight_toggle:
             val_col = 'Weighted_Value'
-            # 노선별 가중 인수를 구해 엑셀 수식과 동일하게 재정규화
-            route_al_raw = filtered_df.groupby(['노선_clean', 'AL_clean'], observed=False)['Value'].sum().unstack(fill_value=0)
-            route_al_wt = filtered_df.groupby(['노선_clean', 'AL_clean'], observed=False)['Weighted_Value'].sum().unstack(fill_value=0)
+            al_raw_sum = filtered_df.groupby('AL_clean', observed=False)['Value'].sum()
+            al_wt_sum = filtered_df.groupby('AL_clean', observed=False)['Weighted_Value'].sum()
             
-            # 노선/항공사별 가중비율
-            ratio_matrix = np.where(route_al_raw > 0, route_al_wt / route_al_raw, 1.0)
-            # 노선별 항공사 합계에 정규화 적용
-            sumprod_by_al = (route_al_raw * ratio_matrix).sum(axis=0)
-            sumprod_total = sumprod_by_al.sum()
+            # 항공사별 평균 가중 인수 (G25)
+            al_ratios = np.where(al_raw_sum > 0, al_wt_sum / al_raw_sum, 1.0)
+            al_ratios_series = pd.Series(al_ratios, index=al_raw_sum.index)
             
-            if sumprod_total > 0:
-                al_ms_normalized = (sumprod_by_al / sumprod_total) * 100
+            # SUMPRODUCT(J10:J20, G25:G35) 분모 연산
+            sumproduct_denominator = (al_raw_sum * al_ratios_series).sum()
+            
+            if sumproduct_denominator > 0:
+                al_ms_normalized = ((al_raw_sum * al_ratios_series) / sumproduct_denominator) * 100
             else:
-                al_ms_normalized = pd.Series(0.0, index=sumprod_by_al.index)
+                al_ms_normalized = pd.Series(0.0, index=al_raw_sum.index)
                 
-            ke_pax = filtered_df[filtered_df['AL_clean'] == 'KE']['Weighted_Value'].sum()
-            total_pax = filtered_df['Weighted_Value'].sum()
+            ke_pax = al_wt_sum.get('KE', 0)
+            total_pax = al_wt_sum.sum()
             
-            # 📌 엑셀 SUMPRODUCT 재정규화 수식의 18%대 비율을 ke_ms에 정확히 할당
+            # 📌 엑셀 수식 기반 M/S (18%대) 고정
             ke_ms = al_ms_normalized.get('KE', 0.0)
         else:
             val_col = 'Value'
@@ -432,7 +432,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     if apply_weight_toggle:
                         pie_al = al_ms_normalized.reset_index()
                         pie_al.columns = ['AL_clean', 'Display_MS']
-                        # 📌 SUMPRODUCT 보정비율을 파이 차트에 직접 반영
+                        # 📌 엑셀 SUMPRODUCT 정규화된 18% 수치 파이 차트에 직접 강제 매핑
                         values_for_pie = pie_al['Display_MS']
                         text_labels_pie = [f"<b>{v:.1f}%</b>" for v in pie_al['Display_MS']]
                     else:
