@@ -6,6 +6,31 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 import os
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
+# =========================================================
+# 📍 여기에 @st.cache_data 로 함수를 작성해서 추가합니다.
+# =========================================================
+@st.cache_data(ttl=3600)  # 1시간 동안 데이터를 메모리에 캐싱
+def load_data():
+  # 기존에 데이터를 불러오던 코드를 이 안에 넣으시면 됩니다.
+  # 예: df = pd.read_csv("your_data.csv")
+  df = pd.read_excel("your_data.xlsx")
+  return df
+
+
+# 함수를 실행해서 변수에 할당해 줍니다.
+df = load_data()
+
+
+# =========================================================
+# 기존 st.set_page_config() 및 대시보드 UI 코드 시작...
+# =========================================================
+st.set_page_config(page_title="마켓셰어 대시보드", layout="wide")
 
 # 1. Page Config
 st.set_page_config(
