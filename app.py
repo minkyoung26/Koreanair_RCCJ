@@ -197,7 +197,6 @@ def process_any_uploaded_file(file_obj):
     df.columns = [str(c).strip() for c in df.columns]
     return optimize_df(clean_transport_column(df))
 
-# 📌 [지연 로딩 최적화]: 메인 켜질 때는 공급 데이터만 읽기
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_aux_files():
     df_sup = None
@@ -211,8 +210,7 @@ def load_aux_files():
             except: pass
     return optimize_df(df_sup)
 
-# 📌 [6수송 전용 지연 로딩]: 6수송 탭 클릭 시에만 메모리에 불러옴
-@st.cache_data(ttl=3600, show_spinner="🌐 6수송 대용량 데이터를 불러오는 중입니다... (최초 1회만 소요)")
+@st.cache_data(ttl=3600, show_spinner="🌐 6수송 대용량 데이터를 불러오는 중입니다... (최초 1회 소요)")
 def load_6th_data_lazy():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     six_paths = [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']
@@ -1117,7 +1115,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 # GROUP 2: 🌐 6수송 대시보드
 # ==========================================
 elif selected_group == "🌐 6수송 대시보드":
-    # 📌 [지연 로딩 호출]: 6수송 탭을 클릭했을 때만 호출
     df_6th_raw = load_6th_data_lazy()
 
     if df_6th_raw is None:
@@ -1127,19 +1124,25 @@ elif selected_group == "🌐 6수송 대시보드":
     df_6 = df_6th_raw.copy()
     df_6.columns = [str(c).strip() for c in df_6.columns]
 
-    # 컬럼 매핑 보정
-    col_pur_m = 'Ticket Purchase month' if 'Ticket Purchase month' in df_6.columns else ('Purchase Month' if 'Purchase Month' in df_6.columns else '발매월')
-    col_trip_m = 'Trip Month' if 'Trip Month' in df_6.columns else ('Travel Month' if 'Travel Month' in df_6.columns else '출발월')
-    col_rgn = '4.OD RGN' if '4.OD RGN' in df_6.columns else ('OD Region' if 'OD Region' in df_6.columns else 'OD REGION')
-    col_dir = 'DIRECTION' if 'DIRECTION' in df_6.columns else ('Direction' if 'Direction' in df_6.columns else '일본발/일본행')
-    col_orig_c = 'Trip Origin Country Code' if 'Trip Origin Country Code' in df_6.columns else ('Origin Country' if 'Origin Country' in df_6.columns else '출발 국가')
-    col_dest_c = 'Trip Destination Country Code' if 'Trip Destination Country Code' in df_6.columns else ('Destination Country' if 'Destination Country' in df_6.columns else '도착 국가')
-    col_jp_apo = '일본 APO' if '일본 APO' in df_6.columns else ('Japan APO' if 'Japan APO' in df_6.columns else '일본공항')
-    col_ov_apo = '해외 APO' if '해외 APO' in df_6.columns else ('Overseas APO' if 'Overseas APO' in df_6.columns else '해외공항')
-    col_od_mkt = 'Trip O&D Market' if 'Trip O&D Market' in df_6.columns else ('OD ON/OFF' if 'OD ON/OFF' in df_6.columns else 'O&D Market')
-    col_al_6 = 'Dominant Marketing Airline' if 'Dominant Marketing Airline' in df_6.columns else ('Airline' if 'Airline' in df_6.columns else '항공사')
-    col_val_6 = 'Value' if 'Value' in df_6.columns else ('Pax' if 'Pax' in df_6.columns else 'Val_num')
-    col_year_type = '금년/전년' if '금년/전년' in df_6.columns else ('Year_Type' if 'Year_Type' in df_6.columns else '구분')
+    # 📌 대소문자 및 띄어쓰기 둔감 매핑 함수
+    lower_col_map = {c.lower().replace(" ", "").replace("_", ""): c for c in df_6.columns}
+
+    def get_actual_col(target_str):
+        cleaned = target_str.lower().replace(" ", "").replace("_", "")
+        return lower_col_map.get(cleaned, None)
+
+    col_pur_m = get_actual_col("Ticket Purchase month") or get_actual_col("Purchase Month") or "Ticket Purchase month"
+    col_trip_m = get_actual_col("Trip Month") or get_actual_col("Travel Month") or "Trip Month"
+    col_rgn = get_actual_col("4.OD RGN") or get_actual_col("OD Region") or "4.OD RGN"
+    col_dir = get_actual_col("DIRECTION") or get_actual_col("Direction") or "DIRECTION"
+    col_orig_c = get_actual_col("Trip Origin Country Code") or "Trip Origin Country Code"
+    col_dest_c = get_actual_col("Trip Destination Country Code") or "Trip Destination Country Code"
+    col_jp_apo = get_actual_col("일본 APO") or get_actual_col("Japan APO") or "일본 APO"
+    col_ov_apo = get_actual_col("해외 APO") or get_actual_col("Overseas APO") or "해외 APO"
+    col_od_mkt = get_actual_col("Trip O&D Market") or get_actual_col("OD ON/OFF") or "Trip O&D Market"
+    col_al_6 = get_actual_col("Dominant Marketing Airline") or "Dominant Marketing Airline"
+    col_val_6 = get_actual_col("Value") or get_actual_col("Pax") or "Value"
+    col_year_type = get_actual_col("금년/전년") or get_actual_col("Year_Type") or "금년/전년"
 
     df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if col_val_6 in df_6.columns else 0.0
 
@@ -1150,7 +1153,7 @@ elif selected_group == "🌐 6수송 대시보드":
         df_6['Val_CY_num'] = df_6['Val_num']
         df_6['Val_PY_num'] = 0.0
 
-    # 📌 슬라이서 옵션 추출
+    # 📌 슬라이서 옵션 정밀 추출
     # 1. 발매기간 (금년 기준 최근 6개월)
     if col_pur_m in df_6.columns:
         all_pur_m = sorted([str(x).strip() for x in df_6[df_6['Val_CY_num'] > 0][col_pur_m].dropna().unique() if str(x).strip() != 'nan'])
@@ -1206,7 +1209,7 @@ elif selected_group == "🌐 6수송 대시보드":
         sel_ov_apo = render_multiselect_box(f6_col8, "8. 해외 APO", all_ov_apo, "slicer6_ov_apo")
         sel_od_mkt = render_multiselect_box(f6_col9, "9. Trip O&D", all_od_mkt, "slicer6_od_mkt")
 
-        # 필터링 마스크
+        # 필터링 마스크 (고속 Series 연산)
         mask_6th = pd.Series(True, index=df_6.index)
         if col_pur_m in df_6.columns and sel_pur_m: mask_6th &= (df_6[col_pur_m].astype(str).isin(sel_pur_m))
         if col_trip_m in df_6.columns and sel_trip_m: mask_6th &= (df_6[col_trip_m].astype(str).isin(sel_trip_m))
@@ -1218,7 +1221,7 @@ elif selected_group == "🌐 6수송 대시보드":
         if col_ov_apo in df_6.columns and sel_ov_apo: mask_6th &= (df_6[col_ov_apo].astype(str).isin(sel_ov_apo))
         if col_od_mkt in df_6.columns and sel_od_mkt: mask_6th &= (df_6[col_od_mkt].astype(str).isin(sel_od_mkt))
 
-        filtered_6th = df_6[mask_6th].copy()
+        filtered_6th = df_6[mask_6th]
 
         if not filtered_6th.empty and col_al_6 in filtered_6th.columns:
             al_agg = filtered_6th.groupby(col_al_6, observed=False)[['Val_CY_num', 'Val_PY_num']].sum().reset_index()
