@@ -92,7 +92,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 5. Sidebar Uploader
+# 5. Sidebar
 st.sidebar.header("📁 실시간 데이터 업로드")
 uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=['parquet', 'csv', 'xlsx'], key="sb_uploader_iss")
 uploaded_sup = st.sidebar.file_uploader("2. 공급 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_sup")
@@ -231,7 +231,6 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 텍스트 전용 YOY HTML 생성 함수
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
@@ -241,7 +240,6 @@ def format_yoy_html(val, is_percentage_point=False):
     else:
         return f'<span style="color: #475569 !important; font-size: 11px !important; font-weight: 500 !important;">▲ 0{unit}</span>'
 
-# 📌 테이블 셀 전용 YOY HTML 생성 함수
 def get_yoy_td_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0:
@@ -617,7 +615,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
-    # 📌 2. ✈️ 공급 M/S 탭 (KE 한정 타임라인 표출 적용)
+    # 📌 2. ✈️ 공급 M/S 탭 (KE 한정 스케줄 타임라인 적용)
     # ------------------------------------------
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
@@ -1018,6 +1016,7 @@ elif selected_group == "🌐 6수송 대시보드":
         df_6['Val_CY_num'] = df_6['Val_num']
         df_6['Val_PY_num'] = 0.0
 
+    # 📌 슬라이서 옵션 정밀 추출
     if col_pur_m in df_6.columns:
         all_pur_m = sorted([str(x).strip() for x in df_6[col_pur_m].dropna().unique() if str(x).strip() != 'nan'])
         default_pur_m = all_pur_m[-6:] if len(all_pur_m) >= 6 else all_pur_m
@@ -1047,9 +1046,10 @@ elif selected_group == "🌐 6수송 대시보드":
     with tab6_1:
         st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황 (요청 9개 필터 세트)</div>', unsafe_allow_html=True)
         
+        # 📌 9개 필터 박스 배치
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5 = st.columns(5)
-        sel_pur_m = render_multiselect_box(f6_col1, "1. 발매 기간", all_pur_m, "slicer6_pur_m", default_pur_m)
-        sel_trip_m = render_multiselect_box(f6_col2, "2. 출발 기간 (9개월)", all_trip_m, "slicer6_trip_m")
+        sel_pur_m = render_multiselect_box(f6_col1, "1. 발매 기간 (과거 6개월)", all_pur_m, "slicer6_pur_m", default_pur_m)
+        sel_trip_m = render_multiselect_box(f6_col2, "2. 출발 기간 (향후 9개월)", all_trip_m, "slicer6_trip_m")
         sel_rgn = render_multiselect_box(f6_col3, "3. OD Region", all_rgn, "slicer6_rgn", default_rgn)
         sel_dir = render_multiselect_box(f6_col4, "4. 일본발/일본행", all_dir, "slicer6_dir")
         sel_orig_c = render_multiselect_box(f6_col5, "5. 출발 국가", all_orig_c, "slicer6_orig_c")
@@ -1134,7 +1134,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.markdown("---")
 
         # ------------------------------------------
-        # 📌 1-2) 2번째 표: Carrier별 M/S (TOP 20 O&D) 다차원 종합 비교 표 (보정 완료)
+        # 📌 1-2) 2번째 표: Carrier별 M/S (TOP 20 O&D) 다차원 종합 비교 표 (완벽 복구)
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 O&D)</div>', unsafe_allow_html=True)
         
@@ -1194,7 +1194,7 @@ elif selected_group == "🌐 6수송 대시보드":
                 tot_ke_yoy = ((tot_ke_cy - tot_ke_py) / tot_ke_py * 100) if tot_ke_py > 0 else 0
                 tot_ke_ms_cy = (tot_ke_cy / tot_mkt_cy * 100) if tot_mkt_cy > 0 else 0
 
-                # 📌 <td> 구문 내부 HTML 오염 완전 정제
+                # 📌 <td> 구문 내부 HTML 오염 완벽 해결
                 od_matrix_html = '''
                 <div class="custom-piv-container">
                 <table class="custom-piv-table">
