@@ -53,7 +53,7 @@ def load_file_to_polars(file_path):
     return df
 
 def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, output_parquet_path="cache_6th_data.parquet"):
-    print("🚀 6수송 RAW 데이터 정밀 정제 및 사전 집계를 시작합니다...")
+    print("🚀 6수송 RAW 데이터 정밀 매핑 및 사전 집계를 시작합니다...")
     
     if not os.path.exists(cy_file_path) or not os.path.exists(py_file_path):
         print("❌ 금년/전년 원본 CSV 파일을 찾을 수 없습니다.")
@@ -89,39 +89,36 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
     c_airline = get_actual_col_name("Dominant Marketing Airline")
     c_value = get_actual_col_name("Value")
 
-    # 📌 3. 월 데이터 정제 함수 (소수점 .0 제거 및 깔끔한 "X월" 처리)
-    def clean_month_expr(col_name):
+    # 📌 3. YYYY-MM 포맷 정제 함수 (예: "2026-01")
+    def format_ym_expr(col_name):
+        clean_str = pl.col(col_name).cast(pl.Utf8).str.replace(r"\.0$", "").str.replace(r"월$", "").str.strip_chars()
         return (
-            pl.col(col_name).cast(pl.Utf8)
-              .str.replace(r"\.0$", "")            # .0 소수점 제거
-              .str.replace(r"월$", "")             # 기존 '월' 제거하여 순수 값 추출
-              .str.strip_chars() + pl.lit("월")   # 다시 '월' 붙이기
+            pl.when(clean_str.str.contains(r"^\d{4}-\d{2}$"))
+              .then(clean_str)
+              .when(clean_str.str.contains(r"^\d{4}-\d{1}$"))
+              .then(clean_str.str.slice(0, 5) + pl.lit("0") + clean_str.str.slice(5, 1))
+              .when(clean_str.str.contains(r"^\d{6}$"))
+              .then(clean_str.str.slice(0, 4) + pl.lit("-") + clean_str.str.slice(4, 2))
+              .otherwise(clean_str)
         )
 
-    # 4. 파생 컬럼 생성
+    is_jp_expr = pl.col(c_orig_country).cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN"])
+
+    # 4. 파생 컬럼 연산
     df_processed = df_merged.with_columns([
-        clean_month_expr(c_pur_m).alias("Ticket Purchase month"),
-        clean_month_expr(c_trip_m).alias("Trip Month"),
+        format_ym_expr(c_pur_m).alias("Ticket Purchase month"),
+        format_ym_expr(c_trip_m).alias("Trip Month"),
         
-        pl.when(pl.col(c_orig_country).cast(pl.Utf8).str.to_uppercase().str.strip_chars() == "JP")
-          .then(pl.lit("일본발"))
-          .otherwise(pl.lit("일본행"))
-          .alias("DIRECTION"),
+        pl.when(is_jp_expr).then(pl.lit("일본발")).otherwise(pl.lit("일본행")).alias("DIRECTION"),
           
-        (pl.col(c_market).cast(pl.Utf8).str.slice(0, 3) + pl.lit("-") + pl.col(c_market).cast(pl.Utf8).str.slice(-3, 3)).alias("Trip O&D Market"),
+        # 📌 Trip O&D vv 부착 (예: NRT-TPE vv)
+        (pl.col(c_market).cast(pl.Utf8).str.slice(0, 3) + pl.lit("-") + pl.col(c_market).cast(pl.Utf8).str.slice(-3, 3) + pl.lit(" vv")).alias("Trip O&D Market"),
         
-        pl.when(pl.col(c_orig_country).cast(pl.Utf8).str.to_uppercase().str.strip_chars() == "JP")
-          .then(pl.col(c_orig_code).cast(pl.Utf8))
-          .otherwise(pl.col(c_dest_code).cast(pl.Utf8))
-          .alias("일본 APO"),
-          
-        pl.when(pl.col(c_orig_country).cast(pl.Utf8).str.to_uppercase().str.strip_chars() == "JP")
-          .then(pl.col(c_dest_code).cast(pl.Utf8))
-          .otherwise(pl.col(c_orig_code).cast(pl.Utf8))
-          .alias("해외 APO"),
+        pl.when(is_jp_expr).then(pl.col(c_orig_code).cast(pl.Utf8)).otherwise(pl.col(c_dest_code).cast(pl.Utf8)).alias("일본 APO"),
+        pl.when(is_jp_expr).then(pl.col(c_dest_code).cast(pl.Utf8)).otherwise(pl.col(c_orig_code).cast(pl.Utf8)).alias("해외 APO"),
         
-        # 📌 Dimension 조인 키 정규화 (대문자 및 공백 제거)
-        pl.when(pl.col(c_orig_country).cast(pl.Utf8).str.to_uppercase().str.strip_chars() == "JP")
+        # 📌 OD Region 매핑용 국가 코드 추출 정규화
+        pl.when(is_jp_expr)
           .then(pl.col(c_dest_country).cast(pl.Utf8).str.to_uppercase().str.strip_chars())
           .otherwise(pl.col(c_orig_country).cast(pl.Utf8).str.to_uppercase().str.strip_chars())
           .alias("DIM_LOOKUP_KEY"),
@@ -129,9 +126,9 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         pl.col(c_value).cast(pl.Utf8).str.replace_all(",", "").cast(pl.Float64, strict=False).fill_null(0.0).alias("Value_num")
     ])
 
-    # 📌 5. Dimension 파일 기반 O&D Region 매핑
+    # 📌 5. Dimension 파일 기반 O&D Region 정밀 매핑
     if os.path.exists(dim_file_path):
-        print(f"📌 Dimension 마스터 파일('{dim_file_path}') 국가코드 조인 중...")
+        print(f"📌 Dimension 마스터 파일('{dim_file_path}') 국가코드 조인 연동 중...")
         dim_df = pd.read_excel(dim_file_path) if dim_file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(dim_file_path)
         dim_pl = pl.from_pandas(dim_df)
         
@@ -144,15 +141,16 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         df_processed = df_processed.join(
             dim_pl, left_on="DIM_LOOKUP_KEY", right_on="DIM_KEY", how="left"
         ).with_columns([
-            pl.when(pl.col("RGN_NAME").is_not_null() & (pl.col("RGN_NAME") != ""))
+            pl.when(pl.col("RGN_NAME").is_not_null() & (pl.col("RGN_NAME") != "") & (pl.col("RGN_NAME") != "nan"))
               .then(pl.lit("JPN-") + pl.col("RGN_NAME"))
               .otherwise(pl.lit("기타"))
               .alias("4.OD RGN")
         ]).drop(["RGN_NAME", "DIM_LOOKUP_KEY"])
     else:
+        print("⚠️ Dimension 파일이 없어 OD Region을 기타로 정합니다.")
         df_processed = df_processed.with_columns([pl.lit("기타").alias("4.OD RGN")]).drop(["DIM_LOOKUP_KEY"])
 
-    # 6. 사전 집계 (Groupby Sum)
+    # 6. 컬럼 정돈 및 사전 집계 (Groupby)
     df_processed = df_processed.rename({
         c_orig_country: "Trip Origin Country Code",
         c_dest_country: "Trip Destination Country Code",
@@ -165,16 +163,16 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         "일본 APO", "해외 APO", "Trip O&D Market", "Dominant Marketing Airline", "금년/전년"
     ]
 
-    print("⚡ 대시보드 연동용 사전 집계 연산 중...")
+    print("⚡ 대시보드 로딩 최적화 사전 집계 진행 중...")
     df_aggregated = df_processed.group_by(final_group_cols).agg([
         pl.col("Value_num").sum().alias("Value")
     ])
 
-    print(f"📉 축소 결과: {len(df_aggregated):,}행 저장 완료!")
+    print(f"📉 결과: 총 {len(df_aggregated):,}행 저장 완료!")
 
     # 7. 최적화 파켓 파일 저장
     df_aggregated.write_parquet(output_parquet_path, compression="snappy")
-    print(f"🎉 캐시 파일 생성 완료: '{output_parquet_path}'")
+    print(f"🎉 캐시 파켓 생성 완료: '{output_parquet_path}'")
 
 if __name__ == "__main__":
     CY_FILE_NAME = "6수송_금년.csv"

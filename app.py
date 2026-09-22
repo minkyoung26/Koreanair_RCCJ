@@ -615,7 +615,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
-    # 📌 2. ✈️ 공급 M/S 탭 (KE 한정 스케줄 타임라인 적용)
+    # 2. ✈️ 공급 M/S 탭 (KE 한정 스케줄 타임라인 적용)
     # ------------------------------------------
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
@@ -742,7 +742,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.markdown(sup_pivot_html, unsafe_allow_html=True)
 
             st.markdown("---")
-            # 📌 3. 항공사별 스케줄 타임라인 (KE 한정 표출 적용)
+            # 📌 3. 항공사별 스케줄 타임라인 (KE 한정 표출)
             st.markdown('<div class="unified-sub-header">3. 대한항공(KE) 스케줄 타임라인</div>', unsafe_allow_html=True)
             
             ke_sup_sub = filtered_sup[filtered_sup['Airline'] == 'KE']
@@ -1016,7 +1016,6 @@ elif selected_group == "🌐 6수송 대시보드":
         df_6['Val_CY_num'] = df_6['Val_num']
         df_6['Val_PY_num'] = 0.0
 
-    # 📌 슬라이서 옵션 정밀 추출
     if col_pur_m in df_6.columns:
         all_pur_m = sorted([str(x).strip() for x in df_6[col_pur_m].dropna().unique() if str(x).strip() != 'nan'])
         default_pur_m = all_pur_m[-6:] if len(all_pur_m) >= 6 else all_pur_m
@@ -1046,7 +1045,6 @@ elif selected_group == "🌐 6수송 대시보드":
     with tab6_1:
         st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황 (요청 9개 필터 세트)</div>', unsafe_allow_html=True)
         
-        # 📌 9개 필터 박스 배치
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5 = st.columns(5)
         sel_pur_m = render_multiselect_box(f6_col1, "1. 발매 기간 (과거 6개월)", all_pur_m, "slicer6_pur_m", default_pur_m)
         sel_trip_m = render_multiselect_box(f6_col2, "2. 출발 기간 (향후 9개월)", all_trip_m, "slicer6_trip_m")
@@ -1134,7 +1132,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.markdown("---")
 
         # ------------------------------------------
-        # 📌 1-2) 2번째 표: Carrier별 M/S (TOP 20 O&D) 다차원 종합 비교 표 (완벽 복구)
+        # 📌 1-2) 2번째 표: Carrier별 M/S (TOP 20 O&D) 다차원 종합 비교 표 (HTML 파싱 보정)
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 O&D)</div>', unsafe_allow_html=True)
         
@@ -1194,78 +1192,61 @@ elif selected_group == "🌐 6수송 대시보드":
                 tot_ke_yoy = ((tot_ke_cy - tot_ke_py) / tot_ke_py * 100) if tot_ke_py > 0 else 0
                 tot_ke_ms_cy = (tot_ke_cy / tot_mkt_cy * 100) if tot_mkt_cy > 0 else 0
 
-                # 📌 <td> 구문 내부 HTML 오염 완벽 해결
-                od_matrix_html = '''
-                <div class="custom-piv-container">
-                <table class="custom-piv-table">
-                <thead>
-                    <tr>
-                        <th rowspan="2" class="header-main" style="width:40px;">순위</th>
-                        <th rowspan="2" class="header-main" style="width:110px;">TOP O&D</th>
-                        <th colspan="3" class="header-main" style="background-color:#215b88 !important; color:#ffffff !important;">시장 전체</th>
-                        <th colspan="3" class="header-main" style="background-color:#1e4e79 !important; color:#ffffff !important;">선택 항공사 발매량</th>
-                        <th colspan="3" class="header-main" style="background-color:#1b3d5a !important; color:#ffffff !important;">선택 항공사 M/S</th>
-                        <th colspan="4" class="header-main" style="background-color:#16a34a !important; color:#ffffff !important;">KE 발매량</th>
-                    </tr>
-                    <tr>
-                        <th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">금년</th>
-                        <th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">전년</th>
-                        <th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">YOY</th>
-                        <th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">금년</th>
-                        <th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">전년</th>
-                        <th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">YOY</th>
-                        <th class="header-main" style="background-color:#204f77 !important; color:#ffffff !important;">M/S</th>
-                        <th class="header-main" style="background-color:#204f77 !important; color:#ffffff !important;">전년</th>
-                        <th class="header-main" style="background-color:#204f77 !important; color:#ffffff !important;">YOY</th>
-                        <th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">금년</th>
-                        <th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">전년</th>
-                        <th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">YOY</th>
-                        <th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">M/S</th>
-                    </tr>
-                </thead>
-                <tbody>
-                '''
+                # 📌 들여쓰기 공백 완벽 제거 (Streamlit 코드블록 인식 방지)
+                od_matrix_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead>'
+                od_matrix_html += '<tr><th rowspan="2" class="header-main" style="width:40px;">순위</th>'
+                od_matrix_html += '<th rowspan="2" class="header-main" style="width:110px;">TOP O&D</th>'
+                od_matrix_html += '<th colspan="3" class="header-main" style="background-color:#215b88 !important; color:#ffffff !important;">시장 전체</th>'
+                od_matrix_html += '<th colspan="3" class="header-main" style="background-color:#1e4e79 !important; color:#ffffff !important;">선택 항공사 발매량</th>'
+                od_matrix_html += '<th colspan="3" class="header-main" style="background-color:#1b3d5a !important; color:#ffffff !important;">선택 항공사 M/S</th>'
+                od_matrix_html += '<th colspan="4" class="header-main" style="background-color:#16a34a !important; color:#ffffff !important;">KE 발매량</th></tr>'
+                od_matrix_html += '<tr><th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">금년</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">전년</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">YOY</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">금년</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">전년</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">YOY</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#204f77 !important; color:#ffffff !important;">M/S</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#204f77 !important; color:#ffffff !important;">전년</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#204f77 !important; color:#ffffff !important;">YOY</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">금년</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">전년</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">YOY</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">M/S</th></tr></thead><tbody>'
 
                 for r in matrix_rows:
-                    od_matrix_html += f'''
-                    <tr>
-                        <td style="font-weight:700;">{r['rank']}</td>
-                        <td style="font-weight:700;">{r['od']}</td>
-                        <td>{r['mkt_cy']:,.0f}</td>
-                        <td style="color:#64748b;">{r['mkt_py']:,.0f}</td>
-                        <td>{format_yoy_html(r['mkt_yoy'])}</td>
-                        <td style="font-weight:700;">{r['sel_cy']:,.0f}</td>
-                        <td style="color:#64748b;">{r['sel_py']:,.0f}</td>
-                        <td>{format_yoy_html(r['sel_yoy'])}</td>
-                        <td style="font-weight:700;">{r['sel_ms_cy']:.0f}%</td>
-                        <td style="color:#64748b;">{r['sel_ms_py']:.0f}%</td>
-                        <td>{format_yoy_html(r['sel_ms_yoy'], True)}</td>
-                        <td style="font-weight:700; color:#16a34a;">{r['ke_cy']:,.0f}</td>
-                        <td style="color:#64748b;">{r['ke_py']:,.0f}</td>
-                        <td>{format_yoy_html(r['ke_yoy'])}</td>
-                        <td style="font-weight:700; color:#16a34a;">{r['ke_ms_cy']:.1f}%</td>
-                    </tr>
-                    '''
+                    od_matrix_html += f'<tr><td style="font-weight:700;">{r["rank"]}</td>'
+                    od_matrix_html += f'<td style="font-weight:700;">{r["od"]}</td>'
+                    od_matrix_html += f'<td>{r["mkt_cy"]:,.0f}</td>'
+                    od_matrix_html += f'<td style="color:#64748b;">{r["mkt_py"]:,.0f}</td>'
+                    od_matrix_html += f'<td>{format_yoy_html(r["mkt_yoy"])}</td>'
+                    od_matrix_html += f'<td style="font-weight:700;">{r["sel_cy"]:,.0f}</td>'
+                    od_matrix_html += f'<td style="color:#64748b;">{r["sel_py"]:,.0f}</td>'
+                    od_matrix_html += f'<td>{format_yoy_html(r["sel_yoy"])}</td>'
+                    od_matrix_html += f'<td style="font-weight:700;">{r["sel_ms_cy"]:.0f}%</td>'
+                    od_matrix_html += f'<td style="color:#64748b;">{r["sel_ms_py"]:.0f}%</td>'
+                    od_matrix_html += f'<td>{format_yoy_html(r["sel_ms_yoy"], True)}</td>'
+                    od_matrix_html += f'<td style="font-weight:700; color:#16a34a;">{r["ke_cy"]:,.0f}</td>'
+                    od_matrix_html += f'<td style="color:#64748b;">{r["ke_py"]:,.0f}</td>'
+                    od_matrix_html += f'<td>{format_yoy_html(r["ke_yoy"])}</td>'
+                    od_matrix_html += f'<td style="font-weight:700; color:#16a34a;">{r["ke_ms_cy"]:.1f}%</td></tr>'
 
-                od_matrix_html += f'''
-                <tr class="row-title" style="background-color:#f1f5f9 !important; font-weight:800;">
-                    <td colspan="2">금년 요약</td>
-                    <td><b>{tot_mkt_cy:,.0f}</b></td>
-                    <td style="color:#64748b;"><b>{tot_mkt_py:,.0f}</b></td>
-                    <td>{format_yoy_html(tot_mkt_yoy)}</td>
-                    <td><b>{tot_sel_cy:,.0f}</b></td>
-                    <td style="color:#64748b;"><b>{tot_sel_py:,.0f}</b></td>
-                    <td>{format_yoy_html(tot_sel_yoy)}</td>
-                    <td><b>{tot_sel_ms_cy:.0f}%</b></td>
-                    <td style="color:#64748b;"><b>{tot_sel_ms_py:.0f}%</b></td>
-                    <td>{format_yoy_html(tot_sel_ms_yoy, True)}</td>
-                    <td style="color:#16a34a;"><b>{tot_ke_cy:,.0f}</b></td>
-                    <td style="color:#64748b;"><b>{tot_ke_py:,.0f}</b></td>
-                    <td>{format_yoy_html(tot_ke_yoy)}</td>
-                    <td style="color:#16a34a;"><b>{tot_ke_ms_cy:.0f}%</b></td>
-                </tr>
-                </tbody></table></div>
-                '''
+                od_matrix_html += f'<tr class="row-title" style="background-color:#f1f5f9 !important; font-weight:800;"><td colspan="2">금년 요약</td>'
+                od_matrix_html += f'<td><b>{tot_mkt_cy:,.0f}</b></td>'
+                od_matrix_html += f'<td style="color:#64748b;"><b>{tot_mkt_py:,.0f}</b></td>'
+                od_matrix_html += f'<td>{format_yoy_html(tot_mkt_yoy)}</td>'
+                od_matrix_html += f'<td><b>{tot_sel_cy:,.0f}</b></td>'
+                od_matrix_html += f'<td style="color:#64748b;"><b>{tot_sel_py:,.0f}</b></td>'
+                od_matrix_html += f'<td>{format_yoy_html(tot_sel_yoy)}</td>'
+                od_matrix_html += f'<td><b>{tot_sel_ms_cy:.0f}%</b></td>'
+                od_matrix_html += f'<td style="color:#64748b;"><b>{tot_sel_ms_py:.0f}%</b></td>'
+                od_matrix_html += f'<td>{format_yoy_html(tot_sel_ms_yoy, True)}</td>'
+                od_matrix_html += f'<td style="color:#16a34a;"><b>{tot_ke_cy:,.0f}</b></td>'
+                od_matrix_html += f'<td style="color:#64748b;"><b>{tot_ke_py:,.0f}</b></td>'
+                od_matrix_html += f'<td>{format_yoy_html(tot_ke_yoy)}</td>'
+                od_matrix_html += f'<td style="color:#16a34a;"><b>{tot_ke_ms_cy:.0f}%</b></td></tr>'
+                od_matrix_html += '</tbody></table></div>'
+                
                 st.markdown(od_matrix_html, unsafe_allow_html=True)
             else:
                 st.info("💡 실적이 존재하는 O&D Market이 없습니다.")
