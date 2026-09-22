@@ -175,7 +175,7 @@ def clean_transport_column(df):
         df['수송'] = df[b_col].astype(str).str.strip()
     return df
 
-@st.cache_data(ttl=3600, show_spinner="데이터 로딩 중...")
+@st.cache_data(ttl=3600, show_spinner="3/4수송 데이터를 읽어오는 중...")
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_34_data.parquet')
@@ -197,11 +197,11 @@ def process_any_uploaded_file(file_obj):
     df.columns = [str(c).strip() for c in df.columns]
     return optimize_df(clean_transport_column(df))
 
+# 📌 [지연 로딩 최적화]: 메인 켜질 때는 공급 데이터만 읽기
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_aux_files():
-    df_sup, df_6th = None, None
+    df_sup = None
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    
     sup_paths = [os.path.join(base_dir, '공급.csv'), '공급.csv']
     for sp in sup_paths:
         if os.path.exists(sp):
@@ -209,18 +209,22 @@ def load_aux_files():
                 df_sup = pd.read_csv(sp, low_memory=False)
                 if df_sup is not None and not df_sup.empty: break
             except: pass
+    return optimize_df(df_sup)
 
+# 📌 [6수송 전용 지연 로딩]: 6수송 탭 클릭 시에만 메모리에 불러옴
+@st.cache_data(ttl=3600, show_spinner="🌐 6수송 대용량 데이터를 불러오는 중입니다... (최초 1회만 소요)")
+def load_6th_data_lazy():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     six_paths = [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']
     for sp in six_paths:
         if os.path.exists(sp):
             try:
-                df_6th = pd.read_parquet(sp)
-                if df_6th is not None and not df_6th.empty: break
+                df = pd.read_parquet(sp, engine='pyarrow')
+                return optimize_df(df)
             except: pass
+    return None
 
-    return optimize_df(df_sup), optimize_df(df_6th)
-
-disk_sup, disk_6th = load_aux_files()
+disk_sup = load_aux_files()
 
 if uploaded_iss is not None:
     df_iss_merged = process_any_uploaded_file(uploaded_iss)
@@ -228,7 +232,6 @@ else:
     df_iss_merged = load_fast_parquet_data_file()
 
 df_sup_raw = disk_sup
-df_6th_raw = disk_6th
 
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
@@ -1114,8 +1117,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
 # GROUP 2: 🌐 6수송 대시보드
 # ==========================================
 elif selected_group == "🌐 6수송 대시보드":
+    # 📌 [지연 로딩 호출]: 6수송 탭을 클릭했을 때만 호출
+    df_6th_raw = load_6th_data_lazy()
+
     if df_6th_raw is None:
-        st.warning("👈 좌측 사이드바 3번 위치에서 6수송 CSV/Parquet 파일을 업로드해 주세요.")
+        st.warning("👈 6수송 파켓 파일(`cache_6th_data.parquet`)이 없거나 읽을 수 없습니다. 사이드바 3번 위치에서 업로드하거나 배치 스크립트로 생성해 주세요.")
         st.stop()
 
     df_6 = df_6th_raw.copy()
