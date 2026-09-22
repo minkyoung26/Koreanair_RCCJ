@@ -37,7 +37,7 @@ issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.st
 
 # 📌 6수송 dynamic date range calculation: 과거 5개월 + 금월 + 향후 3개월 (총 9개월)
 six_dep_months = []
-for i in range(-5, 4): # -5, -4, -3, -2, -1, 0, 1, 2, 3
+for i in range(-5, 4):
     m = (today.month - 1 + i) % 12 + 1
     y = today.year + (today.month - 1 + i) // 12
     six_dep_months.append(f"{y}-{m:02d}월")
@@ -233,15 +233,6 @@ def get_dynamic_date_ranges_34(df_iss):
     w_col = '발매주차_일자' if '발매주차_일자' in df_iss.columns else ('발매 주차' if '발매 주차' in df_iss.columns else 'Purchase Month')
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
-
-def format_yoy_html(val, is_percentage_point=False):
-    unit = "%p" if is_percentage_point else "%"
-    if val > 0:
-        return f'<span class="yoy-up-txt" style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 600 !important; display: inline-block;">▲ {val:.0f}{unit}</span>'
-    elif val < 0:
-        return f'<span class="yoy-down-txt" style="color: #dc2626 !important; font-size: 10px !important; font-weight: 600 !important; display: inline-block;">▼ {abs(val):.0f}{unit}</span>'
-    else:
-        return f'<span class="yoy-zero-txt" style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important; display: inline-block;">▲ 0{unit}</span>'
 
 def get_yoy_td_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
@@ -1054,13 +1045,12 @@ elif selected_group == "🌐 6수송 대시보드":
     df_6th_raw = load_6th_data_lazy()
 
     if df_6th_raw is None:
-        st.warning("👈 6수송 파켓 파일(`cache_6th_data.parquet`)이 없거나 읽을 수 없습니다.")
+        st.warning("👈 6수송 파켓 파일(`cache_6th_data.parquet`)이 없거나 읽을 수 없습니다. 사이드바 3번 위치에서 업로드하거나 배치 스크립트로 생성해 주세요.")
         st.stop()
 
     df_6 = df_6th_raw.copy()
     df_6.columns = [str(c).strip() for c in df_6.columns]
 
-    # 📌 대소문자 및 띄어쓰기 둔감 매핑 함수
     lower_col_map = {c.lower().replace(" ", "").replace("_", "").replace(".", ""): c for c in df_6.columns}
 
     def get_actual_col(target_str):
@@ -1082,7 +1072,6 @@ elif selected_group == "🌐 6수송 대시보드":
 
     df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if col_val_6 in df_6.columns else 0.0
 
-    # 📌 금년 / 전년 연동 분리
     if col_year_type in df_6.columns:
         df_6['Val_CY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), df_6['Val_num'], 0.0)
         df_6['Val_PY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('전년|PY', na=False), df_6['Val_num'], 0.0)
@@ -1090,52 +1079,32 @@ elif selected_group == "🌐 6수송 대시보드":
         df_6['Val_CY_num'] = df_6['Val_num']
         df_6['Val_PY_num'] = 0.0
 
-    # 📌 슬라이서 옵션 정밀 추출
-    # 1. 발매기간 (금년 기준 최근 6개월)
     if col_pur_m in df_6.columns:
         all_pur_m = sorted([str(x).strip() for x in df_6[col_pur_m].dropna().unique() if str(x).strip() != 'nan'])
         default_pur_m = all_pur_m[-6:] if len(all_pur_m) >= 6 else all_pur_m
     else:
         all_pur_m, default_pur_m = [], []
 
-    # 2. 출발기간 (과거 5개월 ~ 향후 3개월 = 총 9개월)
     if col_trip_m in df_6.columns:
-        raw_trip_m = sorted([str(x).strip() for x in df_6[col_trip_m].dropna().unique() if str(x).strip() != 'nan'])
-        all_trip_m = raw_trip_m
+        all_trip_m = sorted([str(x).strip() for x in df_6[col_trip_m].dropna().unique() if str(x).strip() != 'nan'])
     else:
         all_trip_m = []
 
-    # 3. OD Region
     all_rgn = sorted([str(x).strip() for x in df_6[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in df_6.columns else []
     default_rgn = ["JPN-AME"] if "JPN-AME" in all_rgn else []
 
-    # 4. 일본발/일본행
     all_dir = sorted([str(x).strip() for x in df_6[col_dir].dropna().unique() if str(x).strip() != 'nan']) if col_dir in df_6.columns else []
-
-    # 5. 출발 국가
     all_orig_c = sorted([str(x).strip() for x in df_6[col_orig_c].dropna().unique() if str(x).strip() != 'nan']) if col_orig_c in df_6.columns else []
-
-    # 6. 도착 국가
     all_dest_c = sorted([str(x).strip() for x in df_6[col_dest_c].dropna().unique() if str(x).strip() != 'nan']) if col_dest_c in df_6.columns else []
-
-    # 7. 일본 APO
     all_jp_apo = sorted([str(x).strip() for x in df_6[col_jp_apo].dropna().unique() if str(x).strip() != 'nan']) if col_jp_apo in df_6.columns else []
-
-    # 8. 해외 APO
     all_ov_apo = sorted([str(x).strip() for x in df_6[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in df_6.columns else []
-
-    # 9. Trip O&D
     all_od_mkt = sorted([str(x).strip() for x in df_6[col_od_mkt].dropna().unique() if str(x).strip() != 'nan']) if col_od_mkt in df_6.columns else []
 
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
-    # ------------------------------------------
-    # 6수송 1번 탭: 종합 M/S 분석
-    # ------------------------------------------
     with tab6_1:
         st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황 (요청 9개 필터 세트)</div>', unsafe_allow_html=True)
         
-        # 📌 9개 필터 박스 배치
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5 = st.columns(5)
         sel_pur_m = render_multiselect_box(f6_col1, "1. 발매 기간", all_pur_m, "slicer6_pur_m", default_pur_m)
         sel_trip_m = render_multiselect_box(f6_col2, "2. 출발 기간 (9개월)", all_trip_m, "slicer6_trip_m")
@@ -1149,7 +1118,6 @@ elif selected_group == "🌐 6수송 대시보드":
         sel_ov_apo = render_multiselect_box(f6_col8, "8. 해외 APO", all_ov_apo, "slicer6_ov_apo")
         sel_od_mkt = render_multiselect_box(f6_col9, "9. Trip O&D", all_od_mkt, "slicer6_od_mkt")
 
-        # 필터링 마스크
         mask_6th = pd.Series(True, index=df_6.index)
         if col_pur_m in df_6.columns and sel_pur_m: mask_6th &= (df_6[col_pur_m].astype(str).isin(sel_pur_m))
         if col_trip_m in df_6.columns and sel_trip_m: mask_6th &= (df_6[col_trip_m].astype(str).isin(sel_trip_m))
@@ -1220,14 +1188,9 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
 
-    # ------------------------------------------
-    # 📌 6수송 2번 탭: Raw Data View 및 다운로드 (복구 완료)
-    # ------------------------------------------
     with tab6_2:
         st.subheader("📋 6수송 가공 Raw Data 조회 및 다운로드")
-        
         if not filtered_6th.empty:
-            # 1. 필터링된 6수송 데이터 CSV 다운로드 버튼
             csv_6th_bytes = filtered_6th.to_csv(index=False).encode('utf-8-sig')
             st.download_button(
                 label="📥 필터링된 6수송 Raw Data (CSV) 다운로드",
@@ -1235,8 +1198,6 @@ elif selected_group == "🌐 6수송 대시보드":
                 file_name=f"6th_Freedom_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
                 mime="text/csv"
             )
-            
-            # 2. 상위 100건 데이터 프레임 샘플 표출
             st.markdown("*(속도 최적화를 위해 상위 100건 샘플만 표출합니다)*")
             st.dataframe(filtered_6th.head(100), width="stretch")
         else:
