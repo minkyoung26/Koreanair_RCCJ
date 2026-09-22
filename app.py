@@ -40,7 +40,7 @@ six_dep_months = []
 for i in range(-5, 4): # -5, -4, -3, -2, -1, 0, 1, 2, 3
     m = (today.month - 1 + i) % 12 + 1
     y = today.year + (today.month - 1 + i) // 12
-    six_dep_months.append(f"{y}-{m:02d}")
+    six_dep_months.append(f"{y}-{m:02d}월")
 
 # 📌 엑셀 수식 기준 지정 22개 대한항공 정규 취항 노선 마스터 리스트
 EXCEL_KE_ROUTES_MASTER = [
@@ -49,104 +49,47 @@ EXCEL_KE_ROUTES_MASTER = [
     "P/NGO", "I/KIJ", "I/KMQ", "I/OKA", "I/CTS", "I/AOJ"
 ]
 
-# 한국 주요 출발 공항 맵
-KOREA_APO_MAP = {
-    'I': 'ICN', 'G': 'GMP', 'P': 'PUS', 'C': 'CJU', 'T': 'TAE', 'W': 'MWX', 'Y': 'YNY', 'K': 'CJJ'
-}
+KOREA_APO_MAP = {'I': 'ICN', 'G': 'GMP', 'P': 'PUS', 'C': 'CJU', 'T': 'TAE', 'W': 'MWX', 'Y': 'YNY', 'K': 'CJJ'}
 
-# 📌 엑셀 기준 항공사별 가중 승수 배율 마스터
 AIRLINE_WEIGHT_MULTIPLIERS = {
-    'KE': 1.0,
-    'OZ': 1.0,
-    '7C': 4.75884657,
-    'LJ': 4.387110992,
-    'TW': 4.413912854,
-    'BX': 1.865842867,
-    'RS': 1.758028702,
-    'JL': 1.0,
-    'NH': 1.0,
-    'ET': 1.0,
-    'YP': 5.92588446,
-    'ZE': 3.783327953,
-    'WE': 1.0
+    'KE': 1.0, 'OZ': 1.0, '7C': 4.75884657, 'LJ': 4.387110992, 'TW': 4.413912854,
+    'BX': 1.865842867, 'RS': 1.758028702, 'JL': 1.0, 'NH': 1.0, 'ET': 1.0,
+    'YP': 5.92588446, 'ZE': 3.783327953, 'WE': 1.0
 }
 
-# 3. 항공사별 RBD 계층 정의
 RBD_HIERARCHY = {
-    'KE': list('YBMSHEKLUQTX'),
-    'OZ': list('YBMHEQKSVWTLX'),
-    '7C': list('YBKNQMTWORXSZLHEFVGPJ'),
-    'LJ': list('YWDEHKLQBNMXPSVZARIOT'),
-    'TW': list('YWZVSPONMLKHDBAJQET'),
-    'BX': list('YBRMKEUDOIVJHXGWQN'),
-    'RS': list('YBMHEQKSOLWTRUIXAVGNDPFJC'),
-    'JL': list('WREYBHKMLVSOGQNPZ'),
-    'NH': list('ENYBMUHQVWSLK'),
-    'YP': list('PRZYBMHELQNSAFKVOGWX'),
-    'ZE': list('PFAJCIROYBMSHEKLQNTVWGX'),
-    'WE': list('ADIZOYBMHEUQNTVW')
+    'KE': list('YBMSHEKLUQTX'), 'OZ': list('YBMHEQKSVWTLX'),
+    '7C': list('YBKNQMTWORXSZLHEFVGPJ'), 'LJ': list('YWDEHKLQBNMXPSVZARIOT'),
+    'TW': list('YWZVSPONMLKHDBAJQET'), 'BX': list('YBRMKEUDOIVJHXGWQN'),
+    'RS': list('YBMHEQKSOLWTRUIXAVGNDPFJC'), 'JL': list('WREYBHKMLVSOGQNPZ'),
+    'NH': list('ENYBMUHQVWSLK'), 'YP': list('PRZYBMHELQNSAFKVOGWX'),
+    'ZE': list('PFAJCIROYBMSHEKLQNTVWGX'), 'WE': list('ADIZOYBMHEUQNTVW')
 }
 
 # 4. Custom CSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
-    
-    html, body, [class*="css"], .stApp {
-        font-family: 'Noto Sans KR', sans-serif !important;
-        color: #0f172a;
-    }
-    
+    html, body, [class*="css"], .stApp { font-family: 'Noto Sans KR', sans-serif !important; color: #0f172a; }
     :root { --primary-color: #0ea5e9 !important; --primaryColor: #0ea5e9 !important; }
-    
     .main-app-title { font-size: 28px !important; font-weight: 700 !important; color: #0f172a; margin-bottom: 12px; }
     .unified-sub-header { font-size: 18px !important; font-weight: 600 !important; color: #0f172a; margin-top: 10px; margin-bottom: 10px; }
     .group-section-header { font-size: 18px !important; font-weight: 600 !important; color: #0f172a; padding-bottom: 8px; border-bottom: 2px solid #cbd5e1; margin-top: 10px; margin-bottom: 12px; }
-    
     p, span, label, div, select, button, input { font-size: 13.5px !important; font-weight: 400; }
-    
     div[data-baseweb="tab-highlight"] { display: none !important; }
-    
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px !important;
-        background-color: #f1f5f9 !important;
-        padding: 6px !important;
-        border-radius: 8px !important;
-        border: 1px solid #cbd5e1 !important;
-        margin-bottom: 15px !important;
-    }
-    
-    div[role="tab"], button[role="tab"], button[data-baseweb="tab"], div[data-baseweb="tab"] {
-        background-color: #cbd5e1 !important;
-        border: 1px solid #94a3b8 !important;
-        border-radius: 6px !important;
-        padding: 8px 18px !important;
-        color: #1e293b !important;
-        font-weight: 700 !important;
-    }
-    
-    div[role="tab"][aria-selected="true"], button[role="tab"][aria-selected="true"], button[data-baseweb="tab"][aria-selected="true"], div[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #0284c7 !important;
-        color: #ffffff !important;
-        border-color: #0284c7 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-    }
-    
-    summary::-webkit-details-marker { display: none !important; }
-    summary { list-style: none !important; cursor: pointer; }
-    
+    .stTabs [data-baseweb="tab-list"] { gap: 6px !important; background-color: #f1f5f9 !important; padding: 6px !important; border-radius: 8px !important; border: 1px solid #cbd5e1 !important; margin-bottom: 15px !important; }
+    div[role="tab"], button[role="tab"], button[data-baseweb="tab"], div[data-baseweb="tab"] { background-color: #cbd5e1 !important; border: 1px solid #94a3b8 !important; border-radius: 6px !important; padding: 8px 18px !important; color: #1e293b !important; font-weight: 700 !important; }
+    div[role="tab"][aria-selected="true"], button[role="tab"][aria-selected="true"], button[data-baseweb="tab"][aria-selected="true"], div[data-baseweb="tab"][aria-selected="true"] { background-color: #0284c7 !important; color: #ffffff !important; border-color: #0284c7 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important; }
     .source-header-box { background-color: #f0f9ff; border-left: 5px solid #0284c7; padding: 12px 18px; border-radius: 6px; margin-bottom: 15px; font-size: 13.5px; color: #0f172a; font-weight: 500; }
     .metric-card { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); margin-bottom: 10px; }
     .metric-card-ke { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); margin-bottom: 10px; }
     .metric-title { font-size: 12.5px; color: #64748b; margin-bottom: 4px; font-weight: 500; }
     .metric-value { font-size: 22px; color: #1e293b; font-weight: 700; }
-    
     .custom-piv-container, .yoy-table-container { width: 100%; overflow-x: auto; margin-bottom: 20px; border-radius: 8px; border: 1px solid #cbd5e1 !important; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
     .custom-piv-table, .yoy-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background-color: #ffffff; text-align: center !important; table-layout: fixed !important; }
     .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header { background-color: #cfe2f3 !important; color: #0f172a !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-weight: 600; text-align: center !important; white-space: nowrap; }
     .yoy-table th.ke-header { background-color: #6fa8dc !important; color: #ffffff !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 700 !important; text-align: center !important; white-space: nowrap; }
-    
-    .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; background-color: #ffffff !important; text-align: center !important; }
+    .custom-piv-table td, .yoy-table td, .yoy-table tr.ke-row td.ke-cell { padding: 6px 10px; border: 1px solid #cbd5e1 !important; background-color: #ffffff !important; text-align: center !important; }
     .yoy-table tr:hover { background-color: #f8fafc !important; }
     .yoy-table tr.row-title { background-color: #f8fafc !important; font-weight: 600; color: #0f172a; }
 </style>
@@ -324,7 +267,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     st.markdown("---")
     
-    # 📌 서브 탭
     tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs([
         "🎟️ 발매 M/S", 
         "✈️ 공급 M/S", 
@@ -332,9 +274,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         "👥 단체실적"
     ])
 
-    # ------------------------------------------
     # 1. 🎟️ 발매 M/S 탭
-    # ------------------------------------------
     with tab_34_1:
         if df_iss_merged is None:
             st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다. 좌측 사이드바 1번에서 파일을 업로드해 주세요.")
@@ -534,7 +474,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.markdown(f'<div class="metric-card"><div class="metric-title">최대 실적 노선</div><div class="metric-value" style="color:#047857;">{top_route}</div></div>', unsafe_allow_html=True)
 
                 st.markdown("---")
-                
+
                 if week_col and week_col in merged_df.columns:
                     st.markdown('<div class="unified-sub-header">2. 발매 주차별 주요 항공사 M/S 점유비 추이 (%)</div>', unsafe_allow_html=True)
                     df_no_week = filtered_df
@@ -726,9 +666,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 if admin_pw: st.error("❌ 비밀번호가 올바르지 않습니다.")
                 else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
-    # ------------------------------------------
     # 2. ✈️ 공급 M/S 탭
-    # ------------------------------------------
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
         
@@ -910,9 +848,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_timeline)
                     st.plotly_chart(fig_timeline, width='stretch')
 
-    # ------------------------------------------
     # 3. 🏷️ 대리점,RBD별 발매현황 탭
-    # ------------------------------------------
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
@@ -1118,34 +1054,35 @@ elif selected_group == "🌐 6수송 대시보드":
     df_6th_raw = load_6th_data_lazy()
 
     if df_6th_raw is None:
-        st.warning("👈 6수송 파켓 파일(`cache_6th_data.parquet`)이 없거나 읽을 수 없습니다. 사이드바 3번 위치에서 업로드하거나 배치 스크립트로 생성해 주세요.")
+        st.warning("👈 6수송 파켓 파일(`cache_6th_data.parquet`)이 없거나 읽을 수 없습니다.")
         st.stop()
 
     df_6 = df_6th_raw.copy()
     df_6.columns = [str(c).strip() for c in df_6.columns]
 
     # 📌 대소문자 및 띄어쓰기 둔감 매핑 함수
-    lower_col_map = {c.lower().replace(" ", "").replace("_", ""): c for c in df_6.columns}
+    lower_col_map = {c.lower().replace(" ", "").replace("_", "").replace(".", ""): c for c in df_6.columns}
 
     def get_actual_col(target_str):
-        cleaned = target_str.lower().replace(" ", "").replace("_", "")
+        cleaned = target_str.lower().replace(" ", "").replace("_", "").replace(".", "")
         return lower_col_map.get(cleaned, None)
 
-    col_pur_m = get_actual_col("Ticket Purchase month") or get_actual_col("Purchase Month") or "Ticket Purchase month"
-    col_trip_m = get_actual_col("Trip Month") or get_actual_col("Travel Month") or "Trip Month"
+    col_pur_m = get_actual_col("Ticket Purchase month") or "Ticket Purchase month"
+    col_trip_m = get_actual_col("Trip Month") or "Trip Month"
     col_rgn = get_actual_col("4.OD RGN") or get_actual_col("OD Region") or "4.OD RGN"
-    col_dir = get_actual_col("DIRECTION") or get_actual_col("Direction") or "DIRECTION"
+    col_dir = get_actual_col("DIRECTION") or "DIRECTION"
     col_orig_c = get_actual_col("Trip Origin Country Code") or "Trip Origin Country Code"
     col_dest_c = get_actual_col("Trip Destination Country Code") or "Trip Destination Country Code"
-    col_jp_apo = get_actual_col("일본 APO") or get_actual_col("Japan APO") or "일본 APO"
-    col_ov_apo = get_actual_col("해외 APO") or get_actual_col("Overseas APO") or "해외 APO"
-    col_od_mkt = get_actual_col("Trip O&D Market") or get_actual_col("OD ON/OFF") or "Trip O&D Market"
+    col_jp_apo = get_actual_col("일본 APO") or "일본 APO"
+    col_ov_apo = get_actual_col("해외 APO") or "해외 APO"
+    col_od_mkt = get_actual_col("Trip O&D Market") or "Trip O&D Market"
     col_al_6 = get_actual_col("Dominant Marketing Airline") or "Dominant Marketing Airline"
-    col_val_6 = get_actual_col("Value") or get_actual_col("Pax") or "Value"
-    col_year_type = get_actual_col("금년/전년") or get_actual_col("Year_Type") or "금년/전년"
+    col_val_6 = get_actual_col("Value") or "Value"
+    col_year_type = get_actual_col("금년/전년") or "금년/전년"
 
     df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if col_val_6 in df_6.columns else 0.0
 
+    # 📌 금년 / 전년 연동 분리
     if col_year_type in df_6.columns:
         df_6['Val_CY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), df_6['Val_num'], 0.0)
         df_6['Val_PY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('전년|PY', na=False), df_6['Val_num'], 0.0)
@@ -1156,7 +1093,7 @@ elif selected_group == "🌐 6수송 대시보드":
     # 📌 슬라이서 옵션 정밀 추출
     # 1. 발매기간 (금년 기준 최근 6개월)
     if col_pur_m in df_6.columns:
-        all_pur_m = sorted([str(x).strip() for x in df_6[df_6['Val_CY_num'] > 0][col_pur_m].dropna().unique() if str(x).strip() != 'nan'])
+        all_pur_m = sorted([str(x).strip() for x in df_6[col_pur_m].dropna().unique() if str(x).strip() != 'nan'])
         default_pur_m = all_pur_m[-6:] if len(all_pur_m) >= 6 else all_pur_m
     else:
         all_pur_m, default_pur_m = [], []
@@ -1164,7 +1101,7 @@ elif selected_group == "🌐 6수송 대시보드":
     # 2. 출발기간 (과거 5개월 ~ 향후 3개월 = 총 9개월)
     if col_trip_m in df_6.columns:
         raw_trip_m = sorted([str(x).strip() for x in df_6[col_trip_m].dropna().unique() if str(x).strip() != 'nan'])
-        all_trip_m = [m for m in raw_trip_m if m in six_dep_months] if any(m in raw_trip_m for m in six_dep_months) else raw_trip_m
+        all_trip_m = raw_trip_m
     else:
         all_trip_m = []
 
@@ -1192,10 +1129,13 @@ elif selected_group == "🌐 6수송 대시보드":
 
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
+    # ------------------------------------------
+    # 6수송 1번 탭: 종합 M/S 분석
+    # ------------------------------------------
     with tab6_1:
         st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황 (요청 9개 필터 세트)</div>', unsafe_allow_html=True)
         
-        # 📌 요청된 9개 필터 박스 배치
+        # 📌 9개 필터 박스 배치
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5 = st.columns(5)
         sel_pur_m = render_multiselect_box(f6_col1, "1. 발매 기간", all_pur_m, "slicer6_pur_m", default_pur_m)
         sel_trip_m = render_multiselect_box(f6_col2, "2. 출발 기간 (9개월)", all_trip_m, "slicer6_trip_m")
@@ -1209,7 +1149,7 @@ elif selected_group == "🌐 6수송 대시보드":
         sel_ov_apo = render_multiselect_box(f6_col8, "8. 해외 APO", all_ov_apo, "slicer6_ov_apo")
         sel_od_mkt = render_multiselect_box(f6_col9, "9. Trip O&D", all_od_mkt, "slicer6_od_mkt")
 
-        # 필터링 마스크 (고속 Series 연산)
+        # 필터링 마스크
         mask_6th = pd.Series(True, index=df_6.index)
         if col_pur_m in df_6.columns and sel_pur_m: mask_6th &= (df_6[col_pur_m].astype(str).isin(sel_pur_m))
         if col_trip_m in df_6.columns and sel_trip_m: mask_6th &= (df_6[col_trip_m].astype(str).isin(sel_trip_m))
@@ -1280,14 +1220,31 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
 
+    # ------------------------------------------
+    # 📌 6수송 2번 탭: Raw Data View 및 다운로드 (복구 완료)
+    # ------------------------------------------
     with tab6_2:
-        st.markdown("*(속도 최적화를 위해 상위 100건만 표출합니다)*")
-        st.dataframe(df_6.head(100), width="stretch")
+        st.subheader("📋 6수송 가공 Raw Data 조회 및 다운로드")
+        
+        if not filtered_6th.empty:
+            # 1. 필터링된 6수송 데이터 CSV 다운로드 버튼
+            csv_6th_bytes = filtered_6th.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="📥 필터링된 6수송 Raw Data (CSV) 다운로드",
+                data=csv_6th_bytes,
+                file_name=f"6th_Freedom_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+            
+            # 2. 상위 100건 데이터 프레임 샘플 표출
+            st.markdown("*(속도 최적화를 위해 상위 100건 샘플만 표출합니다)*")
+            st.dataframe(filtered_6th.head(100), width="stretch")
+        else:
+            st.info("💡 선택하신 슬라이서 조건에 해당하는 6수송 데이터가 없습니다.")
 
 # ==========================================
 # GROUP 3: 🔗 W26 연결 네트워크
 # ==========================================
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
-    st.info("💡 사내 보안 정책(SSO 로그인 권한)으로 인해 대시보드 내부 프레임 출력이 제한될 수 있습니다. 아래 버튼을 눌러 새 탭에서 접속해 주세요.")
     st.link_button("🔗 W26 연결 네트워크 바로가기 (새 탭에서 열기)", EXT_WEB_APP_URL, use_container_width=True)
