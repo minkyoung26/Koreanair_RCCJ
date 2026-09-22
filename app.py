@@ -38,7 +38,6 @@ issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.st
 # 📌 6수송 dynamic date range calculation: 과거 5개월 + 금월 + 향후 3개월 (총 9개월)
 six_dep_months = []
 for i in range(-5, 4): # -5, -4, -3, -2, -1, 0, 1, 2, 3
-    # month index calculation
     m = (today.month - 1 + i) % 12 + 1
     y = today.year + (today.month - 1 + i) // 12
     six_dep_months.append(f"{y}-{m:02d}")
@@ -1070,7 +1069,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 sel_g_bound_list = render_multiselect_box(gc3, "3. 수송 구분", g_bounds, "slicer_g_bound_multi") if g_b_col else []
 
                 gc4, gc5 = st.columns(2)
-                sel_g_tt_list = render_multiselect_box(gc4, "4. TRIP TYPE", g_tts, "slicer_g_tt_multi")
+                sel_g_tt_list = render_multiselect_box(gc4, "4. TRIP TYPE", all_tt_a, "slicer_g_tt_multi")
                 sel_g_al_list = render_multiselect_box(gc5, "5. 항공사", g_als, "slicer_g_al_multi")
 
             mask_grp = pd.Series(True, index=df_grp_raw.index)
