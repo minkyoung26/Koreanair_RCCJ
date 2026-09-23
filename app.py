@@ -202,7 +202,7 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 전년비 양/음수 색상 처리 (+파란색, -붉은색)
+# 📌 [수정] 전년비(YOY) 서식: 양수 파란색(#1d4ed8), 음수 붉은색(#dc2626)
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0: return f'<span style="color: #1d4ed8 !important; font-size: 11px !important; font-weight: 600 !important;">▲ {val:.1f}{unit}</span>'
@@ -853,7 +853,7 @@ elif selected_group == "🌐 6수송 대시보드":
     all_jp_apo = sorted([str(x).strip() for x in df_6[col_jp_apo].dropna().unique() if str(x).strip() != 'nan']) if col_jp_apo in df_6.columns else []
     all_ov_apo = sorted([str(x).strip() for x in df_6[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in df_6.columns else []
     
-    # 📌 필터용 항공사 정렬: KE 최우선, 그리고 발매순 내림차순
+    # 📌 11. 항공사 목록 정렬 (KE 1순위, 나머지 발매순 내림차순)
     if col_al_6 in df_6.columns:
         al_val_series = cy_df_only.groupby(col_al_6, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
         al_sorted = [str(x).strip() for x in al_val_series.index if str(x).strip() != 'nan']
@@ -911,7 +911,6 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table = '<div class="yoy-table-container"><table class="yoy-table"><thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             for al_code in airline_rank_list:
                 if al_code == 'KE':
-                    # KE 헤더 강조 색상 (상단 테이블: #6fa8dc)
                     html_table += f'<th class="ke-header" style="width:130px; background-color:#6fa8dc !important; color:#ffffff !important;">★ KE ({ke_rank}위)</th>'
                 else:
                     rank_num = full_al_ranking.index(al_code) + 1 if al_code in full_al_ranking else "-"
@@ -959,7 +958,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.markdown("---")
 
         # ------------------------------------------
-        # 📌 Carrier별 M/S 테이블 (하단 테이블 KE 컬럼 색상 동기화 적용)
+        # 📌 2번째 표: Carrier별 M/S (Trip O&D 표출 추가 및 KE 컬럼 색상 적용)
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 O&D)</div>', unsafe_allow_html=True)
         
@@ -1035,7 +1034,8 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += '<th colspan="2" class="header-main" style="background-color:#215b88 !important; color:#ffffff !important;">시장 전체</th>'
                 od_matrix_html += f'<th colspan="2" class="header-main" style="background-color:#1e4e79 !important; color:#ffffff !important;">선택 항공사 발매량{sel_al_title_suffix}</th>'
                 od_matrix_html += '<th colspan="2" class="header-main" style="background-color:#1b3d5a !important; color:#ffffff !important;">선택 항공사 M/S</th>'
-                # 📌 하단 테이블 KE 컬럼 상단 테이블 색상(#6fa8dc)과 동기화 적용
+                
+                # 📌 KE 강조 색상 적용 (#6fa8dc)
                 od_matrix_html += '<th colspan="4" class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">KE 발매량 & M/S (대한항공)</th></tr>'
                 od_matrix_html += '<tr><th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">금년</th>'
                 od_matrix_html += '<th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">YOY</th>'
@@ -1058,7 +1058,8 @@ elif selected_group == "🌐 6수송 대시보드":
                     od_matrix_html += f'<td>{format_yoy_html(r["sel_yoy"])}</td>'
                     od_matrix_html += f'<td style="font-weight:700;">{r["sel_ms_cy"]:.1f}%</td>'
                     od_matrix_html += f'<td>{format_yoy_html(r["sel_ms_yoy"], True)}</td>'
-                    # 📌 셀 배경색 연파랑(#cfe2f3), 텍스트 진파랑(#0b5394) 적용 
+                    
+                    # 📌 KE 데이터 열에 연파랑(#cfe2f3) 및 진파랑 텍스트(#0b5394) 적용
                     od_matrix_html += f'<td style="font-weight:700; color:#0b5394; background-color:#cfe2f3 !important;">{r["ke_cy"]:,.0f}</td>'
                     od_matrix_html += f'<td style="background-color:#cfe2f3 !important;">{format_yoy_html(r["ke_yoy"])}</td>'
                     od_matrix_html += f'<td style="font-weight:700; color:#0b5394; background-color:#cfe2f3 !important;">{r["ke_ms_cy"]:.1f}%</td>'

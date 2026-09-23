@@ -58,11 +58,11 @@ def load_file_and_clean_columns(file_path):
     c_pur_m = get_col("Ticket Purchase Month-YYYY MM") or get_col("Ticket Purchase month")
     c_trip_m = get_col("Trip Month-YYYY MM") or get_col("Trip Month")
     
-    # 필터 표출용 Code
+    # 필터용 (Code)
     c_orig_code_only = get_col("Trip Origin Country Code") or get_col("Trip Origin Country Name Code")
     c_dest_code_only = get_col("Trip Destination Country Code") or get_col("Trip Destination Country Name Code")
     
-    # Dimension 조인용 Name
+    # 매핑용 (Name) 
     c_orig_name = get_col("Trip Origin Country Name")
     c_dest_name = get_col("Trip Destination Country Name")
 
@@ -108,29 +108,30 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
             if len(parts) == 2:
                 m_str, y_str = parts[0].lower(), parts[1]
                 if m_str in month_dict:
-                    return f"20{y_str if len(y_str)==2 else y_str[-2:]}-{month_dict[m_str]}"
+                    y_full = "20" + y_str if len(y_str) == 2 else y_str
+                    return f"{y_full}-{month_dict[m_str]}"
                 if y_str.lower() in month_dict:
-                    return f"20{m_str if len(m_str)==2 else m_str[-2:]}-{month_dict[y_str.lower()]}"
+                    y_full = "20" + m_str if len(m_str) == 2 else m_str
+                    return f"{y_full}-{month_dict[y_str.lower()]}"
         return st_s
 
-    # 6. Trip O&D: 원본 Trip Market에서 왼쪽 3개, 오른쪽 3개 추출
-    def parse_simple_od(mkt_str):
-        if not mkt_str or str(mkt_str).lower() == "nan": return ""
-        m_clean = str(mkt_str).strip().replace("-", "").replace("/", "").replace(" ", "")
-        if len(m_clean) >= 6:
-            return f"{m_clean[:3]}-{m_clean[-3:]}"
+    # 📌 [수정] 6. Trip O&D: Trip Market에서 기호 무시하고 무조건 앞 3자리-뒤 3자리 추출
+    def parse_simple_od(mkt_str, o_code, d_code):
+        if not mkt_str or str(mkt_str) == "nan": return f"{str(o_code).strip()}-{str(d_code).strip()}"
+        mkt_clean = str(mkt_str).replace(" ", "").replace("/", "").replace("-", "")
+        if len(mkt_clean) >= 6: return f"{mkt_clean[:3]}-{mkt_clean[-3:]}"
         return str(mkt_str)
 
-    # 4. Trip O&D V.V.: 일본 공항이 무조건 왼쪽
+    # 📌 [수정] 4. Trip O&D V.V.: Origin이나 Destination이 JP인 경우 해당 공항을 무조건 왼쪽에 배치
     def make_vv_market(o_code, d_code, o_cntry_code, d_cntry_code):
         o_c = str(o_cntry_code).upper().strip()
         d_c = str(d_cntry_code).upper().strip()
-        if o_c in ["JP", "JPN"]:
-            return f"{str(o_code).strip()}-{str(d_code).strip()} v.v."
-        elif d_c in ["JP", "JPN"]:
-            return f"{str(d_code).strip()}-{str(o_code).strip()} v.v."
-        else:
-            return f"{str(o_code).strip()}-{str(d_code).strip()} v.v."
+        is_o_jp = o_c in ["JP", "JPN"]
+        is_d_jp = d_c in ["JP", "JPN"]
+
+        if is_o_jp: return f"{str(o_code).strip()}-{str(d_code).strip()} v.v."
+        elif is_d_jp: return f"{str(d_code).strip()}-{str(o_code).strip()} v.v."
+        else: return f"{str(o_code).strip()}-{str(d_code).strip()} v.v."
 
     is_jp_expr = pl.col("Trip Origin Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN"])
 
@@ -143,7 +144,9 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
 
         pl.when(is_jp_expr).then(pl.lit("일본발")).otherwise(pl.lit("일본행")).alias("DIRECTION"),
         
-        pl.col("Trip Market").cast(pl.Utf8).map_elements(parse_simple_od, return_dtype=pl.Utf8).alias("Trip O&D"),
+        pl.struct(["Trip Market", "Trip Origin Code", "Trip Destination Code"]).map_elements(
+            lambda x: parse_simple_od(x["Trip Market"], x["Trip Origin Code"], x["Trip Destination Code"]), return_dtype=pl.Utf8
+        ).alias("Trip O&D"),
 
         pl.struct(["Trip Origin Code", "Trip Destination Code", "Trip Origin Country Code", "Trip Destination Country Code"]).map_elements(
             lambda x: make_vv_market(x["Trip Origin Code"], x["Trip Destination Code"], x["Trip Origin Country Code"], x["Trip Destination Country Code"]), return_dtype=pl.Utf8
@@ -163,6 +166,7 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
     if os.path.exists(dim_file_path):
         dim_df = pd.read_excel(dim_file_path, usecols="AA:AB") if dim_file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(dim_file_path, usecols=[26, 27])
         dim_pl = pl.from_pandas(dim_df)
+        
         dim_pl = dim_pl.rename({dim_pl.columns[0]: "DIM_KEY", dim_pl.columns[1]: "RGN_NAME"})
         dim_pl = dim_pl.with_columns([
             pl.col("DIM_KEY").cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("DIM_KEY"),
