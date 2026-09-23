@@ -5,7 +5,7 @@ import os
 import csv
 
 def find_header_row_index(file_path):
-    keywords = ["trip destination", "ticket purchase", "trip market", "dominant marketing airline", "trip origin"]
+    keywords = ["trip destination", "ticket purchase", "trip market", "dominant marketing airline", "trip origin", "stop1"]
     encoding = 'utf-8-sig'
     try:
         with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
@@ -57,18 +57,16 @@ def load_file_and_clean_columns(file_path):
 
     c_pur_m = get_col("Ticket Purchase Month-YYYY MM") or get_col("Ticket Purchase month")
     c_trip_m = get_col("Trip Month-YYYY MM") or get_col("Trip Month")
-    
     c_orig_code_only = get_col("Trip Origin Country Code") or get_col("Trip Origin Country Name Code")
     c_dest_code_only = get_col("Trip Destination Country Code") or get_col("Trip Destination Country Name Code")
-    
     c_orig_name = get_col("Trip Origin Country Name")
     c_dest_name = get_col("Trip Destination Country Name")
-
     c_dest_code = get_col("Trip Destination Code")
     c_orig_code = get_col("Trip Origin Code")
     c_market = get_col("Trip Market") or get_col("Trip O&D")
     c_airline = get_col("Dominant Marketing Airline")
     c_value = get_col("Value")
+    c_stop1 = get_col("STOP1") # 직항/경유 기준
 
     clean_pdf = pd.DataFrame()
     clean_pdf["Ticket Purchase month"] = pdf[c_pur_m] if c_pur_m else ""
@@ -82,8 +80,9 @@ def load_file_and_clean_columns(file_path):
     clean_pdf["Trip Market"] = pdf[c_market] if c_market else ""
     clean_pdf["Dominant Marketing Airline"] = pdf[c_airline] if c_airline else ""
     clean_pdf["Value"] = pdf[c_value] if c_value else 0
+    clean_pdf["STOP1"] = pdf[c_stop1] if c_stop1 else ""
 
-    # 📌 결측치 및 빈 행 원천 삭제 로직 (None-None 생성 방지)
+    # 📌 결측치 및 빈 행 완벽 제거 (None-None 방지)
     clean_pdf = clean_pdf.dropna(subset=["Trip Origin Code", "Trip Destination Code"])
     clean_pdf = clean_pdf[
         (~clean_pdf["Trip Origin Code"].astype(str).str.lower().isin(['nan', 'none', '', 'null'])) &
@@ -120,20 +119,19 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
                     return f"{y_full}-{month_dict[y_str.lower()]}"
         return st_s
 
-    # 📌 6. Trip O&D: Trip Market에서 기호 무시하고 무조건 앞 3자리-뒤 3자리 추출
+    # 📌 Trip O&D 로직 (좌측 3개 - 우측 3개)
     def parse_simple_od(mkt_str, o_code, d_code):
         mkt_clean = str(mkt_str).replace(" ", "").replace("/", "").replace("-", "").strip()
         if mkt_clean and mkt_clean.lower() != "nan" and mkt_clean.lower() != "none" and len(mkt_clean) >= 6: 
             return f"{mkt_clean[:3]}-{mkt_clean[-3:]}"
         return f"{str(o_code).strip()}-{str(d_code).strip()}"
 
-    # 📌 4. Trip O&D V.V.: Origin이나 Destination이 JP인 경우 해당 공항을 무조건 왼쪽에 배치
+    # 📌 Trip O&D V.V. 로직 (JP 국가코드 공항 무조건 좌측)
     def make_vv_market(o_code, d_code, o_cntry_code, d_cntry_code):
         o_c = str(o_cntry_code).upper().strip()
         d_c = str(d_cntry_code).upper().strip()
         o_str = str(o_code).strip()
         d_str = str(d_code).strip()
-        
         is_o_jp = o_c in ["JP", "JPN"]
         is_d_jp = d_c in ["JP", "JPN"]
 
@@ -142,6 +140,9 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         else: return f"{o_str}-{d_str} v.v."
 
     is_jp_expr = pl.col("Trip Origin Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN"])
+
+    # 📌 STOP1 컬럼 기준 직항/경유 매핑
+    is_direct_expr = pl.col("STOP1").cast(pl.Utf8).str.strip_chars().str.to_lowercase().is_in(['', 'nan', 'none', 'null']) | pl.col("STOP1").is_null()
 
     df_processed = df_merged.with_columns([
         pl.col("Ticket Purchase month").cast(pl.Utf8).map_elements(parse_str_to_ym, return_dtype=pl.Utf8).alias("Ticket Purchase month"),
@@ -152,6 +153,8 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
 
         pl.when(is_jp_expr).then(pl.lit("일본발")).otherwise(pl.lit("일본행")).alias("DIRECTION"),
         
+        pl.when(is_direct_expr).then(pl.lit("직항")).otherwise(pl.lit("경유")).alias("직항/경유"),
+
         pl.struct(["Trip Market", "Trip Origin Code", "Trip Destination Code"]).map_elements(
             lambda x: parse_simple_od(x["Trip Market"], x["Trip Origin Code"], x["Trip Destination Code"]), return_dtype=pl.Utf8
         ).alias("Trip O&D"),
@@ -163,7 +166,6 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         pl.when(is_jp_expr).then(pl.col("Trip Origin Code").cast(pl.Utf8)).otherwise(pl.col("Trip Destination Code").cast(pl.Utf8)).alias("일본 APO"),
         pl.when(is_jp_expr).then(pl.col("Trip Destination Code").cast(pl.Utf8)).otherwise(pl.col("Trip Origin Code").cast(pl.Utf8)).alias("해외 APO"),
         
-        # 매핑 키로 Country Name 지정
         pl.when(is_jp_expr)
           .then(pl.col("Trip Destination Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars())
           .otherwise(pl.col("Trip Origin Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars())
@@ -172,11 +174,9 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         pl.col("Value").cast(pl.Utf8).str.replace_all(",", "").cast(pl.Float64, strict=False).fill_null(0.0).alias("Value_num")
     ])
 
-    # usecols="AA:AB" 옵션으로 정확히 해당 열만 불러오기
     if os.path.exists(dim_file_path):
         dim_df = pd.read_excel(dim_file_path, usecols="AA:AB") if dim_file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(dim_file_path, usecols=[26, 27])
         dim_pl = pl.from_pandas(dim_df)
-        
         dim_pl = dim_pl.rename({dim_pl.columns[0]: "DIM_KEY", dim_pl.columns[1]: "RGN_NAME"})
         dim_pl = dim_pl.with_columns([
             pl.col("DIM_KEY").cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("DIM_KEY"),
@@ -193,7 +193,7 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         df_processed = df_processed.with_columns([pl.lit("기타").alias("4.OD RGN")]).drop(["DIM_LOOKUP_KEY"])
 
     final_group_cols = [
-        "Ticket Purchase month", "Trip Month", "발매월_표시", "출발월_표시", "4.OD RGN", "DIRECTION",
+        "Ticket Purchase month", "Trip Month", "발매월_표시", "출발월_표시", "4.OD RGN", "DIRECTION", "직항/경유",
         "Trip Origin Country Code", "Trip Destination Country Code", 
         "일본 APO", "해외 APO", "Trip O&D", "Trip O&D Market", "Dominant Marketing Airline", "금년/전년"
     ]
