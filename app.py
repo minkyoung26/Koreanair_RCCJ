@@ -18,7 +18,7 @@ st.set_page_config(
 # 외부 구글 앱스 스크립트 웹앱 URL
 EXT_WEB_APP_URL = "https://script.google.com/a/macros/koreanair.com/s/AKfycbxt3IfN0gB4n344U4gL1kt5i4RVjn7_uuG5PtKY-pPgNejpDCsjp2PEbopEexw5NLUjDQ/exec"
 
-# 2. Dynamic Date Logic (2026년 기준)
+# 2. Dynamic Date Logic
 today = datetime.date.today()
 current_monday = today - datetime.timedelta(days=today.weekday())
 
@@ -58,7 +58,7 @@ RBD_HIERARCHY = {
     'ZE': list('PFAJCIROYBMSHEKLQNTVWGX'), 'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 4. Custom CSS (드롭다운 목록 전체 표출 높이 보정 포함)
+# 4. Custom CSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
@@ -77,7 +77,6 @@ st.markdown("""
     summary { list-style: none !important; list-style-type: none !important; cursor: pointer; }
     details > summary { list-style: none !important; list-style-type: none !important; }
     
-    /* 📌 multiselect 드롭다운 팝업 높이 제한 해제 및 전체 항목 표출 스타일 */
     div[data-baseweb="popover"] div[role="listbox"] {
         max-height: 400px !important;
         overflow-y: auto !important;
@@ -98,7 +97,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 5. Sidebar
+# 5. Sidebar & Utils
 st.sidebar.header("📁 실시간 데이터 업로드")
 uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=['parquet', 'csv', 'xlsx'], key="sb_uploader_iss")
 uploaded_sup = st.sidebar.file_uploader("2. 공급 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_sup")
@@ -123,9 +122,7 @@ def clean_transport_column(df):
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_34_data.parquet')
-    if os.path.exists(target_path):
-        df_p = pd.read_parquet(target_path)
-        return optimize_df(clean_transport_column(df_p))
+    if os.path.exists(target_path): return optimize_df(clean_transport_column(pd.read_parquet(target_path)))
     return None
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -139,26 +136,21 @@ def process_any_uploaded_file(file_obj):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_aux_files():
-    df_sup = None
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    sup_paths = [os.path.join(base_dir, '공급.csv'), '공급.csv']
-    for sp in sup_paths:
+    for sp in [os.path.join(base_dir, '공급.csv'), '공급.csv']:
         if os.path.exists(sp):
             try:
-                df_sup = pd.read_csv(sp, low_memory=False)
-                if df_sup is not None and not df_sup.empty: break
+                df = pd.read_csv(sp, low_memory=False)
+                if df is not None and not df.empty: return optimize_df(df)
             except: pass
-    return optimize_df(df_sup)
+    return None
 
 @st.cache_data(ttl=3600, show_spinner="🌐 6수송 집계 데이터를 로드하는 중입니다...")
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    six_paths = [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']
-    for sp in six_paths:
+    for sp in [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']:
         if os.path.exists(sp):
-            try:
-                df = pd.read_parquet(sp, engine='pyarrow')
-                return optimize_df(df)
+            try: return optimize_df(pd.read_parquet(sp, engine='pyarrow'))
             except: pass
     return None
 
@@ -169,25 +161,19 @@ df_sup_raw = disk_sup
 st.markdown('<div class="main-app-title">✈️ 일본노선 발매/공급 Market Share</div>', unsafe_allow_html=True)
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
 
-selected_group = st.radio(
-    "분석할 수송 영역을 선택하세요:",
-    options=["✈️ 3/4수송 대시보드", "🌐 6수송 대시보드", "🔗 W26 연결 네트워크"],
-    index=0, horizontal=True
-)
+selected_group = st.radio("분석할 수송 영역을 선택하세요:", options=["✈️ 3/4수송 대시보드", "🌐 6수송 대시보드", "🔗 W26 연결 네트워크"], index=0, horizontal=True)
 
 def build_airline_color_map(airlines_list):
-    KE_COLOR = '#16a34a'
+    cmap = {'KE': '#16a34a'}
     palette = px.colors.qualitative.Plotly + px.colors.qualitative.Bold + px.colors.qualitative.Pastel
-    FORBIDDEN_COLORS = ['#16a34a', '#16A34A', '#00cc96', '#00CC96', '#2ca02c', '#636EFA', '#0ea5e9']
-    cmap = {'KE': KE_COLOR}
     color_idx = 0
     for al in airlines_list:
         if str(al).upper() != 'KE':
             while True:
-                candidate_color = palette[color_idx % len(palette)]
+                candidate = palette[color_idx % len(palette)]
                 color_idx += 1
-                if candidate_color.upper() not in [c.upper() for c in FORBIDDEN_COLORS]:
-                    cmap[al] = candidate_color
+                if candidate.upper() not in [c.upper() for c in ['#16a34a', '#16A34A', '#00cc96', '#00CC96', '#2ca02c', '#636EFA', '#0ea5e9']]:
+                    cmap[al] = candidate
                     break
     return cmap
 
@@ -197,11 +183,9 @@ def apply_bottom_legend(fig):
 
 def format_dep_time(dep_val):
     try:
-        val_str = str(int(dep_val)).zfill(4)
-        hh, mm = int(val_str[:2]), int(val_str[2:])
-        if hh >= 24: hh = 23
-        if mm >= 60: mm = 59
-        return f"2026-08-01 {hh:02d}:{mm:02d}:00", f"2026-08-01 {(hh+2)%24:02d}:{mm:02d}:00"
+        v = str(int(dep_val)).zfill(4)
+        hh, mm = int(v[:2]), int(v[2:])
+        return f"2026-08-01 {min(hh,23):02d}:{min(mm,59):02d}:00", f"2026-08-01 {(hh+2)%24:02d}:{min(mm,59):02d}:00"
     except: return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
 def render_multiselect_box(container, label, full_list, key_name, default_vals=None):
@@ -218,7 +202,7 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 전년비(YOY) 색상: +이면 파란색(#1d4ed8), -이면 붉은색(#dc2626) 서식 지정
+# 📌 전년비 양/음수 색상 처리 (+파란색, -붉은색)
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
     if val > 0: return f'<span style="color: #1d4ed8 !important; font-size: 11px !important; font-weight: 600 !important;">▲ {val:.1f}{unit}</span>'
@@ -855,7 +839,6 @@ elif selected_group == "🌐 6수송 대시보드":
 
     cy_df_only = df_6[df_6['Val_CY_num'] > 0] if 'Val_CY_num' in df_6.columns else df_6
 
-    # 📌 필터 표시용 변수 추출 
     all_pur_m_disp = sorted([str(x).strip() for x in cy_df_only[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in cy_df_only.columns else []
     all_trip_m_disp = sorted([str(x).strip() for x in cy_df_only[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_trip_m_disp in cy_df_only.columns else []
 
@@ -869,7 +852,14 @@ elif selected_group == "🌐 6수송 대시보드":
     all_dest_c = sorted([str(x).strip() for x in df_6[col_dest_c].dropna().unique() if str(x).strip() != 'nan']) if col_dest_c in df_6.columns else []
     all_jp_apo = sorted([str(x).strip() for x in df_6[col_jp_apo].dropna().unique() if str(x).strip() != 'nan']) if col_jp_apo in df_6.columns else []
     all_ov_apo = sorted([str(x).strip() for x in df_6[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in df_6.columns else []
-    all_al_6_opts = sorted([str(x).strip() for x in df_6[col_al_6].dropna().unique() if str(x).strip() != 'nan']) if col_al_6 in df_6.columns else []
+    
+    # 📌 필터용 항공사 정렬: KE 최우선, 그리고 발매순 내림차순
+    if col_al_6 in df_6.columns:
+        al_val_series = cy_df_only.groupby(col_al_6)['Val_CY_num'].sum().sort_values(ascending=False)
+        al_sorted = [str(x).strip() for x in al_val_series.index if str(x).strip() != 'nan']
+        all_al_6_opts = ['KE'] + [x for x in al_sorted if x != 'KE'] if 'KE' in al_sorted else al_sorted
+    else:
+        all_al_6_opts = []
 
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
@@ -910,7 +900,6 @@ elif selected_group == "🌐 6수송 대시보드":
         if not filtered_6th.empty and col_al_6 in filtered_6th.columns:
             al_agg = filtered_6th.groupby(col_al_6, observed=False)[['Val_CY_num', 'Val_PY_num']].sum().reset_index()
             
-            # 📌 항공사 정렬 (KE 최우선 + 발매순)
             non_ke_agg = al_agg[al_agg[col_al_6] != 'KE'].sort_values(by='Val_CY_num', ascending=False)
             ke_agg = al_agg[al_agg[col_al_6] == 'KE']
             al_agg_sorted = pd.concat([ke_agg, non_ke_agg]).reset_index(drop=True)
@@ -922,6 +911,7 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table = '<div class="yoy-table-container"><table class="yoy-table"><thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             for al_code in airline_rank_list:
                 if al_code == 'KE':
+                    # KE 헤더 강조 색상 (상단 테이블: #6fa8dc)
                     html_table += f'<th class="ke-header" style="width:130px; background-color:#6fa8dc !important; color:#ffffff !important;">★ KE ({ke_rank}위)</th>'
                 else:
                     rank_num = full_al_ranking.index(al_code) + 1 if al_code in full_al_ranking else "-"
@@ -969,7 +959,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.markdown("---")
 
         # ------------------------------------------
-        # 📌 2번째 표: Carrier별 M/S (Trip O&D 표출 추가)
+        # 📌 Carrier별 M/S 테이블 (하단 테이블 KE 컬럼 색상 동기화 적용)
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 O&D)</div>', unsafe_allow_html=True)
         
@@ -1045,17 +1035,18 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += '<th colspan="2" class="header-main" style="background-color:#215b88 !important; color:#ffffff !important;">시장 전체</th>'
                 od_matrix_html += f'<th colspan="2" class="header-main" style="background-color:#1e4e79 !important; color:#ffffff !important;">선택 항공사 발매량{sel_al_title_suffix}</th>'
                 od_matrix_html += '<th colspan="2" class="header-main" style="background-color:#1b3d5a !important; color:#ffffff !important;">선택 항공사 M/S</th>'
-                od_matrix_html += '<th colspan="4" class="header-main" style="background-color:#16a34a !important; color:#ffffff !important;">KE 발매량 & M/S (대한항공)</th></tr>'
+                # 📌 하단 테이블 KE 컬럼 상단 테이블 색상(#6fa8dc)과 동기화 적용
+                od_matrix_html += '<th colspan="4" class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">KE 발매량 & M/S (대한항공)</th></tr>'
                 od_matrix_html += '<tr><th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">금년</th>'
                 od_matrix_html += '<th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">YOY</th>'
                 od_matrix_html += '<th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">금년</th>'
                 od_matrix_html += '<th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">YOY</th>'
                 od_matrix_html += '<th class="header-main" style="background-color:#204f77 !important; color:#ffffff !important;">금년 M/S</th>'
                 od_matrix_html += '<th class="header-main" style="background-color:#204f77 !important; color:#ffffff !important;">YOY</th>'
-                od_matrix_html += '<th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">금년 발매량</th>'
-                od_matrix_html += '<th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">YOY</th>'
-                od_matrix_html += '<th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">KE M/S</th>'
-                od_matrix_html += '<th class="header-main" style="background-color:#22c55e !important; color:#ffffff !important;">YOY</th></tr></thead><tbody>'
+                od_matrix_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">금년 발매량</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">YOY</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">KE M/S</th>'
+                od_matrix_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">YOY</th></tr></thead><tbody>'
 
                 for r in matrix_rows:
                     od_matrix_html += f'<tr><td style="font-weight:700;">{r["rank"]}</td>'
@@ -1067,10 +1058,11 @@ elif selected_group == "🌐 6수송 대시보드":
                     od_matrix_html += f'<td>{format_yoy_html(r["sel_yoy"])}</td>'
                     od_matrix_html += f'<td style="font-weight:700;">{r["sel_ms_cy"]:.1f}%</td>'
                     od_matrix_html += f'<td>{format_yoy_html(r["sel_ms_yoy"], True)}</td>'
-                    od_matrix_html += f'<td style="font-weight:700; color:#16a34a; background-color:#f0fdf4 !important;">{r["ke_cy"]:,.0f}</td>'
-                    od_matrix_html += f'<td style="background-color:#f0fdf4 !important;">{format_yoy_html(r["ke_yoy"])}</td>'
-                    od_matrix_html += f'<td style="font-weight:700; color:#16a34a; background-color:#f0fdf4 !important;">{r["ke_ms_cy"]:.1f}%</td>'
-                    od_matrix_html += f'<td style="background-color:#f0fdf4 !important;">{format_yoy_html(r["ke_ms_yoy"], True)}</td></tr>'
+                    # 📌 셀 배경색 연파랑(#cfe2f3), 텍스트 진파랑(#0b5394) 적용 
+                    od_matrix_html += f'<td style="font-weight:700; color:#0b5394; background-color:#cfe2f3 !important;">{r["ke_cy"]:,.0f}</td>'
+                    od_matrix_html += f'<td style="background-color:#cfe2f3 !important;">{format_yoy_html(r["ke_yoy"])}</td>'
+                    od_matrix_html += f'<td style="font-weight:700; color:#0b5394; background-color:#cfe2f3 !important;">{r["ke_ms_cy"]:.1f}%</td>'
+                    od_matrix_html += f'<td style="background-color:#cfe2f3 !important;">{format_yoy_html(r["ke_ms_yoy"], True)}</td></tr>'
 
                 od_matrix_html += f'<tr class="row-title" style="background-color:#f1f5f9 !important; font-weight:800;"><td colspan="3">금년 요약</td>'
                 od_matrix_html += f'<td><b>{tot_mkt_cy:,.0f}</b></td>'
@@ -1079,9 +1071,9 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += f'<td>{format_yoy_html(tot_sel_yoy)}</td>'
                 od_matrix_html += f'<td><b>{tot_sel_ms_cy:.1f}%</b></td>'
                 od_matrix_html += f'<td>{format_yoy_html(tot_sel_ms_yoy, True)}</td>'
-                od_matrix_html += f'<td style="color:#16a34a;"><b>{tot_ke_cy:,.0f}</b></td>'
+                od_matrix_html += f'<td style="color:#0b5394;"><b>{tot_ke_cy:,.0f}</b></td>'
                 od_matrix_html += f'<td>{format_yoy_html(tot_ke_yoy)}</td>'
-                od_matrix_html += f'<td style="color:#16a34a;"><b>{tot_ke_ms_cy:.1f}%</b></td>'
+                od_matrix_html += f'<td style="color:#0b5394;"><b>{tot_ke_ms_cy:.1f}%</b></td>'
                 od_matrix_html += f'<td>{format_yoy_html(tot_ke_ms_yoy, True)}</td></tr>'
                 od_matrix_html += '</tbody></table></div>'
                 
