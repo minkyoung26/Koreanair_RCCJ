@@ -855,7 +855,7 @@ elif selected_group == "🌐 6수송 대시보드":
     
     # 📌 필터용 항공사 정렬: KE 최우선, 그리고 발매순 내림차순
     if col_al_6 in df_6.columns:
-        al_val_series = cy_df_only.groupby(col_al_6)['Val_CY_num'].sum().sort_values(ascending=False)
+        al_val_series = cy_df_only.groupby(col_al_6, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
         al_sorted = [str(x).strip() for x in al_val_series.index if str(x).strip() != 'nan']
         all_al_6_opts = ['KE'] + [x for x in al_sorted if x != 'KE'] if 'KE' in al_sorted else al_sorted
     else:
