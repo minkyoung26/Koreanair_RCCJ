@@ -362,6 +362,41 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
 
+                if month_col and month_col in merged_df.columns:
+                    st.markdown('<div class="unified-sub-header">3. 출발기간별 주요 항공사 M/S 점유비 추이</div>', unsafe_allow_html=True)
+                    df_dep_al = filtered_df
+                    if not df_dep_al.empty:
+                        dep_al_grp = df_dep_al.groupby([month_col, 'AL_clean'], observed=False)[val_col].sum().reset_index()
+                        dep_mkt_tot = df_dep_al.groupby(month_col, observed=False)[val_col].sum().reset_index()
+                        dep_al_grp[month_col] = dep_al_grp[month_col].astype(str)
+                        dep_mkt_tot[month_col] = dep_mkt_tot[month_col].astype(str)
+                        dep_merged = pd.merge(dep_al_grp, dep_mkt_tot, on=month_col, suffixes=('', '_Mkt'))
+                        dep_merged[val_col] = dep_merged[val_col].fillna(0)
+                        dep_merged['MS_Percent'] = np.where(dep_merged[f'{val_col}_Mkt'] > 0, (dep_merged[val_col] / dep_merged[f'{val_col}_Mkt']) * 100, 0)
+                        top_al_in_dep = df_dep_al.groupby('AL_clean', observed=False)[val_col].sum().sort_values(ascending=False).index.tolist()
+                        top_al_display = ['KE'] + [al for al in top_al_in_dep if al != 'KE'][:5]
+                        dep_merged_top = dep_merged[dep_merged['AL_clean'].isin(top_al_display)].copy()
+
+                        fig_ke_dep = go.Figure()
+                        for al_code in top_al_display:
+                            al_data = dep_merged_top[dep_merged_top['AL_clean'] == al_code]
+                            if al_data.empty: continue
+                            is_ke = (al_code == 'KE')
+                            line_style = dict(color='#16a34a', width=3.5) if is_ke else dict(color=build_airline_color_map(opts_al).get(al_code, '#94a3b8'), dash='dot', width=1.5)
+                            marker_style = dict(size=8, symbol='circle') if is_ke else dict(size=4)
+                            mode_setting = 'lines+markers+text' if is_ke else 'lines+markers'
+                            text_labels = [f"<b>{v:.1f}%</b>" for v in al_data['MS_Percent']] if is_ke else None
+                            fig_ke_dep.add_trace(go.Scatter(
+                                x=al_data[month_col], y=al_data['MS_Percent'], mode=mode_setting,
+                                name=f"★ KE (대한항공)" if is_ke else al_code, line=line_style, marker=marker_style, text=text_labels,
+                                textposition="top center", hovertemplate=f"<b>항공사: {al_code}</b><br>출발월: %{{x}}<br>점유율: %{{y:.1f}}%<extra></extra>"
+                            ))
+                        fig_ke_dep.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_month), yaxis=dict(range=[0, max(dep_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
+                        apply_bottom_legend(fig_ke_dep)
+                        st.plotly_chart(fig_ke_dep, width='stretch')
+
+                st.markdown("---")
+                
                 c3, c4 = st.columns(2)
                 ke_only_df = filtered_df[filtered_df['AL_clean'] == 'KE']
                 with c3:
@@ -836,7 +871,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.markdown("---")
 
         # ------------------------------------------
-        # 📌 Carrier별 M/S (TOP 20 O&D) 및 전체 총계/소계
+        # 📌 Carrier별 M/S (TOP 20 O&D 및 전체 총계/소계)
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 O&D 및 전체 총계)</div>', unsafe_allow_html=True)
         
@@ -871,7 +906,13 @@ elif selected_group == "🌐 6수송 대시보드":
                 matrix_rows = []
                 for rank_i, od_vv_code in enumerate(top20_ods, 1):
                     df_od = filtered_6th[filtered_6th[col_od_mkt] == od_vv_code]
-                    simple_od_str = str(df_od[col_od_simple].iloc[0]) if col_od_simple in df_od.columns and not df_od.empty else od_vv_code.replace(" v.v.", "")
+                    
+                    # 📌 모든 단방향 O&D 표시 로직 반영 (NRT-PVG / PVG-NRT)
+                    if col_od_simple in df_od.columns and not df_od.empty:
+                        unique_ods = sorted(list(set([str(x).strip() for x in df_od[col_od_simple].unique() if str(x).strip() != 'nan'])))
+                        simple_od_str = " / ".join(unique_ods)
+                    else:
+                        simple_od_str = od_vv_code.replace(" v.v.", "")
 
                     mkt_cy = df_od['Val_CY_num'].sum()
                     mkt_py = df_od['Val_PY_num'].sum()
@@ -952,14 +993,12 @@ elif selected_group == "🌐 6수송 대시보드":
                     od_matrix_html += f'<td style="font-weight:700;">{r["sel_ms_cy"]:.1f}%</td>'
                     od_matrix_html += get_yoy_td_html(r["sel_ms_yoy"], True)
                     
-                    # 📌 강제 색상 지정 완료
                     od_matrix_html += f'<td style="font-weight:700 !important; color:#0b5394 !important; background-color:#cfe2f3 !important;">{r["ke_cy"]:,.0f}</td>'
                     od_matrix_html += get_yoy_td_html(r["ke_yoy"], bg_color="#cfe2f3")
                     od_matrix_html += f'<td style="font-weight:700 !important; color:#0b5394 !important; background-color:#cfe2f3 !important;">{r["ke_ms_cy"]:.1f}%</td>'
                     od_matrix_html += get_yoy_td_html(r["ke_ms_yoy"], True, bg_color="#cfe2f3")
                     od_matrix_html += '</tr>'
 
-                # 📌 소계 행 
                 od_matrix_html += f'<tr class="row-title" style="background-color:#f1f5f9 !important; border-top:2px solid #94a3b8 !important;"><td colspan="3" style="font-weight:800 !important; text-align:center;">[TOP 20 소계]</td>'
                 od_matrix_html += f'<td style="font-weight:800 !important;">{tot_mkt_cy:,.0f}</td>'
                 od_matrix_html += get_yoy_td_html(tot_mkt_yoy, bg_color="#f1f5f9")
@@ -973,7 +1012,6 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += get_yoy_td_html(tot_ke_ms_yoy, True, bg_color="#cfe2f3")
                 od_matrix_html += '</tr>'
 
-                # 📌 총계 행
                 od_matrix_html += f'<tr class="row-title" style="background-color:#e2e8f0 !important; border-top:2px solid #64748b !important;"><td colspan="3" style="font-weight:800 !important; text-align:center; color:#0f172a !important;">[선택 필터 전체 총계]</td>'
                 od_matrix_html += f'<td style="font-weight:800 !important; color:#0f172a !important;">{grand_mkt_cy:,.0f}</td>'
                 od_matrix_html += get_yoy_td_html(grand_mkt_yoy, bg_color="#e2e8f0")
