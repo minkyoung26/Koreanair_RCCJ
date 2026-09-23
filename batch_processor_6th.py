@@ -62,7 +62,7 @@ def load_file_and_clean_columns(file_path):
     c_orig_code_only = get_col("Trip Origin Country Code") or get_col("Trip Origin Country Name Code")
     c_dest_code_only = get_col("Trip Destination Country Code") or get_col("Trip Destination Country Name Code")
     
-    # 📌 매핑용 (Name) - 사용자 요청사항 100% 분리 반영
+    # 📌 매핑용 (Name) 
     c_orig_name = get_col("Trip Origin Country Name")
     c_dest_name = get_col("Trip Destination Country Name")
 
@@ -115,7 +115,7 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
                     return f"{y_full}-{month_dict[y_str.lower()]}"
         return st_s
 
-    # 6. Trip O&D: 방향 가공 없이 Origin-Destination 형태
+    # 6. Trip O&D
     def parse_simple_od(mkt_str, o_code, d_code):
         if not mkt_str or str(mkt_str) == "nan": return f"{str(o_code).strip()}-{str(d_code).strip()}"
         mkt_clean = str(mkt_str).replace(" ", "").replace("/", "-")
@@ -123,7 +123,7 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         if len(p) >= 2: return f"{p[0][:3]}-{p[1][:3]}"
         return str(mkt_str)
 
-    # 4. Trip O&D V.V.: JP 공항을 무조건 왼쪽에 배치
+    # 4. Trip O&D V.V.
     def make_vv_market(o_code, d_code, o_cntry_code, d_cntry_code):
         o_c = str(o_cntry_code).upper().strip()
         d_c = str(d_cntry_code).upper().strip()
@@ -136,23 +136,19 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
 
     is_jp_expr = pl.col("Trip Origin Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN"])
 
-    # 파생 필드 연산
     df_processed = df_merged.with_columns([
         pl.col("Ticket Purchase month").cast(pl.Utf8).map_elements(parse_str_to_ym, return_dtype=pl.Utf8).alias("Ticket Purchase month"),
         pl.col("Trip Month").cast(pl.Utf8).map_elements(parse_str_to_ym, return_dtype=pl.Utf8).alias("Trip Month"),
         
-        # 필터 표시용 "08월" 형태
         pl.col("Ticket Purchase month").cast(pl.Utf8).str.slice(-2, 2).map_elements(lambda x: f"{x}월" if x else "", return_dtype=pl.Utf8).alias("발매월_표시"),
         pl.col("Trip Month").cast(pl.Utf8).str.slice(-2, 2).map_elements(lambda x: f"{x}월" if x else "", return_dtype=pl.Utf8).alias("출발월_표시"),
 
         pl.when(is_jp_expr).then(pl.lit("일본발")).otherwise(pl.lit("일본행")).alias("DIRECTION"),
         
-        # 6. Trip O&D
         pl.struct(["Trip Market", "Trip Origin Code", "Trip Destination Code"]).map_elements(
             lambda x: parse_simple_od(x["Trip Market"], x["Trip Origin Code"], x["Trip Destination Code"]), return_dtype=pl.Utf8
         ).alias("Trip O&D"),
 
-        # 4. Trip O&D V.V.
         pl.struct(["Trip Origin Code", "Trip Destination Code", "Trip Origin Country Code", "Trip Destination Country Code"]).map_elements(
             lambda x: make_vv_market(x["Trip Origin Code"], x["Trip Destination Code"], x["Trip Origin Country Code"], x["Trip Destination Country Code"]), return_dtype=pl.Utf8
         ).alias("Trip O&D Market"),
@@ -160,7 +156,7 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         pl.when(is_jp_expr).then(pl.col("Trip Origin Code").cast(pl.Utf8)).otherwise(pl.col("Trip Destination Code").cast(pl.Utf8)).alias("일본 APO"),
         pl.when(is_jp_expr).then(pl.col("Trip Destination Code").cast(pl.Utf8)).otherwise(pl.col("Trip Origin Code").cast(pl.Utf8)).alias("해외 APO"),
         
-        # 📌 3. OD Region 매핑 키: 엑셀과 매칭되도록 Name 사용, 대문자 처리
+        # 📌 매핑 키로 Country Name 지정
         pl.when(is_jp_expr)
           .then(pl.col("Trip Destination Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars())
           .otherwise(pl.col("Trip Origin Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars())
@@ -169,10 +165,11 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         pl.col("Value").cast(pl.Utf8).str.replace_all(",", "").cast(pl.Float64, strict=False).fill_null(0.0).alias("Value_num")
     ])
 
-    # 📌 Dimension.xlsx 조인 (JPN-XXX)
+    # 📌 원인 해결: usecols="AA:AB" 옵션으로 정확히 해당 열만 불러오기
     if os.path.exists(dim_file_path):
-        dim_df = pd.read_excel(dim_file_path) if dim_file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(dim_file_path)
+        dim_df = pd.read_excel(dim_file_path, usecols="AA:AB") if dim_file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(dim_file_path, usecols=[26, 27])
         dim_pl = pl.from_pandas(dim_df)
+        
         dim_pl = dim_pl.rename({dim_pl.columns[0]: "DIM_KEY", dim_pl.columns[1]: "RGN_NAME"})
         dim_pl = dim_pl.with_columns([
             pl.col("DIM_KEY").cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("DIM_KEY"),
@@ -188,7 +185,6 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
     else:
         df_processed = df_processed.with_columns([pl.lit("기타").alias("4.OD RGN")]).drop(["DIM_LOOKUP_KEY"])
 
-    # 그룹핑 (Name 필드는 드롭하고 대시보드용 Code 필드만 남김)
     final_group_cols = [
         "Ticket Purchase month", "Trip Month", "발매월_표시", "출발월_표시", "4.OD RGN", "DIRECTION",
         "Trip Origin Country Code", "Trip Destination Country Code", 
