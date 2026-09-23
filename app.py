@@ -202,18 +202,18 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-# 📌 [수정] 전년비(YOY) 서식: 양수 파란색(#1d4ed8), 음수 붉은색(#dc2626)
+# 📌 전년비(YOY) 색상 명시적 주입 (브라우저 캐시 무시용 !important 적용)
 def format_yoy_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
-    if val > 0: return f'<span style="color: #1d4ed8 !important; font-size: 11px !important; font-weight: 600 !important;">▲ {val:.1f}{unit}</span>'
-    elif val < 0: return f'<span style="color: #dc2626 !important; font-size: 11px !important; font-weight: 600 !important;">▼ {abs(val):.1f}{unit}</span>'
-    else: return f'<span style="color: #475569 !important; font-size: 11px !important; font-weight: 500 !important;">-</span>'
+    if val > 0: return f'<span style="color: #1d4ed8 !important; font-size: 11px !important; font-weight: 700 !important;">▲ {val:.1f}{unit}</span>'
+    elif val < 0: return f'<span style="color: #dc2626 !important; font-size: 11px !important; font-weight: 700 !important;">▼ {abs(val):.1f}{unit}</span>'
+    else: return f'<span style="color: #64748b !important; font-size: 11px !important; font-weight: 500 !important;">-</span>'
 
 def get_yoy_td_html(val, is_percentage_point=False):
     unit = "%p" if is_percentage_point else "%"
-    if val > 0: return f'<td style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 600 !important; text-align: center !important;">▲ {val:.1f}{unit}</td>'
-    elif val < 0: return f'<td style="color: #dc2626 !important; font-size: 10px !important; font-weight: 600 !important; text-align: center !important;">▼ {abs(val):.1f}{unit}</td>'
-    else: return f'<td style="color: #475569 !important; font-size: 10px !important; font-weight: 500 !important; text-align: center !important;">-</td>'
+    if val > 0: return f'<td style="color: #1d4ed8 !important; font-size: 10px !important; font-weight: 700 !important; text-align: center !important;">▲ {val:.1f}{unit}</td>'
+    elif val < 0: return f'<td style="color: #dc2626 !important; font-size: 10px !important; font-weight: 700 !important; text-align: center !important;">▼ {abs(val):.1f}{unit}</td>'
+    else: return f'<td style="color: #64748b !important; font-size: 10px !important; font-weight: 500 !important; text-align: center !important;">-</td>'
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
@@ -617,7 +617,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     fig_timeline.update_layout(height=300, showlegend=False)
                     st.plotly_chart(fig_timeline, width='stretch')
 
-    # 📌 3. 🏷️ 대리점, RBD별 발매현황 탭 (화살표 제거)
+    # 📌 3. 🏷️ 대리점, RBD별 발매현황 탭
     with tab_34_3:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
@@ -812,11 +812,9 @@ elif selected_group == "🌐 6수송 대시보드":
         cleaned = target_str.lower().replace(" ", "").replace("_", "").replace(".", "")
         return lower_col_map.get(cleaned, None)
 
-    col_pur_m = get_actual_col("Ticket Purchase month") or "Ticket Purchase month"
     col_pur_m_disp = get_actual_col("발매월_표시") or "발매월_표시"
-    col_trip_m = get_actual_col("Trip Month") or "Trip Month"
     col_trip_m_disp = get_actual_col("출발월_표시") or "출발월_표시"
-    col_rgn = get_actual_col("4.OD RGN") or get_actual_col("OD Region") or "4.OD RGN"
+    col_rgn = get_actual_col("4.OD RGN") or "4.OD RGN"
     col_dir = get_actual_col("DIRECTION") or "DIRECTION"
     col_orig_c = get_actual_col("Trip Origin Country Code") or "Trip Origin Country Code"
     col_dest_c = get_actual_col("Trip Destination Country Code") or "Trip Destination Country Code"
@@ -837,65 +835,82 @@ elif selected_group == "🌐 6수송 대시보드":
         df_6['Val_CY_num'] = df_6['Val_num']
         df_6['Val_PY_num'] = 0.0
 
-    cy_df_only = df_6[df_6['Val_CY_num'] > 0] if 'Val_CY_num' in df_6.columns else df_6
-
-    all_pur_m_disp = sorted([str(x).strip() for x in cy_df_only[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in cy_df_only.columns else []
-    all_trip_m_disp = sorted([str(x).strip() for x in cy_df_only[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_trip_m_disp in cy_df_only.columns else []
-
-    all_rgn = sorted([str(x).strip() for x in df_6[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in df_6.columns else []
-    default_rgn = ["JPN-AME"] if "JPN-AME" in all_rgn else []
-
-    all_vv_opts = sorted([str(x).strip() for x in df_6[col_od_mkt].dropna().unique() if str(x).strip() != 'nan']) if col_od_mkt in df_6.columns else []
-    all_dir = sorted([str(x).strip() for x in df_6[col_dir].dropna().unique() if str(x).strip() != 'nan']) if col_dir in df_6.columns else []
-    all_od_simple_opts = sorted([str(x).strip() for x in df_6[col_od_simple].dropna().unique() if str(x).strip() != 'nan']) if col_od_simple in df_6.columns else []
-    all_orig_c = sorted([str(x).strip() for x in df_6[col_orig_c].dropna().unique() if str(x).strip() != 'nan']) if col_orig_c in df_6.columns else []
-    all_dest_c = sorted([str(x).strip() for x in df_6[col_dest_c].dropna().unique() if str(x).strip() != 'nan']) if col_dest_c in df_6.columns else []
-    all_jp_apo = sorted([str(x).strip() for x in df_6[col_jp_apo].dropna().unique() if str(x).strip() != 'nan']) if col_jp_apo in df_6.columns else []
-    all_ov_apo = sorted([str(x).strip() for x in df_6[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in df_6.columns else []
-    
-    # 📌 11. 항공사 목록 정렬 (KE 1순위, 나머지 발매순 내림차순)
-    if col_al_6 in df_6.columns:
-        al_val_series = cy_df_only.groupby(col_al_6, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
-        al_sorted = [str(x).strip() for x in al_val_series.index if str(x).strip() != 'nan']
-        all_al_6_opts = ['KE'] + [x for x in al_sorted if x != 'KE'] if 'KE' in al_sorted else al_sorted
-    else:
-        all_al_6_opts = []
-
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황 (11개 슬라이서 세트)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황 (종속형 순차 필터링 적용)</div>', unsafe_allow_html=True)
         
+        # 📌 동적 종속 필터링을 위한 기준 복사본 생성
+        temp_df = df_6.copy()
+
+        # ------------------- Row 1 (5개 슬라이서) -------------------
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5 = st.columns(5)
-        sel_pur_m_disp = render_multiselect_box(f6_col1, "1. 금년 발매월 (과거 6개월)", all_pur_m_disp, "slicer6_pur_m_disp")
-        sel_trip_m_disp = render_multiselect_box(f6_col2, "2. 금년 출발월 (향후 9개월)", all_trip_m_disp, "slicer6_trip_m_disp")
-        sel_rgn = render_multiselect_box(f6_col3, "3. OD Region", all_rgn, "slicer6_rgn", default_rgn)
-        sel_vv = render_multiselect_box(f6_col4, "4. Trip O&D V.V.", all_vv_opts, "slicer6_vv")
-        sel_dir = render_multiselect_box(f6_col5, "5. 일본발/일본행", all_dir, "slicer6_dir")
+        
+        # 1. 금년 발매월
+        opts_pur_m = sorted([str(x).strip() for x in temp_df[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in temp_df.columns else []
+        sel_pur_m_disp = render_multiselect_box(f6_col1, "1. 금년 발매월", opts_pur_m, "slicer6_pur_m_disp")
+        if sel_pur_m_disp: temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(sel_pur_m_disp)]
 
+        # 2. 금년 출발월
+        opts_trip_m = sorted([str(x).strip() for x in temp_df[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_trip_m_disp in temp_df.columns else []
+        sel_trip_m_disp = render_multiselect_box(f6_col2, "2. 금년 출발월", opts_trip_m, "slicer6_trip_m_disp")
+        if sel_trip_m_disp: temp_df = temp_df[temp_df[col_trip_m_disp].astype(str).isin(sel_trip_m_disp)]
+
+        # 3. OD Region (기본값 JPN-AME 삭제, 전체 선택으로 초기화)
+        opts_rgn = sorted([str(x).strip() for x in temp_df[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in temp_df.columns else []
+        sel_rgn = render_multiselect_box(f6_col3, "3. OD Region", opts_rgn, "slicer6_rgn")
+        if sel_rgn: temp_df = temp_df[temp_df[col_rgn].astype(str).isin(sel_rgn)]
+
+        # 4. 항공사 (위치 변경, KE 우선 및 발매순 내림차순 정렬)
+        if col_al_6 in temp_df.columns:
+            al_val_series = temp_df[temp_df['Val_CY_num'] > 0].groupby(col_al_6, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
+            al_sorted = [str(x).strip() for x in al_val_series.index if str(x).strip() != 'nan']
+            opts_al = ['KE'] + [x for x in al_sorted if x != 'KE'] if 'KE' in al_sorted else al_sorted
+        else:
+            opts_al = []
+        sel_al_list = render_multiselect_box(f6_col4, "4. 항공사", opts_al, "slicer6_al_multi")
+        if sel_al_list: temp_df = temp_df[temp_df[col_al_6].astype(str).isin(sel_al_list)]
+
+        # 5. Trip O&D V.V.
+        opts_vv = sorted([str(x).strip() for x in temp_df[col_od_mkt].dropna().unique() if str(x).strip() != 'nan']) if col_od_mkt in temp_df.columns else []
+        sel_vv = render_multiselect_box(f6_col5, "5. Trip O&D V.V.", opts_vv, "slicer6_vv")
+        if sel_vv: temp_df = temp_df[temp_df[col_od_mkt].astype(str).isin(sel_vv)]
+
+        # ------------------- Row 2 (6개 슬라이서) -------------------
         f6_col6, f6_col7, f6_col8, f6_col9, f6_col10, f6_col11 = st.columns(6)
-        sel_od_simple = render_multiselect_box(f6_col6, "6. Trip O&D", all_od_simple_opts, "slicer6_od_simple")
-        sel_orig_c = render_multiselect_box(f6_col7, "7. 출발국가", all_orig_c, "slicer6_orig_c")
-        sel_dest_c = render_multiselect_box(f6_col8, "8. 도착국가", all_dest_c, "slicer6_dest_c")
-        sel_jp_apo = render_multiselect_box(f6_col9, "9. 일본공항", all_jp_apo, "slicer6_jp_apo")
-        sel_ov_apo = render_multiselect_box(f6_col10, "10. 해외공항", all_ov_apo, "slicer6_ov_apo")
-        sel_al_list = render_multiselect_box(f6_col11, "11. 항공사", all_al_6_opts, "slicer6_al_multi")
 
-        mask_6th = pd.Series(True, index=df_6.index)
+        # 6. 일본발/일본행
+        opts_dir = sorted([str(x).strip() for x in temp_df[col_dir].dropna().unique() if str(x).strip() != 'nan']) if col_dir in temp_df.columns else []
+        sel_dir = render_multiselect_box(f6_col6, "6. 일본발/일본행", opts_dir, "slicer6_dir")
+        if sel_dir: temp_df = temp_df[temp_df[col_dir].astype(str).isin(sel_dir)]
 
-        if col_pur_m_disp in df_6.columns and sel_pur_m_disp: mask_6th &= (df_6[col_pur_m_disp].astype(str).isin(sel_pur_m_disp))
-        if col_trip_m_disp in df_6.columns and sel_trip_m_disp: mask_6th &= (df_6[col_trip_m_disp].astype(str).isin(sel_trip_m_disp))
-        if col_rgn in df_6.columns and sel_rgn: mask_6th &= (df_6[col_rgn].astype(str).isin(sel_rgn))
-        if col_od_mkt in df_6.columns and sel_vv: mask_6th &= (df_6[col_od_mkt].astype(str).isin(sel_vv))
-        if col_dir in df_6.columns and sel_dir: mask_6th &= (df_6[col_dir].astype(str).isin(sel_dir))
-        if col_od_simple in df_6.columns and sel_od_simple: mask_6th &= (df_6[col_od_simple].astype(str).isin(sel_od_simple))
-        if col_orig_c in df_6.columns and sel_orig_c: mask_6th &= (df_6[col_orig_c].astype(str).isin(sel_orig_c))
-        if col_dest_c in df_6.columns and sel_dest_c: mask_6th &= (df_6[col_dest_c].astype(str).isin(sel_dest_c))
-        if col_jp_apo in df_6.columns and sel_jp_apo: mask_6th &= (df_6[col_jp_apo].astype(str).isin(sel_jp_apo))
-        if col_ov_apo in df_6.columns and sel_ov_apo: mask_6th &= (df_6[col_ov_apo].astype(str).isin(sel_ov_apo))
-        if col_al_6 in df_6.columns and sel_al_list: mask_6th &= (df_6[col_al_6].astype(str).isin(sel_al_list))
+        # 7. Trip O&D
+        opts_od = sorted([str(x).strip() for x in temp_df[col_od_simple].dropna().unique() if str(x).strip() != 'nan']) if col_od_simple in temp_df.columns else []
+        sel_od_simple = render_multiselect_box(f6_col7, "7. Trip O&D", opts_od, "slicer6_od_simple")
+        if sel_od_simple: temp_df = temp_df[temp_df[col_od_simple].astype(str).isin(sel_od_simple)]
 
-        filtered_6th = df_6[mask_6th]
+        # 8. 출발국가
+        opts_orig_c = sorted([str(x).strip() for x in temp_df[col_orig_c].dropna().unique() if str(x).strip() != 'nan']) if col_orig_c in temp_df.columns else []
+        sel_orig_c = render_multiselect_box(f6_col8, "8. 출발국가", opts_orig_c, "slicer6_orig_c")
+        if sel_orig_c: temp_df = temp_df[temp_df[col_orig_c].astype(str).isin(sel_orig_c)]
+
+        # 9. 도착국가
+        opts_dest_c = sorted([str(x).strip() for x in temp_df[col_dest_c].dropna().unique() if str(x).strip() != 'nan']) if col_dest_c in temp_df.columns else []
+        sel_dest_c = render_multiselect_box(f6_col9, "9. 도착국가", opts_dest_c, "slicer6_dest_c")
+        if sel_dest_c: temp_df = temp_df[temp_df[col_dest_c].astype(str).isin(sel_dest_c)]
+
+        # 10. 일본공항
+        opts_jp_apo = sorted([str(x).strip() for x in temp_df[col_jp_apo].dropna().unique() if str(x).strip() != 'nan']) if col_jp_apo in temp_df.columns else []
+        sel_jp_apo = render_multiselect_box(f6_col10, "10. 일본공항", opts_jp_apo, "slicer6_jp_apo")
+        if sel_jp_apo: temp_df = temp_df[temp_df[col_jp_apo].astype(str).isin(sel_jp_apo)]
+
+        # 11. 해외공항
+        opts_ov_apo = sorted([str(x).strip() for x in temp_df[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in temp_df.columns else []
+        sel_ov_apo = render_multiselect_box(f6_col11, "11. 해외공항", opts_ov_apo, "slicer6_ov_apo")
+        if sel_ov_apo: temp_df = temp_df[temp_df[col_ov_apo].astype(str).isin(sel_ov_apo)]
+
+        # 최종 연동 필터링된 데이터프레임
+        filtered_6th = temp_df
 
         if not filtered_6th.empty and col_al_6 in filtered_6th.columns:
             al_agg = filtered_6th.groupby(col_al_6, observed=False)[['Val_CY_num', 'Val_PY_num']].sum().reset_index()
@@ -957,9 +972,6 @@ elif selected_group == "🌐 6수송 대시보드":
 
         st.markdown("---")
 
-        # ------------------------------------------
-        # 📌 2번째 표: Carrier별 M/S (Trip O&D 표출 추가 및 KE 컬럼 색상 적용)
-        # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 O&D)</div>', unsafe_allow_html=True)
         
         if not filtered_6th.empty and col_od_mkt in filtered_6th.columns:
@@ -973,7 +985,6 @@ elif selected_group == "🌐 6수송 대시보드":
 
                 for rank_i, od_vv_code in enumerate(top20_ods, 1):
                     df_od = filtered_6th[filtered_6th[col_od_mkt] == od_vv_code]
-                    
                     simple_od_str = str(df_od[col_od_simple].iloc[0]) if col_od_simple in df_od.columns and not df_od.empty else od_vv_code.replace(" v.v.", "")
 
                     mkt_cy = df_od['Val_CY_num'].sum()
@@ -1035,7 +1046,7 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += f'<th colspan="2" class="header-main" style="background-color:#1e4e79 !important; color:#ffffff !important;">선택 항공사 발매량{sel_al_title_suffix}</th>'
                 od_matrix_html += '<th colspan="2" class="header-main" style="background-color:#1b3d5a !important; color:#ffffff !important;">선택 항공사 M/S</th>'
                 
-                # 📌 KE 강조 색상 적용 (#6fa8dc)
+                # 📌 KE 컬럼 헤더 강제 색상 지정 (#6fa8dc)
                 od_matrix_html += '<th colspan="4" class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">KE 발매량 & M/S (대한항공)</th></tr>'
                 od_matrix_html += '<tr><th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">금년</th>'
                 od_matrix_html += '<th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">YOY</th>'
@@ -1059,10 +1070,10 @@ elif selected_group == "🌐 6수송 대시보드":
                     od_matrix_html += f'<td style="font-weight:700;">{r["sel_ms_cy"]:.1f}%</td>'
                     od_matrix_html += f'<td>{format_yoy_html(r["sel_ms_yoy"], True)}</td>'
                     
-                    # 📌 KE 데이터 열에 연파랑(#cfe2f3) 및 진파랑 텍스트(#0b5394) 적용
-                    od_matrix_html += f'<td style="font-weight:700; color:#0b5394; background-color:#cfe2f3 !important;">{r["ke_cy"]:,.0f}</td>'
+                    # 📌 KE 데이터 행 강제 색상 지정 (배경: 연파랑 #cfe2f3 / 글씨: 진파랑 #0b5394)
+                    od_matrix_html += f'<td style="font-weight:700; color:#0b5394 !important; background-color:#cfe2f3 !important;">{r["ke_cy"]:,.0f}</td>'
                     od_matrix_html += f'<td style="background-color:#cfe2f3 !important;">{format_yoy_html(r["ke_yoy"])}</td>'
-                    od_matrix_html += f'<td style="font-weight:700; color:#0b5394; background-color:#cfe2f3 !important;">{r["ke_ms_cy"]:.1f}%</td>'
+                    od_matrix_html += f'<td style="font-weight:700; color:#0b5394 !important; background-color:#cfe2f3 !important;">{r["ke_ms_cy"]:.1f}%</td>'
                     od_matrix_html += f'<td style="background-color:#cfe2f3 !important;">{format_yoy_html(r["ke_ms_yoy"], True)}</td></tr>'
 
                 od_matrix_html += f'<tr class="row-title" style="background-color:#f1f5f9 !important; font-weight:800;"><td colspan="3">금년 요약</td>'
@@ -1072,10 +1083,10 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += f'<td>{format_yoy_html(tot_sel_yoy)}</td>'
                 od_matrix_html += f'<td><b>{tot_sel_ms_cy:.1f}%</b></td>'
                 od_matrix_html += f'<td>{format_yoy_html(tot_sel_ms_yoy, True)}</td>'
-                od_matrix_html += f'<td style="color:#0b5394;"><b>{tot_ke_cy:,.0f}</b></td>'
-                od_matrix_html += f'<td>{format_yoy_html(tot_ke_yoy)}</td>'
-                od_matrix_html += f'<td style="color:#0b5394;"><b>{tot_ke_ms_cy:.1f}%</b></td>'
-                od_matrix_html += f'<td>{format_yoy_html(tot_ke_ms_yoy, True)}</td></tr>'
+                od_matrix_html += f'<td style="color:#0b5394 !important; background-color:#cfe2f3 !important;"><b>{tot_ke_cy:,.0f}</b></td>'
+                od_matrix_html += f'<td style="background-color:#cfe2f3 !important;">{format_yoy_html(tot_ke_yoy)}</td>'
+                od_matrix_html += f'<td style="color:#0b5394 !important; background-color:#cfe2f3 !important;"><b>{tot_ke_ms_cy:.1f}%</b></td>'
+                od_matrix_html += f'<td style="background-color:#cfe2f3 !important;">{format_yoy_html(tot_ke_ms_yoy, True)}</td></tr>'
                 od_matrix_html += '</tbody></table></div>'
                 
                 st.markdown(od_matrix_html, unsafe_allow_html=True)
