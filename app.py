@@ -41,14 +41,6 @@ AIRLINE_WEIGHT_MULTIPLIERS = {
     'BX': 1.865842867, 'RS': 1.758028702, 'JL': 1.0, 'NH': 1.0, 'ET': 1.0,
     'YP': 5.92588446, 'ZE': 3.783327953, 'WE': 1.0
 }
-RBD_HIERARCHY = {
-    'KE': list('YBMSHEKLUQTX'), 'OZ': list('YBMHEQKSVWTLX'),
-    '7C': list('YBKNQMTWORXSZLHEFVGPJ'), 'LJ': list('YWDEHKLQBNMXPSVZARIOT'),
-    'TW': list('YWZVSPONMLKHDBAJQET'), 'BX': list('YBRMKEUDOIVJHXGWQN'),
-    'RS': list('YBMHEQKSOLWTRUIXAVGNDPFJC'), 'JL': list('WREYBHKMLVSOGQNPZ'),
-    'NH': list('ENYBMUHQVWSLK'), 'YP': list('PRZYBMHELQNSAFKVOGWX'),
-    'ZE': list('PFAJCIROYBMSHEKLQNTVWGX'), 'WE': list('ADIZOYBMHEUQNTVW')
-}
 
 st.markdown("""
 <style>
@@ -178,18 +170,16 @@ def get_dynamic_date_ranges_34(df_iss):
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
 
-def format_yoy_html(val, is_percentage_point=False):
-    unit = "%p" if is_percentage_point else "%"
-    if val > 0: return f'<span style="color:#1d4ed8 !important; font-weight:700 !important;">▲ {val:.1f}{unit}</span>'
-    elif val < 0: return f'<span style="color:#dc2626 !important; font-weight:700 !important;">▼ {abs(val):.1f}{unit}</span>'
-    else: return f'<span style="color:#64748b !important; font-weight:500 !important;">-</span>'
-
+# 📌 span 태그를 활용해 CSS 테마 오버라이딩을 완벽 차단하는 강제 색상 지정 함수
 def get_yoy_td_html(val, is_percentage_point=False, bg_color="#ffffff", extra_style=""):
     unit = "%p" if is_percentage_point else "%"
-    base_style = f"background-color:{bg_color} !important; font-weight:700 !important; text-align:center !important; {extra_style}"
-    if val > 0: return f'<td style="{base_style} color:#1d4ed8 !important;">▲ {val:.1f}{unit}</td>'
-    elif val < 0: return f'<td style="{base_style} color:#dc2626 !important;">▼ {abs(val):.1f}{unit}</td>'
-    else: return f'<td style="background-color:{bg_color} !important; color:#64748b !important; font-weight:500 !important; text-align:center !important; {extra_style}">-</td>'
+    base_td = f'<td style="background-color:{bg_color} !important; text-align:center !important; {extra_style}">'
+    if val > 0: 
+        return f'{base_td}<span style="color:#1d4ed8 !important; font-weight:700 !important;">▲ {val:.1f}{unit}</span></td>'
+    elif val < 0: 
+        return f'{base_td}<span style="color:#dc2626 !important; font-weight:700 !important;">▼ {abs(val):.1f}{unit}</span></td>'
+    else: 
+        return f'{base_td}<span style="color:#64748b !important; font-weight:500 !important;">-</span></td>'
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
@@ -423,8 +413,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     for al_idx, row_item in piv_w_ms.iterrows():
                         is_ke_r = (str(al_idx).upper() == 'KE')
                         row_style = ' style="background-color: #cfe2f3 !important;"' if is_ke_r else ''
-                        td_style = ' style="background-color: #cfe2f3 !important; color: #1d4ed8 !important; font-weight: bold;"' if is_ke_r else ''
-                        piv_w_html += f'<tr{row_style}><td{td_style} style="font-weight:700; color: #1d4ed8 !important;">{al_idx}</td>'
+                        td_style = ' style="background-color: #cfe2f3 !important; font-weight: bold;"' if is_ke_r else ''
+                        piv_w_html += f'<tr{row_style}><td{td_style} style="font-weight:700;"><span style="color: #1d4ed8 !important;">{al_idx}</span></td>'
                         for val_ms in row_item: piv_w_html += f'<td{td_style}>{val_ms:.1f}%</td>'
                         piv_w_html += '</tr>'
                     piv_w_html += '</tbody></table></div>'
@@ -437,15 +427,17 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 piv_r_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:100px;">노선_clean</th>'
                 for col_al in piv_r_ms.columns:
                     is_ke_c = (str(col_al).upper() == 'KE')
-                    th_style = ' style="background-color: #cfe2f3 !important; color: #1d4ed8 !important; font-weight: bold;"' if is_ke_c else ''
-                    piv_r_html += f'<th class="header-main"{th_style}>{col_al}</th>'
+                    th_style = ' style="background-color: #cfe2f3 !important;"' if is_ke_c else ''
+                    k_span = '<span style="color:#1d4ed8 !important; font-weight:bold;">' if is_ke_c else '<span>'
+                    piv_r_html += f'<th class="header-main"{th_style}>{k_span}{col_al}</span></th>'
                 piv_r_html += '</tr></thead><tbody>'
                 for route_idx, row_item in piv_r_ms.iterrows():
                     piv_r_html += f'<tr><td style="font-weight:700;">{route_idx}</td>'
                     for al_col_name, val_ms in row_item.items():
                         is_ke_c = (str(al_col_name).upper() == 'KE')
-                        td_style = ' style="background-color: #cfe2f3 !important; color: #1d4ed8 !important; font-weight: bold;"' if is_ke_c else ''
-                        piv_r_html += f'<td{td_style}>{val_ms:.1f}%</td>'
+                        td_style = ' style="background-color: #cfe2f3 !important;"' if is_ke_c else ''
+                        k_span = '<span style="color:#1d4ed8 !important; font-weight:bold;">' if is_ke_c else '<span>'
+                        piv_r_html += f'<td{td_style}>{k_span}{val_ms:.1f}%</span></td>'
                     piv_r_html += '</tr>'
                 piv_r_html += '</tbody></table></div>'
                 st.markdown(piv_r_html, unsafe_allow_html=True)
@@ -493,7 +485,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_sup_dest_list = render_multiselect_box(sf_col3, "3. 도착 공항", opts_dest, "slicer_sup_dest_multi")
             if sel_sup_dest_list: temp_sup = temp_sup[temp_sup['도착공항'].isin(sel_sup_dest_list)]
 
-            opts_sup_m = sorted([str(x) for x in temp_sup[sup_month_col].dropna().unique()]) if sup_month_col else []
+            # 📌 공급 필터에서 1900년 쓰레기 데이터 원천 삭제
+            opts_sup_m = sorted([str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan']) if sup_month_col else []
             sel_sup_month_list = render_multiselect_box(sf_col4, "4. 출발 월", opts_sup_m, "slicer_month_sup_multi")
             if sel_sup_month_list: temp_sup = temp_sup[temp_sup[sup_month_col].isin(sel_sup_month_list)]
 
@@ -506,7 +499,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
             st.markdown("---")
             
-            # 📌 타임라인 개선 (레이아웃 한 줄 배치 및 custom_data 에러 수정)
             st.markdown('<div class="unified-sub-header">3. 노선별 운항 스케줄 타임라인 (경쟁사 포함 - 산점도)</div>', unsafe_allow_html=True)
             
             ke_operated_routes = df_sup[df_sup['Airline'] == 'KE']['노선_clean'].dropna().unique().tolist()
@@ -515,8 +507,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
             if not sup_avail_routes:
                 st.info("💡 선택하신 조건에 해당하는 스케줄 데이터가 없습니다.")
             else:
-                # 필터를 좁게 한 줄로 배치
-                tl_col1, tl_col2, tl_col3 = st.columns([1, 1, 2])
+                # 📌 스케줄 타임라인 컨트롤을 절반 크기로 한 줄로 나란히 축소 배치
+                tl_col1, tl_col2 = st.columns(2)
                 with tl_col1:
                     selected_single_route = st.selectbox("📌 스케줄 타임라인 노선 선택:", options=sup_avail_routes, key="sb_timeline_route_sel")
                 
@@ -524,7 +516,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 
                 with tl_col2:
                     if sup_month_col and not df_schedule_route.empty:
-                        avail_tl_months = sorted([str(x) for x in df_schedule_route[sup_month_col].dropna().unique()])
+                        avail_tl_months = sorted([str(x) for x in df_schedule_route[sup_month_col].dropna().unique() if '1900' not in str(x)])
                         sel_tl_months = st.multiselect(
                             "🗓️ 출발 월 필터 (미선택 시 전체):", 
                             options=avail_tl_months, 
@@ -557,7 +549,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     
                     timeline_color_map = build_airline_color_map(df_schedule['Airline'].unique())
 
-                    # 산점도 생성 및 custom_data 바인딩 (툴팁 에러 해결)
+                    # 📌 custom_data 명시적 바인딩으로 데이터 불일치 완벽 해결
                     fig_timeline = px.scatter(
                         df_schedule, x="Dep_Time_Mins", y="Airline", color="Airline", 
                         title=f"[{selected_single_route}] 하루 출발 시간대별 운항 스케줄 분포 (산점도)", 
@@ -581,7 +573,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     fig_timeline.update_layout(height=350, showlegend=False)
                     st.plotly_chart(fig_timeline, width='stretch')
                 else:
-                    st.info("선택한 월에 해당하는 스케줄 데이터가 없습니다.")
+                    st.info("선택한 조건에 해당하는 스케줄 데이터가 없습니다.")
 
     # 📌 3. 🏷️ 대리점, RBD별 발매현황 탭
     with tab_34_3:
@@ -769,8 +761,9 @@ elif selected_group == "🌐 6수송 대시보드":
         cleaned = target_str.lower().replace(" ", "").replace("_", "").replace(".", "")
         return lower_col_map.get(cleaned, None)
 
-    col_pur_m_disp = get_actual_col("발매월_표시") or "발매월_표시"
-    col_trip_m_disp = get_actual_col("출발월_표시") or "출발월_표시"
+    # 📌 날짜 포맷 변경 반영 (이제 "발매월_표시" 대신 원본 "Ticket Purchase month" (YYYY-MM) 사용)
+    col_pur_m_disp = get_actual_col("Ticket Purchase month") or "Ticket Purchase month"
+    col_trip_m_disp = get_actual_col("Trip Month") or "Trip Month"
     col_rgn = get_actual_col("4.OD RGN") or "4.OD RGN"
     col_dir = get_actual_col("DIRECTION") or "DIRECTION"
     col_direct_transit = get_actual_col("직항/경유") or "직항/경유"
@@ -803,11 +796,12 @@ elif selected_group == "🌐 6수송 대시보드":
         # ------------------- Row 1 (6개 슬라이서) -------------------
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5, f6_col6 = st.columns(6)
         
+        # 📌 YYYY-MM 포맷으로 100% 시간 순서 정렬
         opts_pur_m = sorted([str(x).strip() for x in temp_df[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in temp_df.columns else []
         sel_pur_m_disp = render_multiselect_box(f6_col1, "1. 금년 발매월", opts_pur_m, "slicer6_pur_m_disp")
         if sel_pur_m_disp: temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(sel_pur_m_disp)]
 
-        opts_trip_m = sorted([str(x).strip() for x in temp_df[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_trip_m_disp in temp_df.columns else []
+        opts_trip_m = sorted([str(x).strip() for x in temp_df[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=False) if col_trip_m_disp in temp_df.columns else []
         sel_trip_m_disp = render_multiselect_box(f6_col2, "2. 금년 출발월", opts_trip_m, "slicer6_trip_m_disp")
         if sel_trip_m_disp: temp_df = temp_df[temp_df[col_trip_m_disp].astype(str).isin(sel_trip_m_disp)]
 
@@ -1031,9 +1025,10 @@ elif selected_group == "🌐 6수송 대시보드":
                     od_matrix_html += get_yoy_td_html(r["sel_yoy"])
                     od_matrix_html += f'<td style="font-weight:700;">{r["sel_ms_cy"]:.1f}%</td>'
                     od_matrix_html += get_yoy_td_html(r["sel_ms_yoy"], True)
-                    od_matrix_html += f'<td style="font-weight:700 !important; color:#0b5394 !important; background-color:#cfe2f3 !important;">{r["ke_cy"]:,.0f}</td>'
+                    # 📌 KE 컬럼에도 완벽히 <span> 태그 씌우기
+                    od_matrix_html += f'<td style="background-color:#cfe2f3 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:700 !important;">{r["ke_cy"]:,.0f}</span></td>'
                     od_matrix_html += get_yoy_td_html(r["ke_yoy"], bg_color="#cfe2f3")
-                    od_matrix_html += f'<td style="font-weight:700 !important; color:#0b5394 !important; background-color:#cfe2f3 !important;">{r["ke_ms_cy"]:.1f}%</td>'
+                    od_matrix_html += f'<td style="background-color:#cfe2f3 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:700 !important;">{r["ke_ms_cy"]:.1f}%</span></td>'
                     od_matrix_html += get_yoy_td_html(r["ke_ms_yoy"], True, bg_color="#cfe2f3")
                     od_matrix_html += '</tr>'
 
@@ -1044,9 +1039,9 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += get_yoy_td_html(tot_sel_yoy, bg_color="#f1f5f9")
                 od_matrix_html += f'<td style="font-weight:800 !important;">{tot_sel_ms_cy:.1f}%</td>'
                 od_matrix_html += get_yoy_td_html(tot_sel_ms_yoy, True, bg_color="#f1f5f9")
-                od_matrix_html += f'<td style="font-weight:800 !important; color:#0b5394 !important; background-color:#c9daf8 !important;">{tot_ke_cy:,.0f}</td>'
+                od_matrix_html += f'<td style="background-color:#c9daf8 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:800 !important;">{tot_ke_cy:,.0f}</span></td>'
                 od_matrix_html += get_yoy_td_html(tot_ke_yoy, bg_color="#c9daf8")
-                od_matrix_html += f'<td style="font-weight:800 !important; color:#0b5394 !important; background-color:#c9daf8 !important;">{tot_ke_ms_cy:.1f}%</td>'
+                od_matrix_html += f'<td style="background-color:#c9daf8 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:800 !important;">{tot_ke_ms_cy:.1f}%</span></td>'
                 od_matrix_html += get_yoy_td_html(tot_ke_ms_yoy, True, bg_color="#c9daf8")
                 od_matrix_html += '</tr>'
 
@@ -1057,9 +1052,9 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += get_yoy_td_html(grand_sel_yoy, bg_color="#e2e8f0")
                 od_matrix_html += f'<td style="font-weight:800 !important; color:#0f172a !important;">{grand_sel_ms_cy:.1f}%</td>'
                 od_matrix_html += get_yoy_td_html(grand_sel_ms_yoy, True, bg_color="#e2e8f0")
-                od_matrix_html += f'<td style="font-weight:800 !important; color:#0b5394 !important; background-color:#9fc5e8 !important;">{grand_ke_cy:,.0f}</td>'
+                od_matrix_html += f'<td style="background-color:#9fc5e8 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:800 !important;">{grand_ke_cy:,.0f}</span></td>'
                 od_matrix_html += get_yoy_td_html(grand_ke_yoy, bg_color="#9fc5e8")
-                od_matrix_html += f'<td style="font-weight:800 !important; color:#0b5394 !important; background-color:#9fc5e8 !important;">{grand_ke_ms_cy:.1f}%</td>'
+                od_matrix_html += f'<td style="background-color:#9fc5e8 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:800 !important;">{grand_ke_ms_cy:.1f}%</span></td>'
                 od_matrix_html += get_yoy_td_html(grand_ke_ms_yoy, True, bg_color="#9fc5e8")
                 od_matrix_html += '</tr>'
 
