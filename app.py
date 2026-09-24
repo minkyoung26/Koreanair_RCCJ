@@ -485,7 +485,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_sup_dest_list = render_multiselect_box(sf_col3, "3. 도착 공항", opts_dest, "slicer_sup_dest_multi")
             if sel_sup_dest_list: temp_sup = temp_sup[temp_sup['도착공항'].isin(sel_sup_dest_list)]
 
-            # 📌 공급 필터에서 1900년 쓰레기 데이터 원천 삭제
             opts_sup_m = sorted([str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan']) if sup_month_col else []
             sel_sup_month_list = render_multiselect_box(sf_col4, "4. 출발 월", opts_sup_m, "slicer_month_sup_multi")
             if sel_sup_month_list: temp_sup = temp_sup[temp_sup[sup_month_col].isin(sel_sup_month_list)]
@@ -507,7 +506,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             if not sup_avail_routes:
                 st.info("💡 선택하신 조건에 해당하는 스케줄 데이터가 없습니다.")
             else:
-                # 📌 스케줄 타임라인 컨트롤을 절반 크기로 한 줄로 나란히 축소 배치
                 tl_col1, tl_col2 = st.columns(2)
                 with tl_col1:
                     selected_single_route = st.selectbox("📌 스케줄 타임라인 노선 선택:", options=sup_avail_routes, key="sb_timeline_route_sel")
@@ -549,7 +547,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     
                     timeline_color_map = build_airline_color_map(df_schedule['Airline'].unique())
 
-                    # 📌 custom_data 명시적 바인딩으로 데이터 불일치 완벽 해결
                     fig_timeline = px.scatter(
                         df_schedule, x="Dep_Time_Mins", y="Airline", color="Airline", 
                         title=f"[{selected_single_route}] 하루 출발 시간대별 운항 스케줄 분포 (산점도)", 
@@ -577,6 +574,16 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     # 📌 3. 🏷️ 대리점, RBD별 발매현황 탭
     with tab_34_3:
+        # 에러 방지를 위한 로컬 변수 재정의
+        RBD_HIERARCHY_LOCAL = {
+            'KE': list('YBMSHEKLUQTX'), 'OZ': list('YBMHEQKSVWTLX'),
+            '7C': list('YBKNQMTWORXSZLHEFVGPJ'), 'LJ': list('YWDEHKLQBNMXPSVZARIOT'),
+            'TW': list('YWZVSPONMLKHDBAJQET'), 'BX': list('YBRMKEUDOIVJHXGWQN'),
+            'RS': list('YBMHEQKSOLWTRUIXAVGNDPFJC'), 'JL': list('WREYBHKMLVSOGQNPZ'),
+            'NH': list('ENYBMUHQVWSLK'), 'YP': list('PRZYBMHELQNSAFKVOGWX'),
+            'ZE': list('PFAJCIROYBMSHEKLQNTVWGX'), 'WE': list('ADIZOYBMHEUQNTVW')
+        }
+        
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
             week_col_a = '발매주차_일자' if '발매주차_일자' in df_agency.columns else ('발매 주차' if '발매 주차' in df_agency.columns else '발매주차')
@@ -634,8 +641,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             piv_rbd = piv_rbd[piv_rbd['총합계'] > 0]
 
                             if not piv_rbd.empty:
-                                if al_code in RBD_HIERARCHY:
-                                    h_ord = RBD_HIERARCHY[al_code]
+                                if al_code in RBD_HIERARCHY_LOCAL:
+                                    h_ord = RBD_HIERARCHY_LOCAL[al_code]
                                     e_rbds = piv_rbd.index.tolist()
                                     piv_rbd = piv_rbd.loc[[r for r in h_ord if r in e_rbds] + [r for r in e_rbds if r not in h_ord]]
 
@@ -761,7 +768,6 @@ elif selected_group == "🌐 6수송 대시보드":
         cleaned = target_str.lower().replace(" ", "").replace("_", "").replace(".", "")
         return lower_col_map.get(cleaned, None)
 
-    # 📌 날짜 포맷 변경 반영 (이제 "발매월_표시" 대신 원본 "Ticket Purchase month" (YYYY-MM) 사용)
     col_pur_m_disp = get_actual_col("Ticket Purchase month") or "Ticket Purchase month"
     col_trip_m_disp = get_actual_col("Trip Month") or "Trip Month"
     col_rgn = get_actual_col("4.OD RGN") or "4.OD RGN"
@@ -796,7 +802,6 @@ elif selected_group == "🌐 6수송 대시보드":
         # ------------------- Row 1 (6개 슬라이서) -------------------
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5, f6_col6 = st.columns(6)
         
-        # 📌 YYYY-MM 포맷으로 100% 시간 순서 정렬
         opts_pur_m = sorted([str(x).strip() for x in temp_df[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in temp_df.columns else []
         sel_pur_m_disp = render_multiselect_box(f6_col1, "1. 금년 발매월", opts_pur_m, "slicer6_pur_m_disp")
         if sel_pur_m_disp: temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(sel_pur_m_disp)]
@@ -913,7 +918,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.markdown("---")
 
         # ------------------------------------------
-        # 📌 Carrier별 M/S (Trip O&D 단방향 기준 TOP 20 정렬)
+        # 📌 Carrier별 M/S (오직 Trip O&D 단방향 기준 TOP 20 정렬)
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계)</div>', unsafe_allow_html=True)
         
@@ -1025,7 +1030,7 @@ elif selected_group == "🌐 6수송 대시보드":
                     od_matrix_html += get_yoy_td_html(r["sel_yoy"])
                     od_matrix_html += f'<td style="font-weight:700;">{r["sel_ms_cy"]:.1f}%</td>'
                     od_matrix_html += get_yoy_td_html(r["sel_ms_yoy"], True)
-                    # 📌 KE 컬럼에도 완벽히 <span> 태그 씌우기
+                    
                     od_matrix_html += f'<td style="background-color:#cfe2f3 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:700 !important;">{r["ke_cy"]:,.0f}</span></td>'
                     od_matrix_html += get_yoy_td_html(r["ke_yoy"], bg_color="#cfe2f3")
                     od_matrix_html += f'<td style="background-color:#cfe2f3 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:700 !important;">{r["ke_ms_cy"]:.1f}%</span></td>'
