@@ -506,7 +506,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
             st.markdown("---")
             
-            # 📌 타임라인 개선 (막대형 대신 산점도(Scatter) 방식으로 변경)
+            # 📌 산점도(Scatter) 기반 타임라인 + 정밀 파싱 적용 + Dynamic Range
             st.markdown('<div class="unified-sub-header">3. 노선별 운항 스케줄 타임라인 (경쟁사 포함 - 산점도)</div>', unsafe_allow_html=True)
             
             ke_operated_routes = df_sup[df_sup['Airline'] == 'KE']['노선_clean'].dropna().unique().tolist()
@@ -519,19 +519,31 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 df_schedule = filtered_sup[filtered_sup['노선_clean'] == selected_single_route].copy() if '노선_clean' in filtered_sup.columns else filtered_sup[filtered_sup['노선'] == selected_single_route].copy()
                 
                 if not df_schedule.empty and 'Dep Time' in df_schedule.columns:
-                    # 출발 시간을 Datetime 및 문자열로 변환
+                    
+                    # 매우 정밀한 시간 추출 함수
+                    def parse_time_str(val):
+                        val_str = str(val).strip()
+                        if not val_str or val_str.lower() in ['nan', 'none', 'nat']: return "09", "00"
+                        if ':' in val_str:
+                            parts = val_str.split(':')
+                            return parts[0].zfill(2)[:2], parts[1].zfill(2)[:2]
+                        else:
+                            if val_str.endswith('.0'): val_str = val_str[:-2]
+                            val_str = val_str.zfill(4)
+                            return val_str[:2], val_str[2:4]
+
                     def format_dt(val):
+                        hh, mm = parse_time_str(val)
                         try:
-                            v = str(int(val)).zfill(4)
-                            hh = min(int(v[:2]), 23)
-                            mm = min(int(v[2:]), 59)
-                            return f"2026-08-01 {hh:02d}:{mm:02d}:00"
+                            hh_int, mm_int = min(int(hh), 23), min(int(mm), 59)
+                            return f"2026-08-01 {hh_int:02d}:{mm_int:02d}:00"
                         except: return "2026-08-01 09:00:00"
 
                     def format_str(val):
+                        hh, mm = parse_time_str(val)
                         try:
-                            v = str(int(val)).zfill(4)
-                            return f"{v[:2]}:{v[2:]}"
+                            hh_int, mm_int = min(int(hh), 23), min(int(mm), 59)
+                            return f"{hh_int:02d}:{mm_int:02d}"
                         except: return str(val)
                         
                     df_schedule['Dep_Time_DT'] = df_schedule['Dep Time'].apply(format_dt)
@@ -539,18 +551,23 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     
                     timeline_color_map = build_airline_color_map(df_schedule['Airline'].unique())
 
-                    # 산점도(Scatter) 생성으로 겹침 완벽 방지
+                    # 산점도 생성
                     fig_timeline = px.scatter(
                         df_schedule, x="Dep_Time_DT", y="Airline", color="Airline", 
-                        title=f"[{selected_single_route}] 하루 출발 시간대별 운항 스케줄 분포 (산점도)", 
+                        title=f"[{selected_single_route}] 하루 출발 시간대별 운항 스케줄 분포", 
                         color_discrete_map=timeline_color_map
                     )
+                    
+                    # 📌 Dynamic Range (실제 데이터의 최소~최대 시간에 앞뒤 30분씩만 여백 부여)
+                    dt_series = pd.to_datetime(df_schedule['Dep_Time_DT'])
+                    min_t = (dt_series.min() - pd.Timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+                    max_t = (dt_series.max() + pd.Timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+
                     fig_timeline.update_yaxes(autorange="reversed", title="항공사")
                     fig_timeline.update_xaxes(
-                        title="하루 시간대 (00:00 ~ 24:00)", 
-                        dtick=3600000, 
+                        title="출발 시간대", 
                         tickformat="%H:%M",
-                        range=["2026-08-01 00:00:00", "2026-08-02 00:00:00"]
+                        range=[min_t, max_t]
                     )
                     
                     fig_timeline.update_traces(
@@ -898,7 +915,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.markdown("---")
 
         # ------------------------------------------
-        # 📌 Carrier별 M/S (오직 Trip O&D 단방향 기준 TOP 20 정렬)
+        # 📌 Carrier별 M/S (Trip O&D 단방향 기준 TOP 20 정렬)
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계)</div>', unsafe_allow_html=True)
         
