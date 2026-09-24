@@ -505,6 +505,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
             filtered_sup = temp_sup
 
             st.markdown("---")
+            
+            # 📌 타임라인 개선 (레이아웃 한 줄 배치 및 custom_data 에러 수정)
             st.markdown('<div class="unified-sub-header">3. 노선별 운항 스케줄 타임라인 (경쟁사 포함 - 산점도)</div>', unsafe_allow_html=True)
             
             ke_operated_routes = df_sup[df_sup['Airline'] == 'KE']['노선_clean'].dropna().unique().tolist()
@@ -513,24 +515,27 @@ if selected_group == "✈️ 3/4수송 대시보드":
             if not sup_avail_routes:
                 st.info("💡 선택하신 조건에 해당하는 스케줄 데이터가 없습니다.")
             else:
-                # 노선 선택
-                selected_single_route = st.selectbox("📌 스케줄 타임라인을 조회할 노선을 선택하세요 (KE 취항 노선 기준):", options=sup_avail_routes, key="sb_timeline_route_sel")
+                # 필터를 좁게 한 줄로 배치
+                tl_col1, tl_col2, tl_col3 = st.columns([1, 1, 2])
+                with tl_col1:
+                    selected_single_route = st.selectbox("📌 스케줄 타임라인 노선 선택:", options=sup_avail_routes, key="sb_timeline_route_sel")
+                
                 df_schedule_route = filtered_sup[filtered_sup['노선_clean'] == selected_single_route].copy() if '노선_clean' in filtered_sup.columns else filtered_sup[filtered_sup['노선'] == selected_single_route].copy()
                 
-                # 📌 타임라인 전용 "출발 월" 필터 추가 (동/하계 변동 방지)
-                if sup_month_col and not df_schedule_route.empty:
-                    avail_tl_months = sorted([str(x) for x in df_schedule_route[sup_month_col].dropna().unique()])
-                    sel_tl_months = st.multiselect(
-                        "🗓️ 타임라인 표출 출발 월 선택 (미선택 시 조회된 전체 스케줄 표시):", 
-                        options=avail_tl_months, 
-                        default=[]
-                    )
-                    if sel_tl_months:
-                        df_schedule = df_schedule_route[df_schedule_route[sup_month_col].astype(str).isin(sel_tl_months)].copy()
+                with tl_col2:
+                    if sup_month_col and not df_schedule_route.empty:
+                        avail_tl_months = sorted([str(x) for x in df_schedule_route[sup_month_col].dropna().unique()])
+                        sel_tl_months = st.multiselect(
+                            "🗓️ 출발 월 필터 (미선택 시 전체):", 
+                            options=avail_tl_months, 
+                            default=[]
+                        )
+                        if sel_tl_months:
+                            df_schedule = df_schedule_route[df_schedule_route[sup_month_col].astype(str).isin(sel_tl_months)].copy()
+                        else:
+                            df_schedule = df_schedule_route.copy()
                     else:
                         df_schedule = df_schedule_route.copy()
-                else:
-                    df_schedule = df_schedule_route.copy()
 
                 if not df_schedule.empty and 'Dep Time' in df_schedule.columns:
                     def parse_time_to_minutes(val):
@@ -552,10 +557,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     
                     timeline_color_map = build_airline_color_map(df_schedule['Airline'].unique())
 
+                    # 산점도 생성 및 custom_data 바인딩 (툴팁 에러 해결)
                     fig_timeline = px.scatter(
                         df_schedule, x="Dep_Time_Mins", y="Airline", color="Airline", 
                         title=f"[{selected_single_route}] 하루 출발 시간대별 운항 스케줄 분포 (산점도)", 
-                        color_discrete_map=timeline_color_map
+                        color_discrete_map=timeline_color_map,
+                        custom_data=["Seats_num", "Dep_Time_Str"]
                     )
                     
                     min_mins = max(0, df_schedule['Dep_Time_Mins'].min() - 30)
@@ -569,8 +576,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     )
                     fig_timeline.update_traces(
                         marker=dict(size=14, symbol='circle', line=dict(width=2, color='white')), opacity=0.9,
-                        hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{customdata[1]}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>",
-                        customdata=df_schedule[['Seats_num', 'Dep_Time_Str']]
+                        hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{customdata[1]}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>"
                     )
                     fig_timeline.update_layout(height=350, showlegend=False)
                     st.plotly_chart(fig_timeline, width='stretch')
