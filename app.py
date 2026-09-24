@@ -41,6 +41,14 @@ AIRLINE_WEIGHT_MULTIPLIERS = {
     'BX': 1.865842867, 'RS': 1.758028702, 'JL': 1.0, 'NH': 1.0, 'ET': 1.0,
     'YP': 5.92588446, 'ZE': 3.783327953, 'WE': 1.0
 }
+RBD_HIERARCHY = {
+    'KE': list('YBMSHEKLUQTX'), 'OZ': list('YBMHEQKSVWTLX'),
+    '7C': list('YBKNQMTWORXSZLHEFVGPJ'), 'LJ': list('YWDEHKLQBNMXPSVZARIOT'),
+    'TW': list('YWZVSPONMLKHDBAJQET'), 'BX': list('YBRMKEUDOIVJHXGWQN'),
+    'RS': list('YBMHEQKSOLWTRUIXAVGNDPFJC'), 'JL': list('WREYBHKMLVSOGQNPZ'),
+    'NH': list('ENYBMUHQVWSLK'), 'YP': list('PRZYBMHELQNSAFKVOGWX'),
+    'ZE': list('PFAJCIROYBMSHEKLQNTVWGX'), 'WE': list('ADIZOYBMHEUQNTVW')
+}
 
 st.markdown("""
 <style>
@@ -497,8 +505,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             filtered_sup = temp_sup
 
             st.markdown("---")
-            
-            # 📌 산점도(Scatter) 기반 타임라인 + 정밀 파싱 + 수치형 X축 변환 (Timezone 에러 원천 차단)
             st.markdown('<div class="unified-sub-header">3. 노선별 운항 스케줄 타임라인 (경쟁사 포함 - 산점도)</div>', unsafe_allow_html=True)
             
             ke_operated_routes = df_sup[df_sup['Airline'] == 'KE']['노선_clean'].dropna().unique().tolist()
@@ -507,15 +513,29 @@ if selected_group == "✈️ 3/4수송 대시보드":
             if not sup_avail_routes:
                 st.info("💡 선택하신 조건에 해당하는 스케줄 데이터가 없습니다.")
             else:
+                # 노선 선택
                 selected_single_route = st.selectbox("📌 스케줄 타임라인을 조회할 노선을 선택하세요 (KE 취항 노선 기준):", options=sup_avail_routes, key="sb_timeline_route_sel")
-                df_schedule = filtered_sup[filtered_sup['노선_clean'] == selected_single_route].copy() if '노선_clean' in filtered_sup.columns else filtered_sup[filtered_sup['노선'] == selected_single_route].copy()
+                df_schedule_route = filtered_sup[filtered_sup['노선_clean'] == selected_single_route].copy() if '노선_clean' in filtered_sup.columns else filtered_sup[filtered_sup['노선'] == selected_single_route].copy()
                 
+                # 📌 타임라인 전용 "출발 월" 필터 추가 (동/하계 변동 방지)
+                if sup_month_col and not df_schedule_route.empty:
+                    avail_tl_months = sorted([str(x) for x in df_schedule_route[sup_month_col].dropna().unique()])
+                    sel_tl_months = st.multiselect(
+                        "🗓️ 타임라인 표출 출발 월 선택 (미선택 시 조회된 전체 스케줄 표시):", 
+                        options=avail_tl_months, 
+                        default=[]
+                    )
+                    if sel_tl_months:
+                        df_schedule = df_schedule_route[df_schedule_route[sup_month_col].astype(str).isin(sel_tl_months)].copy()
+                    else:
+                        df_schedule = df_schedule_route.copy()
+                else:
+                    df_schedule = df_schedule_route.copy()
+
                 if not df_schedule.empty and 'Dep Time' in df_schedule.columns:
-                    
-                    # 타임존 이슈를 완벽히 차단하기 위해 시간을 '분(Minute)' 단위 정수로 변환
                     def parse_time_to_minutes(val):
                         val_str = str(val).strip()
-                        if not val_str or val_str.lower() in ['nan', 'none', 'nat']: return 9*60 # 기본값 09:00
+                        if not val_str or val_str.lower() in ['nan', 'none', 'nat']: return 9*60
                         if ':' in val_str:
                             parts = val_str.split(':')
                             hh, mm = int(parts[0]), int(parts[1])
@@ -532,37 +552,30 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     
                     timeline_color_map = build_airline_color_map(df_schedule['Airline'].unique())
 
-                    # 산점도 생성 (X축이 날짜가 아닌 정수값 Minutes)
                     fig_timeline = px.scatter(
                         df_schedule, x="Dep_Time_Mins", y="Airline", color="Airline", 
                         title=f"[{selected_single_route}] 하루 출발 시간대별 운항 스케줄 분포 (산점도)", 
                         color_discrete_map=timeline_color_map
                     )
                     
-                    # 📌 Dynamic Range (빈 시간대 제거: 첫 비행 -30분 ~ 마지막 비행 +30분)
                     min_mins = max(0, df_schedule['Dep_Time_Mins'].min() - 30)
                     max_mins = df_schedule['Dep_Time_Mins'].max() + 30
-
-                    # 숫자로 된 축에 "08:00" 형태의 라벨 매핑 (1시간 간격)
                     tick_vals = list(range(0, 25*60, 60))
                     tick_texts = [f"{h:02d}:00" for h in range(25)]
 
                     fig_timeline.update_yaxes(autorange="reversed", title="항공사")
                     fig_timeline.update_xaxes(
-                        title="출발 시간대", 
-                        tickvals=tick_vals,
-                        ticktext=tick_texts,
-                        range=[min_mins, max_mins]
+                        title="출발 시간대", tickvals=tick_vals, ticktext=tick_texts, range=[min_mins, max_mins]
                     )
-                    
                     fig_timeline.update_traces(
-                        marker=dict(size=14, symbol='circle', line=dict(width=2, color='white')),
-                        opacity=0.9,
+                        marker=dict(size=14, symbol='circle', line=dict(width=2, color='white')), opacity=0.9,
                         hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{customdata[1]}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>",
                         customdata=df_schedule[['Seats_num', 'Dep_Time_Str']]
                     )
                     fig_timeline.update_layout(height=350, showlegend=False)
                     st.plotly_chart(fig_timeline, width='stretch')
+                else:
+                    st.info("선택한 월에 해당하는 스케줄 데이터가 없습니다.")
 
     # 📌 3. 🏷️ 대리점, RBD별 발매현황 탭
     with tab_34_3:
