@@ -41,6 +41,14 @@ AIRLINE_WEIGHT_MULTIPLIERS = {
     'BX': 1.865842867, 'RS': 1.758028702, 'JL': 1.0, 'NH': 1.0, 'ET': 1.0,
     'YP': 5.92588446, 'ZE': 3.783327953, 'WE': 1.0
 }
+RBD_HIERARCHY = {
+    'KE': list('YBMSHEKLUQTX'), 'OZ': list('YBMHEQKSVWTLX'),
+    '7C': list('YBKNQMTWORXSZLHEFVGPJ'), 'LJ': list('YWDEHKLQBNMXPSVZARIOT'),
+    'TW': list('YWZVSPONMLKHDBAJQET'), 'BX': list('YBRMKEUDOIVJHXGWQN'),
+    'RS': list('YBMHEQKSOLWTRUIXAVGNDPFJC'), 'JL': list('WREYBHKMLVSOGQNPZ'),
+    'NH': list('ENYBMUHQVWSLK'), 'YP': list('PRZYBMHELQNSAFKVOGWX'),
+    'ZE': list('PFAJCIROYBMSHEKLQNTVWGX'), 'WE': list('ADIZOYBMHEUQNTVW')
+}
 
 st.markdown("""
 <style>
@@ -68,7 +76,8 @@ st.markdown("""
     .custom-piv-table, .yoy-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background-color: #ffffff; text-align: center !important; table-layout: fixed !important; }
     .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header { background-color: #cfe2f3 !important; color: #0f172a !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-weight: 600; text-align: center !important; white-space: nowrap; }
     .yoy-table th.ke-header { background-color: #6fa8dc !important; color: #ffffff !important; padding: 8px 6px; border: 1px solid #cbd5e1 !important; font-size: 13px !important; font-weight: 700 !important; text-align: center !important; white-space: nowrap; }
-    .custom-piv-table td, .yoy-table td { padding: 6px 10px; border: 1px solid #cbd5e1 !important; background-color: #ffffff !important; text-align: center !important; }
+    /* 글로벌 백그라운드 컬러 오버라이드 삭제 (색상 정상 반영을 위해) */
+    .custom-piv-table td, .yoy-table td { padding: 6px 10px; border: 1px solid #cbd5e1 !important; text-align: center !important; }
     .yoy-table tr:hover { background-color: #f8fafc !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -171,9 +180,10 @@ def get_dynamic_date_ranges_34(df_iss):
     return iss_str, dep_str
 
 # 📌 span 태그를 활용해 CSS 테마 오버라이딩을 완벽 차단하는 강제 색상 지정 함수
-def get_yoy_td_html(val, is_percentage_point=False, bg_color="#ffffff", extra_style=""):
+def get_yoy_td_html(val, is_percentage_point=False, bg_color="", extra_style=""):
     unit = "%p" if is_percentage_point else "%"
-    base_td = f'<td style="background-color:{bg_color} !important; text-align:center !important; {extra_style}">'
+    bg_css = f"background-color:{bg_color} !important;" if bg_color else ""
+    base_td = f'<td style="{bg_css} text-align:center !important; {extra_style}">'
     if val > 0: 
         return f'{base_td}<span style="color:#1d4ed8 !important; font-weight:700 !important;">▲ {val:.1f}{unit}</span></td>'
     elif val < 0: 
@@ -412,10 +422,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     piv_w_html += '</tr></thead><tbody>'
                     for al_idx, row_item in piv_w_ms.iterrows():
                         is_ke_r = (str(al_idx).upper() == 'KE')
-                        row_style = ' style="background-color: #cfe2f3 !important;"' if is_ke_r else ''
-                        td_style = ' style="background-color: #cfe2f3 !important; font-weight: bold;"' if is_ke_r else ''
-                        piv_w_html += f'<tr{row_style}><td{td_style} style="font-weight:700;"><span style="color: #1d4ed8 !important;">{al_idx}</span></td>'
-                        for val_ms in row_item: piv_w_html += f'<td{td_style}>{val_ms:.1f}%</td>'
+                        td_bg = "background-color: #cfe2f3 !important;" if is_ke_r else ""
+                        piv_w_html += f'<tr><td style="{td_bg} font-weight:700;"><span style="color: #1d4ed8 !important;">{al_idx}</span></td>'
+                        for val_ms in row_item: piv_w_html += f'<td style="{td_bg}">{val_ms:.1f}%</td>'
                         piv_w_html += '</tr>'
                     piv_w_html += '</tbody></table></div>'
                     st.markdown(piv_w_html, unsafe_allow_html=True)
@@ -485,6 +494,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_sup_dest_list = render_multiselect_box(sf_col3, "3. 도착 공항", opts_dest, "slicer_sup_dest_multi")
             if sel_sup_dest_list: temp_sup = temp_sup[temp_sup['도착공항'].isin(sel_sup_dest_list)]
 
+            # 📌 공급 월 필터에서 1900년 찌꺼기 원천 삭제
             opts_sup_m = sorted([str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan']) if sup_month_col else []
             sel_sup_month_list = render_multiselect_box(sf_col4, "4. 출발 월", opts_sup_m, "slicer_month_sup_multi")
             if sel_sup_month_list: temp_sup = temp_sup[temp_sup[sup_month_col].isin(sel_sup_month_list)]
@@ -497,7 +507,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             filtered_sup = temp_sup
 
             st.markdown("---")
-            
             st.markdown('<div class="unified-sub-header">3. 노선별 운항 스케줄 타임라인 (경쟁사 포함 - 산점도)</div>', unsafe_allow_html=True)
             
             ke_operated_routes = df_sup[df_sup['Airline'] == 'KE']['노선_clean'].dropna().unique().tolist()
@@ -515,11 +524,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 with tl_col2:
                     if sup_month_col and not df_schedule_route.empty:
                         avail_tl_months = sorted([str(x) for x in df_schedule_route[sup_month_col].dropna().unique() if '1900' not in str(x)])
-                        sel_tl_months = st.multiselect(
-                            "🗓️ 출발 월 필터 (미선택 시 전체):", 
-                            options=avail_tl_months, 
-                            default=[]
-                        )
+                        sel_tl_months = st.multiselect("🗓️ 출발 월 필터 (미선택 시 전체):", options=avail_tl_months, default=[])
                         if sel_tl_months:
                             df_schedule = df_schedule_route[df_schedule_route[sup_month_col].astype(str).isin(sel_tl_months)].copy()
                         else:
@@ -546,25 +551,40 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     df_schedule['Dep_Time_Str'] = df_schedule['Dep_Time_Mins'].apply(lambda x: f"{x//60:02d}:{x%60:02d}")
                     
                     timeline_color_map = build_airline_color_map(df_schedule['Airline'].unique())
+                    
+                    # 📌 KE 다이아몬드 + 크기 차별화 심볼 매핑
+                    symbol_map = {al: 'diamond' if al == 'KE' else 'circle' for al in df_schedule['Airline'].unique()}
 
                     fig_timeline = px.scatter(
                         df_schedule, x="Dep_Time_Mins", y="Airline", color="Airline", 
+                        symbol="Airline", symbol_map=symbol_map,
                         title=f"[{selected_single_route}] 하루 출발 시간대별 운항 스케줄 분포 (산점도)", 
                         color_discrete_map=timeline_color_map,
                         custom_data=["Seats_num", "Dep_Time_Str"]
                     )
                     
+                    # 마커 크기 및 테두리 세부 조정 (KE는 더 크게)
+                    for trace in fig_timeline.data:
+                        if trace.name == 'KE': trace.marker.size = 18
+                        else: trace.marker.size = 14
+                        trace.marker.line.width = 2
+                        trace.marker.line.color = 'white'
+                        trace.opacity = 0.95
+
                     min_mins = max(0, df_schedule['Dep_Time_Mins'].min() - 30)
                     max_mins = df_schedule['Dep_Time_Mins'].max() + 30
                     tick_vals = list(range(0, 25*60, 60))
                     tick_texts = [f"{h:02d}:00" for h in range(25)]
 
-                    fig_timeline.update_yaxes(autorange="reversed", title="항공사")
-                    fig_timeline.update_xaxes(
-                        title="출발 시간대", tickvals=tick_vals, ticktext=tick_texts, range=[min_mins, max_mins]
-                    )
+                    # 📌 Y축 KE 텍스트 Bold 강조
+                    unique_al_sorted = df_schedule['Airline'].drop_duplicates().tolist()
+                    tick_vals_y = unique_al_sorted
+                    tick_text_y = ["<b>KE</b>" if al == "KE" else al for al in unique_al_sorted]
+
+                    fig_timeline.update_yaxes(autorange="reversed", title="항공사", tickvals=tick_vals_y, ticktext=tick_text_y)
+                    fig_timeline.update_xaxes(title="출발 시간대", tickvals=tick_vals, ticktext=tick_texts, range=[min_mins, max_mins])
+                    
                     fig_timeline.update_traces(
-                        marker=dict(size=14, symbol='circle', line=dict(width=2, color='white')), opacity=0.9,
                         hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{customdata[1]}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>"
                     )
                     fig_timeline.update_layout(height=350, showlegend=False)
@@ -574,7 +594,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     # 📌 3. 🏷️ 대리점, RBD별 발매현황 탭
     with tab_34_3:
-        # 에러 방지를 위한 로컬 변수 재정의
+        # 에러 방지를 위한 탭 내부 지역 변수 재선언
         RBD_HIERARCHY_LOCAL = {
             'KE': list('YBMSHEKLUQTX'), 'OZ': list('YBMHEQKSVWTLX'),
             '7C': list('YBKNQMTWORXSZLHEFVGPJ'), 'LJ': list('YWDEHKLQBNMXPSVZARIOT'),
@@ -802,13 +822,22 @@ elif selected_group == "🌐 6수송 대시보드":
         # ------------------- Row 1 (6개 슬라이서) -------------------
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5, f6_col6 = st.columns(6)
         
-        opts_pur_m = sorted([str(x).strip() for x in temp_df[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in temp_df.columns else []
-        sel_pur_m_disp = render_multiselect_box(f6_col1, "1. 금년 발매월", opts_pur_m, "slicer6_pur_m_disp")
-        if sel_pur_m_disp: temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(sel_pur_m_disp)]
+        # 📌 금년(2026) 날짜만 필터 UI에 노출되도록 필터링 + 시간 순서 정렬 반영
+        opts_pur_m_all = sorted([str(x).strip() for x in temp_df[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in temp_df.columns else []
+        opts_pur_m_2026 = [x for x in opts_pur_m_all if x.startswith('2026')]
+        sel_pur_m_disp = render_multiselect_box(f6_col1, "1. 금년 발매월", opts_pur_m_2026, "slicer6_pur_m_disp")
+        if sel_pur_m_disp: 
+            sel_months = [x.split('-')[1] for x in sel_pur_m_disp if '-' in x]
+            target_pur_m = [f"2026-{m}" for m in sel_months] + [f"2025-{m}" for m in sel_months] # 몰래 25년 데이터도 같이 들고감 (YOY 계산용)
+            temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(target_pur_m)]
 
-        opts_trip_m = sorted([str(x).strip() for x in temp_df[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=False) if col_trip_m_disp in temp_df.columns else []
-        sel_trip_m_disp = render_multiselect_box(f6_col2, "2. 금년 출발월", opts_trip_m, "slicer6_trip_m_disp")
-        if sel_trip_m_disp: temp_df = temp_df[temp_df[col_trip_m_disp].astype(str).isin(sel_trip_m_disp)]
+        opts_trip_m_all = sorted([str(x).strip() for x in temp_df[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=False) if col_trip_m_disp in temp_df.columns else []
+        opts_trip_m_2026 = [x for x in opts_trip_m_all if x.startswith('2026')]
+        sel_trip_m_disp = render_multiselect_box(f6_col2, "2. 금년 출발월", opts_trip_m_2026, "slicer6_trip_m_disp")
+        if sel_trip_m_disp: 
+            sel_months = [x.split('-')[1] for x in sel_trip_m_disp if '-' in x]
+            target_trip_m = [f"2026-{m}" for m in sel_months] + [f"2025-{m}" for m in sel_months]
+            temp_df = temp_df[temp_df[col_trip_m_disp].astype(str).isin(target_trip_m)]
 
         opts_rgn = sorted([str(x).strip() for x in temp_df[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in temp_df.columns else []
         sel_rgn = render_multiselect_box(f6_col3, "3. OD Region", opts_rgn, "slicer6_rgn")
@@ -918,7 +947,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.markdown("---")
 
         # ------------------------------------------
-        # 📌 Carrier별 M/S (오직 Trip O&D 단방향 기준 TOP 20 정렬)
+        # 📌 Carrier별 M/S (Trip O&D 단방향 기준 TOP 20 정렬)
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계)</div>', unsafe_allow_html=True)
         
@@ -1031,6 +1060,7 @@ elif selected_group == "🌐 6수송 대시보드":
                     od_matrix_html += f'<td style="font-weight:700;">{r["sel_ms_cy"]:.1f}%</td>'
                     od_matrix_html += get_yoy_td_html(r["sel_ms_yoy"], True)
                     
+                    # 📌 KE 컬럼 전용 CSS (YOY 색상 방어)
                     od_matrix_html += f'<td style="background-color:#cfe2f3 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:700 !important;">{r["ke_cy"]:,.0f}</span></td>'
                     od_matrix_html += get_yoy_td_html(r["ke_yoy"], bg_color="#cfe2f3")
                     od_matrix_html += f'<td style="background-color:#cfe2f3 !important; text-align:center !important;"><span style="color:#0b5394 !important; font-weight:700 !important;">{r["ke_ms_cy"]:.1f}%</span></td>'
