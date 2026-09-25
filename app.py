@@ -75,6 +75,11 @@ st.markdown("""
     table.custom-piv-table td span.yoy-up, table.yoy-table td span.yoy-up { color: #1d4ed8 !important; font-weight: 700 !important; }
     table.custom-piv-table td span.yoy-down, table.yoy-table td span.yoy-down { color: #dc2626 !important; font-weight: 700 !important; }
     table.custom-piv-table td span.yoy-dash, table.yoy-table td span.yoy-dash { color: #64748b !important; font-weight: 500 !important; }
+    table.custom-piv-table td.bg-ke-light, table.yoy-table td.bg-ke-light { background-color: #cfe2f3 !important; }
+    table.custom-piv-table td.bg-ke-mid, table.yoy-table td.bg-ke-mid { background-color: #c9daf8 !important; }
+    table.custom-piv-table td.bg-ke-dark, table.yoy-table td.bg-ke-dark { background-color: #9fc5e8 !important; }
+    table.custom-piv-table td.bg-subtotal, table.yoy-table td.bg-subtotal { background-color: #f1f5f9 !important; }
+    table.custom-piv-table td.bg-grandtotal, table.yoy-table td.bg-grandtotal { background-color: #e2e8f0 !important; }
     table.custom-piv-table td span.txt-ke-bold, table.yoy-table td span.txt-ke-bold { color: #0b5394 !important; font-weight: 800 !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -454,8 +459,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 piv_r_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:100px;">노선_clean</th>'
                 for col_al in piv_r_ms.columns:
                     is_ke_c = (str(col_al).upper() == 'KE')
-                    th_style = ' style="background-color: #6fa8dc !important; color: #ffffff !important;"' if is_ke_c else ''
-                    k_span = '<span style="color:#ffffff !important; font-weight:bold;">' if is_ke_c else '<span>'
+                    th_style = ' style="background-color: #9fc5e8 !important; color: #0f172a !important;"' if is_ke_c else ''
+                    k_span = '<span style="color:#0f172a !important; font-weight:bold;">' if is_ke_c else '<span>'
                     piv_r_html += f'<th class="header-main"{th_style}>{k_span}{col_al}</span></th>'
                 piv_r_html += '</tr></thead><tbody>'
                 for route_idx, row_item in piv_r_ms.iterrows():
@@ -905,6 +910,66 @@ elif selected_group == "🌐 6수송 대시보드":
         filtered_6th = temp_df
 
         # ------------------------------------------
+        # 📌 복구된 첫 번째 테이블: 항공사별 월별 M/S
+        # ------------------------------------------
+        if not filtered_6th.empty and col_al_6 in filtered_6th.columns:
+            al_agg = filtered_6th.groupby(col_al_6, observed=False)[['Val_CY_num', 'Val_PY_num']].sum().reset_index()
+            non_ke_agg = al_agg[al_agg[col_al_6] != 'KE'].sort_values(by='Val_CY_num', ascending=False)
+            ke_agg = al_agg[al_agg[col_al_6] == 'KE']
+            al_agg_sorted = pd.concat([ke_agg, non_ke_agg]).reset_index(drop=True)
+
+            full_al_ranking = [str(x) for x in al_agg.sort_values(by='Val_CY_num', ascending=False)[col_al_6].tolist()]
+            ke_rank = (full_al_ranking.index('KE') + 1) if 'KE' in full_al_ranking else "-"
+            airline_rank_list = [str(x) for x in al_agg_sorted[col_al_6].tolist()[:11]]
+
+            html_table = '<div class="yoy-table-container"><table class="yoy-table"><thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
+            for al_code in airline_rank_list:
+                if al_code == 'KE': html_table += f'<th class="ke-header" style="width:130px; background-color:#9fc5e8 !important; color:#0f172a !important;">★ KE ({ke_rank}위)</th>'
+                else:
+                    rank_num = full_al_ranking.index(al_code) + 1 if al_code in full_al_ranking else "-"
+                    html_table += f'<th class="carrier-header" style="width:110px;"><div style="font-size:10px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
+            html_table += '</tr></thead><tbody>'
+
+            t_curr = al_agg['Val_CY_num'].sum()
+            t_prev = al_agg['Val_PY_num'].sum()
+            t_yoy_pct = ((t_curr - t_prev) / t_prev * 100) if t_prev > 0 else 0
+
+            html_table += f'<tr class="row-title"><td style="background-color:#ffffff !important;">전체 발매</td><td style="background-color:#ffffff !important;"><b>{t_curr:,.0f}</b></td>'
+            for al_code in airline_rank_list:
+                row_val = al_agg[al_agg[col_al_6] == al_code]['Val_CY_num'].sum()
+                html_table += f'<td style="background-color:#ffffff !important;"><b>{row_val:,.0f}</b></td>'
+            html_table += '</tr>'
+
+            html_table += f'<tr><td style="color:#64748b; font-weight:600; background-color:#ffffff !important;">YOY</td>{(get_yoy_td_html(t_yoy_pct, bg_color="#ffffff") if t_prev>0 else get_dash_td(bg_color="#ffffff"))}'
+            for al_code in airline_rank_list:
+                c_val = al_agg[al_agg[col_al_6] == al_code]['Val_CY_num'].sum()
+                p_val = al_agg[al_agg[col_al_6] == al_code]['Val_PY_num'].sum()
+                indiv_yoy = ((c_val - p_val) / p_val * 100) if p_val > 0 else 0
+                html_table += (get_yoy_td_html(indiv_yoy, bg_color="#ffffff") if p_val>0 else get_dash_td(bg_color="#ffffff"))
+            html_table += '</tr>'
+
+            html_table += '<tr class="row-title"><td style="background-color:#ffffff !important;">전체 M/S</td><td style="background-color:#ffffff !important;"><b>100%</b></td>'
+            for al_code in airline_rank_list:
+                c_val = al_agg[al_agg[col_al_6] == al_code]['Val_CY_num'].sum()
+                ms_val = (c_val / t_curr * 100) if t_curr > 0 else 0
+                html_table += f'<td style="background-color:#ffffff !important;"><b>{ms_val:.1f}%</b></td>'
+            html_table += '</tr>'
+
+            diff_total_ms = 0
+            html_table += f'<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600; background-color:#ffffff !important;">YOY</td>{(get_yoy_td_html(diff_total_ms, True, bg_color="#ffffff") if t_prev>0 else get_dash_td(bg_color="#ffffff"))}'
+            for al_code in airline_rank_list:
+                c_val = al_agg[al_agg[col_al_6] == al_code]['Val_CY_num'].sum()
+                p_val = al_agg[al_agg[col_al_6] == al_code]['Val_PY_num'].sum()
+                ms_c = (c_val / t_curr * 100) if t_curr > 0 else 0
+                ms_p = (p_val / t_prev * 100) if t_prev > 0 else 0
+                diff_p = ms_c - ms_p
+                html_table += (get_yoy_td_html(diff_p, True, bg_color="#ffffff") if t_prev>0 and p_val>0 else get_dash_td(bg_color="#ffffff"))
+            html_table += '</tr></tbody></table></div>'
+            st.markdown(html_table, unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # ------------------------------------------
         # 📌 추가된 테이블: OD Region별 발매 및 M/S 현황
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🌍 OD Region별 발매 및 M/S 현황</div>', unsafe_allow_html=True)
@@ -930,7 +995,6 @@ elif selected_group == "🌐 6수송 대시보드":
                 
             rgn_agg = sorted(rgn_agg, key=lambda x: x['m_cy'], reverse=True)
             
-            # 📌 CSS 적용: KE 헤더는 #9fc5e8, 일반 데이터 셀은 흰색, 소계/총계는 각각 #d9d9d9, #b7b7b7 일괄 적용
             rgn_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead>'
             rgn_html += '<tr><th rowspan="2" class="header-main" style="width:150px;">OD Region</th>'
             rgn_html += '<th colspan="4" class="header-main" style="background-color:#215b88 !important; color:#ffffff !important;">시장 전체</th>'
