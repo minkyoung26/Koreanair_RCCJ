@@ -75,11 +75,6 @@ st.markdown("""
     table.custom-piv-table td span.yoy-up, table.yoy-table td span.yoy-up { color: #1d4ed8 !important; font-weight: 700 !important; }
     table.custom-piv-table td span.yoy-down, table.yoy-table td span.yoy-down { color: #dc2626 !important; font-weight: 700 !important; }
     table.custom-piv-table td span.yoy-dash, table.yoy-table td span.yoy-dash { color: #64748b !important; font-weight: 500 !important; }
-    table.custom-piv-table td.bg-ke-light, table.yoy-table td.bg-ke-light { background-color: #cfe2f3 !important; }
-    table.custom-piv-table td.bg-ke-mid, table.yoy-table td.bg-ke-mid { background-color: #c9daf8 !important; }
-    table.custom-piv-table td.bg-ke-dark, table.yoy-table td.bg-ke-dark { background-color: #9fc5e8 !important; }
-    table.custom-piv-table td.bg-subtotal, table.yoy-table td.bg-subtotal { background-color: #f1f5f9 !important; }
-    table.custom-piv-table td.bg-grandtotal, table.yoy-table td.bg-grandtotal { background-color: #e2e8f0 !important; }
     table.custom-piv-table td span.txt-ke-bold, table.yoy-table td span.txt-ke-bold { color: #0b5394 !important; font-weight: 800 !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -226,9 +221,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
     with tab_34_1:
         if df_iss_merged is None: st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다."); st.stop()
         merged_df = df_iss_merged.copy()
+        merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
+        
+        # 📌 발매 M/S 탭 전체를 강제로 KE 취항노선으로 한정 필터링 (비취항 노선 찌꺼기 제거)
+        merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
+
         al_col_target = next((c for c in ['Dominant Marketing Airline', 'AL', '항공사', 'Marketing Airline'] if c in merged_df.columns), None)
         merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target else ''
-        merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
 
         region_col = next((c for c in merged_df.columns if str(c).replace(" ", "") in ['일본권역', '권역', 'JapanRegion', 'Region']), None)
         bound_raw_col = next((c for c in merged_df.columns if str(c).replace(" ", "") in ['Bound', 'BOUND', '방향', '바운드']), None)
@@ -278,9 +277,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             if sel_al_list: temp_df_34 = temp_df_34[temp_df_34['AL_clean'].isin(sel_al_list)]
 
         filtered_df = temp_df_34.copy()
-
-        if not sel_route_list and not sel_region_list:
-            filtered_df = filtered_df[filtered_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
         if apply_weight_toggle:
             filtered_df['Mult_map'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
@@ -517,6 +513,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_sup_dest_list = render_multiselect_box(sf_col3, "3. 도착 공항", opts_dest, "slicer_sup_dest_multi")
             if sel_sup_dest_list: temp_sup = temp_sup[temp_sup['도착공항'].isin(sel_sup_dest_list)]
 
+            # 📌 1900년 찌꺼기 원천 삭제
             opts_sup_m = sorted([str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan']) if sup_month_col else []
             sel_sup_month_list = render_multiselect_box(sf_col4, "4. 출발 월", opts_sup_m, "slicer_month_sup_multi")
             if sel_sup_month_list: temp_sup = temp_sup[temp_sup[sup_month_col].isin(sel_sup_month_list)]
@@ -625,10 +622,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
         
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
+            df_agency['노선_clean'] = df_agency['노선'].astype(str).str.strip()
+            # 📌 대리점/RBD 탭 전체를 강제로 KE 취항노선으로 한정 필터링
+            df_agency = df_agency[df_agency['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
+
             week_col_a = '발매주차_일자' if '발매주차_일자' in df_agency.columns else ('발매 주차' if '발매 주차' in df_agency.columns else '발매주차')
             month_col_a = '출발월' if '출발월' in df_agency.columns else ('출발 월' if '출발 월' in df_agency.columns else None)
             bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
-            df_agency['노선_clean'] = df_agency['노선'].astype(str).str.strip()
 
             temp_ag = df_agency.copy()
             with st.expander("🔍 **대리점 & RBD 분석 피벗 슬라이서 필터 설정** (종속형 순차 필터링)", expanded=True):
@@ -738,6 +738,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
             df_grp_raw['노선_clean'] = df_grp_raw['노선'].astype(str).str.strip()
+            # 📌 단체실적 탭 전체를 강제로 KE 취항노선으로 한정 필터링
+            df_grp_raw = df_grp_raw[df_grp_raw['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
+
             g_m_col = next((c for c in ['출발월', '출발 월'] if c in df_grp_raw.columns), None)
             g_b_col = next((c for c in ['수송', 'Bound'] if c in df_grp_raw.columns), None)
 
@@ -910,7 +913,7 @@ elif selected_group == "🌐 6수송 대시보드":
         filtered_6th = temp_df
 
         # ------------------------------------------
-        # 📌 복구된 첫 번째 테이블: 항공사별 월별 M/S
+        # 📌 테이블 1: 항공사별 M/S 비교 현황
         # ------------------------------------------
         if not filtered_6th.empty and col_al_6 in filtered_6th.columns:
             al_agg = filtered_6th.groupby(col_al_6, observed=False)[['Val_CY_num', 'Val_PY_num']].sum().reset_index()
@@ -968,9 +971,9 @@ elif selected_group == "🌐 6수송 대시보드":
             st.markdown(html_table, unsafe_allow_html=True)
 
         st.markdown("---")
-
+        
         # ------------------------------------------
-        # 📌 추가된 테이블: OD Region별 발매 및 M/S 현황
+        # 📌 테이블 2: OD Region별 발매 및 M/S 현황
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🌍 OD Region별 발매 및 M/S 현황</div>', unsafe_allow_html=True)
         
@@ -1055,9 +1058,9 @@ elif selected_group == "🌐 6수송 대시보드":
             rgn_html += f'<td style="font-weight:800 !important; color:#0f172a !important; background-color:{bg_grand} !important;">{g_m_ms_cy:.1f}%</td>'
             rgn_html += get_yoy_td_html(g_m_ms_yoy, True, bg_color=bg_grand)
             
-            rgn_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold">{g_k_cy:,.0f}</span></td>'
+            rgn_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold" style="color:#ffffff !important;">{g_k_cy:,.0f}</span></td>'
             rgn_html += get_yoy_td_html(g_k_yoy, bg_color=bg_grand)
-            rgn_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold">{g_k_ms_cy:.1f}%</span></td>'
+            rgn_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold" style="color:#ffffff !important;">{g_k_ms_cy:.1f}%</span></td>'
             rgn_html += get_yoy_td_html(g_k_ms_yoy, True, bg_color=bg_grand)
             rgn_html += '</tr>'
             
@@ -1067,7 +1070,7 @@ elif selected_group == "🌐 6수송 대시보드":
         st.markdown("---")
 
         # ------------------------------------------
-        # 📌 Carrier별 M/S (Trip O&D 단방향 기준 TOP 20 정렬)
+        # 📌 테이블 3: Carrier별 M/S (Trip O&D 기준 TOP 20)
         # ------------------------------------------
         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계)</div>', unsafe_allow_html=True)
         
@@ -1210,9 +1213,9 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += get_yoy_td_html(grand_sel_yoy, bg_color=bg_grand)
                 od_matrix_html += f'<td style="font-weight:800 !important; color:#0f172a !important; background-color:{bg_grand} !important;">{grand_sel_ms_cy:.1f}%</td>'
                 od_matrix_html += get_yoy_td_html(grand_sel_ms_yoy, True, bg_color=bg_grand)
-                od_matrix_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold">{grand_ke_cy:,.0f}</span></td>'
+                od_matrix_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold" style="color:#ffffff !important;">{grand_ke_cy:,.0f}</span></td>'
                 od_matrix_html += get_yoy_td_html(grand_ke_yoy, bg_color=bg_grand)
-                od_matrix_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold">{grand_ke_ms_cy:.1f}%</span></td>'
+                od_matrix_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold" style="color:#ffffff !important;">{grand_ke_ms_cy:.1f}%</span></td>'
                 od_matrix_html += get_yoy_td_html(grand_ke_ms_yoy, True, bg_color=bg_grand)
                 od_matrix_html += '</tr>'
 
