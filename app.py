@@ -75,6 +75,11 @@ st.markdown("""
     table.custom-piv-table td span.yoy-up, table.yoy-table td span.yoy-up { color: #1d4ed8 !important; font-weight: 700 !important; }
     table.custom-piv-table td span.yoy-down, table.yoy-table td span.yoy-down { color: #dc2626 !important; font-weight: 700 !important; }
     table.custom-piv-table td span.yoy-dash, table.yoy-table td span.yoy-dash { color: #64748b !important; font-weight: 500 !important; }
+    table.custom-piv-table td.bg-ke-light, table.yoy-table td.bg-ke-light { background-color: #cfe2f3 !important; }
+    table.custom-piv-table td.bg-ke-mid, table.yoy-table td.bg-ke-mid { background-color: #c9daf8 !important; }
+    table.custom-piv-table td.bg-ke-dark, table.yoy-table td.bg-ke-dark { background-color: #9fc5e8 !important; }
+    table.custom-piv-table td.bg-subtotal, table.yoy-table td.bg-subtotal { background-color: #f1f5f9 !important; }
+    table.custom-piv-table td.bg-grandtotal, table.yoy-table td.bg-grandtotal { background-color: #e2e8f0 !important; }
     table.custom-piv-table td span.txt-ke-bold, table.yoy-table td span.txt-ke-bold { color: #0b5394 !important; font-weight: 800 !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -183,10 +188,14 @@ def get_dynamic_range_label(opts):
         return f" ({y1}년 {m1}월~{y2}년 {m2}월)"
 
 # 📌 CSS 클래스를 활용한 완벽한 YOY 색상 강제 렌더링 함수
-def get_yoy_td_html(val, is_percentage_point=False, bg_color=""):
+def get_yoy_td_html(val, is_percentage_point=False, bg_color="", bg_class=""):
     unit = "%p" if is_percentage_point else "%"
-    bg_css = f"background-color:{bg_color} !important;" if bg_color else "background-color:#ffffff !important;"
-    base_td = f'<td style="{bg_css} text-align:center !important;">'
+    
+    # 클래스 우선, 클래스가 없으면 인라인 스타일 적용
+    class_str = f' class="{bg_class}"' if bg_class else ''
+    style_str = f' style="background-color:{bg_color} !important; text-align:center !important;"' if bg_color and not bg_class else ' style="text-align:center !important;"'
+    
+    base_td = f'<td{class_str}{style_str}>'
     if val > 0: 
         return f'{base_td}<span class="yoy-up">▲ {val:.1f}{unit}</span></td>'
     elif val < 0: 
@@ -194,9 +203,10 @@ def get_yoy_td_html(val, is_percentage_point=False, bg_color=""):
     else: 
         return f'{base_td}<span class="yoy-dash">-</span></td>'
 
-def get_dash_td(bg_color=""):
-    bg_css = f"background-color:{bg_color} !important;" if bg_color else "background-color:#ffffff !important;"
-    return f'<td style="{bg_css} text-align:center !important;"><span class="yoy-dash">-</span></td>'
+def get_dash_td(bg_color="", bg_class=""):
+    class_str = f' class="{bg_class}"' if bg_class else ''
+    style_str = f' style="background-color:{bg_color} !important; text-align:center !important;"' if bg_color and not bg_class else ' style="text-align:center !important;"'
+    return f'<td{class_str}{style_str}><span class="yoy-dash">-</span></td>'
 
 def get_dynamic_date_ranges_34(df_iss):
     if df_iss is None or df_iss.empty: return issue_range_str, dep_range_str
@@ -205,7 +215,6 @@ def get_dynamic_date_ranges_34(df_iss):
     w_col = '발매주차_일자' if '발매주차_일자' in df_iss.columns else ('발매 주차' if '발매 주차' in df_iss.columns else 'Purchase Month')
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
     return iss_str, dep_str
-
 
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
@@ -835,10 +844,8 @@ elif selected_group == "🌐 6수송 대시보드":
         
         temp_df = df_6.copy()
 
-        # ------------------- Row 1 (6개 슬라이서) -------------------
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5, f6_col6 = st.columns(6)
         
-        # 📌 동적 날짜 레이블 생성 및 2026년 필터 적용
         opts_pur_m_all = sorted([str(x).strip() for x in temp_df[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in temp_df.columns else []
         opts_pur_m_2026 = [x for x in opts_pur_m_all if x.startswith('2026')]
         pur_label = "1. 금년 발매월" + get_dynamic_range_label(opts_pur_m_2026)
@@ -880,7 +887,6 @@ elif selected_group == "🌐 6수송 대시보드":
         sel_dir = render_multiselect_box(f6_col6, "6. 일본발/일본행", opts_dir, "slicer6_dir")
         if sel_dir: temp_df = temp_df[temp_df[col_dir].astype(str).isin(sel_dir)]
 
-        # ------------------- Row 2 (6개 슬라이서) -------------------
         f6_col7, f6_col8, f6_col9, f6_col10, f6_col11, f6_col12 = st.columns(6)
 
         opts_direct = sorted([str(x).strip() for x in temp_df[col_direct_transit].dropna().unique() if str(x).strip() != 'nan']) if col_direct_transit in temp_df.columns else []
@@ -964,6 +970,103 @@ elif selected_group == "🌐 6수송 대시보드":
             html_table += '</tr></tbody></table></div>'
             st.markdown(html_table, unsafe_allow_html=True)
 
+        st.markdown("---")
+        
+        # ------------------------------------------
+        # 📌 추가된 테이블: OD Region별 발매 및 M/S 현황
+        # ------------------------------------------
+        st.markdown('<div class="unified-sub-header">🌍 OD Region별 발매 및 M/S 현황</div>', unsafe_allow_html=True)
+        
+        if not filtered_6th.empty and col_rgn in filtered_6th.columns:
+            g_mkt_cy = filtered_6th['Val_CY_num'].sum()
+            g_mkt_py = filtered_6th['Val_PY_num'].sum()
+            
+            rgn_agg = []
+            for rgn_name, df_rgn in filtered_6th.groupby(col_rgn, observed=False):
+                m_cy = df_rgn['Val_CY_num'].sum()
+                m_py = df_rgn['Val_PY_num'].sum()
+                
+                df_ke = df_rgn[df_rgn[col_al_6] == 'KE']
+                k_cy = df_ke['Val_CY_num'].sum()
+                k_py = df_ke['Val_PY_num'].sum()
+                
+                rgn_agg.append({
+                    'Region': rgn_name,
+                    'm_cy': m_cy, 'm_py': m_py,
+                    'k_cy': k_cy, 'k_py': k_py
+                })
+                
+            rgn_agg = sorted(rgn_agg, key=lambda x: x['m_cy'], reverse=True)
+            
+            rgn_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead>'
+            rgn_html += '<tr><th rowspan="2" class="header-main" style="width:150px;">OD Region</th>'
+            rgn_html += '<th colspan="4" class="header-main" style="background-color:#215b88 !important; color:#ffffff !important;">시장 전체</th>'
+            rgn_html += '<th colspan="4" class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">KE 발매량 & M/S (대한항공)</th></tr>'
+            rgn_html += '<tr>'
+            rgn_html += '<th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">금년 발매량</th>'
+            rgn_html += '<th class="header-main" style="background-color:#3172ac !important; color:#ffffff !important;">YOY</th>'
+            rgn_html += '<th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">비중(M/S)</th>'
+            rgn_html += '<th class="header-main" style="background-color:#28629b !important; color:#ffffff !important;">YOY</th>'
+            rgn_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">금년 발매량</th>'
+            rgn_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">YOY</th>'
+            rgn_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">KE M/S</th>'
+            rgn_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">YOY</th>'
+            rgn_html += '</tr></thead><tbody>'
+
+            for r in rgn_agg:
+                m_yoy = ((r['m_cy'] - r['m_py']) / r['m_py'] * 100) if r['m_py'] > 0 else 0
+                m_ms_cy = (r['m_cy'] / g_mkt_cy * 100) if g_mkt_cy > 0 else 0
+                m_ms_py = (r['m_py'] / g_mkt_py * 100) if g_mkt_py > 0 else 0
+                m_ms_yoy = m_ms_cy - m_ms_py
+                
+                k_yoy = ((r['k_cy'] - r['k_py']) / r['k_py'] * 100) if r['k_py'] > 0 else 0
+                k_ms_cy = (r['k_cy'] / r['m_cy'] * 100) if r['m_cy'] > 0 else 0
+                k_ms_py = (r['k_py'] / r['m_py'] * 100) if r['m_py'] > 0 else 0
+                k_ms_yoy = k_ms_cy - k_ms_py
+                
+                rgn_html += f'<tr><td style="font-weight:700; background-color:#ffffff !important;">{r["Region"]}</td>'
+                rgn_html += f'<td style="background-color:#ffffff !important;">{r["m_cy"]:,.0f}</td>'
+                rgn_html += get_yoy_td_html(m_yoy, bg_color="#ffffff")
+                rgn_html += f'<td style="background-color:#ffffff !important;">{m_ms_cy:.1f}%</td>'
+                rgn_html += get_yoy_td_html(m_ms_yoy, True, bg_color="#ffffff")
+                
+                rgn_html += f'<td class="bg-ke-light" style="text-align:center !important;"><span class="txt-ke-bold">{r["k_cy"]:,.0f}</span></td>'
+                rgn_html += get_yoy_td_html(k_yoy, bg_class="bg-ke-light")
+                rgn_html += f'<td class="bg-ke-light" style="text-align:center !important;"><span class="txt-ke-bold">{k_ms_cy:.1f}%</span></td>'
+                rgn_html += get_yoy_td_html(k_ms_yoy, True, bg_class="bg-ke-light")
+                rgn_html += '</tr>'
+                
+            # Grand Total 행 생성
+            g_m_yoy = ((g_mkt_cy - g_mkt_py) / g_mkt_py * 100) if g_mkt_py > 0 else 0
+            g_m_ms_cy = 100.0 if g_mkt_cy > 0 else 0
+            g_m_ms_py = 100.0 if g_mkt_py > 0 else 0
+            g_m_ms_yoy = g_m_ms_cy - g_m_ms_py
+            
+            df_ke_tot = filtered_6th[filtered_6th[col_al_6] == 'KE']
+            g_k_cy = df_ke_tot['Val_CY_num'].sum()
+            g_k_py = df_ke_tot['Val_PY_num'].sum()
+            g_k_yoy = ((g_k_cy - g_k_py) / g_k_py * 100) if g_k_py > 0 else 0
+            g_k_ms_cy = (g_k_cy / g_mkt_cy * 100) if g_mkt_cy > 0 else 0
+            g_k_ms_py = (g_k_py / g_mkt_py * 100) if g_mkt_py > 0 else 0
+            g_k_ms_yoy = g_k_ms_cy - g_k_ms_py
+
+            bg_grand = "#e2e8f0"
+            rgn_html += f'<tr style="border-top:2px solid #64748b !important;">'
+            rgn_html += f'<td style="font-weight:800 !important; text-align:center; color:#0f172a !important; background-color:{bg_grand} !important;">[총계]</td>'
+            rgn_html += f'<td style="font-weight:800 !important; color:#0f172a !important; background-color:{bg_grand} !important;">{g_mkt_cy:,.0f}</td>'
+            rgn_html += get_yoy_td_html(g_m_yoy, bg_color=bg_grand)
+            rgn_html += f'<td style="font-weight:800 !important; color:#0f172a !important; background-color:{bg_grand} !important;">{g_m_ms_cy:.1f}%</td>'
+            rgn_html += get_yoy_td_html(g_m_ms_yoy, True, bg_color=bg_grand)
+            
+            rgn_html += f'<td class="bg-ke-dark" style="text-align:center !important;"><span class="txt-ke-bold" style="color:#ffffff !important;">{g_k_cy:,.0f}</span></td>'
+            rgn_html += get_yoy_td_html(g_k_yoy, bg_class="bg-ke-dark")
+            rgn_html += f'<td class="bg-ke-dark" style="text-align:center !important;"><span class="txt-ke-bold" style="color:#ffffff !important;">{g_k_ms_cy:.1f}%</span></td>'
+            rgn_html += get_yoy_td_html(g_k_ms_yoy, True, bg_class="bg-ke-dark")
+            rgn_html += '</tr>'
+            
+            rgn_html += '</tbody></table></div>'
+            st.markdown(rgn_html, unsafe_allow_html=True)
+            
         st.markdown("---")
 
         # ------------------------------------------
@@ -1070,7 +1173,6 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">KE M/S</th>'
                 od_matrix_html += '<th class="header-main" style="background-color:#6fa8dc !important; color:#ffffff !important;">YOY</th></tr></thead><tbody>'
 
-                # 📌 1~20위 데이터 행 렌더링 (KE 배경 파란색 제거, 흰색 통일)
                 for r in matrix_rows:
                     od_matrix_html += f'<tr><td style="font-weight:700; background-color:#ffffff !important;">{r["rank"]}</td>'
                     od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important;">{r["od_simple"]}</td>'
@@ -1081,14 +1183,12 @@ elif selected_group == "🌐 6수송 대시보드":
                     od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important;">{r["sel_ms_cy"]:.1f}%</td>'
                     od_matrix_html += get_yoy_td_html(r["sel_ms_yoy"], True, bg_color="#ffffff")
                     
-                    # KE 데이터 셀 (배경 하얀색, 글씨만 굵은 파랑)
                     od_matrix_html += f'<td style="background-color:#ffffff !important; text-align:center !important;"><span class="txt-ke-bold">{r["ke_cy"]:,.0f}</span></td>'
                     od_matrix_html += get_yoy_td_html(r["ke_yoy"], bg_color="#ffffff")
                     od_matrix_html += f'<td style="background-color:#ffffff !important; text-align:center !important;"><span class="txt-ke-bold">{r["ke_ms_cy"]:.1f}%</span></td>'
                     od_matrix_html += get_yoy_td_html(r["ke_ms_yoy"], True, bg_color="#ffffff")
                     od_matrix_html += '</tr>'
 
-                # 📌 소계 행 (전체 셀 #f1f5f9 배경 통일)
                 bg_sub = "#f1f5f9"
                 od_matrix_html += f'<tr style="border-top:2px solid #94a3b8 !important;">'
                 od_matrix_html += f'<td colspan="2" style="font-weight:800 !important; text-align:center; background-color:{bg_sub} !important;">[TOP 20 소계]</td>'
@@ -1104,7 +1204,6 @@ elif selected_group == "🌐 6수송 대시보드":
                 od_matrix_html += get_yoy_td_html(tot_ke_ms_yoy, True, bg_color=bg_sub)
                 od_matrix_html += '</tr>'
 
-                # 📌 총계 행 (전체 셀 #e2e8f0 배경 통일)
                 bg_grand = "#e2e8f0"
                 od_matrix_html += f'<tr style="border-top:2px solid #64748b !important;">'
                 od_matrix_html += f'<td colspan="2" style="font-weight:800 !important; text-align:center; color:#0f172a !important; background-color:{bg_grand} !important;">[선택 필터 전체 총계]</td>'
