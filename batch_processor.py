@@ -1,106 +1,83 @@
 # batch_processor.py
-import os
-import glob
 import pandas as pd
 import numpy as np
+import os
+import datetime
 
-def normalize_route_code(route_str):
-    if not isinstance(route_str, str): return ""
-    r = route_str.strip().upper()
-    r = r.replace('ICN/', 'I/').replace('/ICN', '/I')
-    r = r.replace('GMP/', 'G/').replace('/GMP', '/G')
-    r = r.replace('PUS/', 'P/').replace('/PUS', '/P')
-    r = r.replace('CJJ/', 'C/').replace('/CJJ', '/C')
-    r = r.replace('TAE/', 'T/').replace('/TAE', '/T')
-    return r
-
-def process_34_transport_data():
+def process_batch_parquet():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # 1. 3/4수송 원본 파일 읽기
-    csv_candidates = glob.glob(os.path.join(base_dir, "*34수송*.csv")) + glob.glob(os.path.join(base_dir, "*34*.csv"))
-    if not csv_candidates:
-        print("❌ 3/4수송 원본 CSV 파일을 찾을 수 없습니다.")
-        return False
-        
-    main_csv_file = csv_candidates[0]
-    print(f"📂 3/4수송 원본 CSV 로딩: {os.path.basename(main_csv_file)}")
+    # 1. 원본 데이터 파일 탐색 (xlsx, csv 등)
+    input_file = None
+    possible_inputs = ['data_new.xlsx', '34수송.xlsx', '34수송.csv', '원본데이터.xlsx', '원본데이터.csv']
     
-    # 2. 가중치 파일 읽기
-    wt_candidates = glob.glob(os.path.join(base_dir, "*가중치*.csv")) + glob.glob(os.path.join(base_dir, "*가중치*.xlsx"))
-    wt_file = wt_candidates[0] if wt_candidates else None
+    for f in possible_inputs:
+        full_path = os.path.join(base_dir, f)
+        if os.path.exists(full_path):
+            input_file = full_path
+            break
+            
+    if not input_file:
+        # 폴더 내 xlsx 또는 csv 파일 자동 탐색
+        files = [f for f in os.listdir(base_dir) if f.endswith('.xlsx') or f.endswith('.csv')]
+        files = [f for f in files if not f.startswith('cache_') and not f.startswith('~$')]
+        if files:
+            input_file = os.path.join(base_dir, files[0])
+
+    if not input_file:
+        print("❌ 원본 데이터 파일을 찾을 수 없습니다.")
+        return
+
+    print(f"📖 원본 파일 읽는 중: {os.path.basename(input_file)}")
     
-    try:
-        df = pd.read_csv(main_csv_file, low_memory=False)
-        df.columns = [str(c).strip() for c in df.columns]
+    if input_file.endswith('.xlsx'):
+        df = pd.read_excel(input_file)
+    else:
+        df = pd.read_csv(input_file, low_memory=False)
+
+    # 2. 컬럼명 공백 제거 및 표준화
+    df.columns = [str(c).strip() for c in df.columns]
+
+    # 문자열 타입 정리
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = df[col].astype(str).str.strip()
+
+    # 3. 실적 수치형 변환
+    if 'Value' in df.columns:
+        df['Value'] = pd.to_numeric(df['Value'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+    else:
+        df['Value'] = 0
+
+    if 'Weighted_Value' in df.columns:
+        df['Weighted_Value'] = pd.to_numeric(df['Weighted_Value'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+    else:
+        df['Weighted_Value'] = df['Value']
+
+    # 4. 안전한 HTML 피벗 생성 테스트 (KeyError 방지 예외 처리)
+    week_col = '발매주차_일자' if '발매주차_일자' in df.columns else ('발매 주차' if '발매 주차' in df.columns else None)
+    if week_col and 'O&D RBKD' in df.columns:
+        week_list = sorted([str(x) for x in df[week_col].dropna().unique()], reverse=True)
         
-        # Value 수치형 정제
-        if 'Value' in df.columns:
-            df['Value'] = pd.to_numeric(df['Value'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
-        else:
-            df['Value'] = 0.0
+        piv_rbd = df.pivot_table(index='O&D RBKD', columns=week_col, values='Value', aggfunc='sum', fill_value=0, observed=False)
+        piv_rbd['총합계'] = piv_rbd.sum(axis=1)
 
-        al_col = 'Dominant Marketing Airline' if 'Dominant Marketing Airline' in df.columns else ('AL' if 'AL' in df.columns else '항공사')
-        route_col = '노선' if '노선' in df.columns else 'Route'
+        # KeyError 원인이었던 주차별 동적 참조 안전 처리 (.get 방식)
+        rbd_html = ""
+        for rbd_code, rbd_row in piv_rbd.iterrows():
+            rbd_html += f'<tr><td style="width:180px; text-align:center; font-weight:700;">{rbd_code}</td>'
+            for wk in week_list:
+                # 핵심 보정: 해당 주차가 피벗 테이블 컬럼에 없더라도 0으로 안나게 처리
+                wk_val = rbd_row.get(wk, 0)
+                rbd_html += f'<td style="text-align:center;">{wk_val:,.0f}</td>'
+            rbd_html += f'<td style="text-align:center; font-weight:700;">{rbd_row.get("총합계", 0):,.0f}</td></tr>'
 
-        df['AL_join'] = df[al_col].astype(str).str.strip().str.upper() if al_col in df.columns else ''
-        df['Route_norm'] = df[route_col].apply(normalize_route_code) if route_col in df.columns else ''
+    # 5. 최신 Parquet 파일로 최종 저장
+    output_parquet = os.path.join(base_dir, 'cache_34_data.parquet')
+    df.to_parquet(output_parquet, engine='pyarrow', index=False)
+    
+    print(f"✅ 파켓 캐시 파일 생성 성공: {output_parquet}")
+    print(f"📌 저장된 총 행 수: {len(df):,}개 | 포함된 컬럼: {list(df.columns)}")
 
-        # 3. 가중 배수 (Multiplier = 1 / Weight) 조인 및 항공사별 평균 Fallback 적용
-        if wt_file:
-            print(f"📂 가중치 파일 로딩 및 가중 배수(1/Weight) 매핑: {os.path.basename(wt_file)}")
-            df_wt = pd.read_excel(wt_file) if wt_file.endswith('.xlsx') else pd.read_csv(wt_file)
-            df_wt.columns = [str(c).strip() for c in df_wt.columns]
-            
-            wt_route_col = 'Route Code' if 'Route Code' in df_wt.columns else ('노선' if '노선' in df_wt.columns else df_wt.columns[0])
-            wt_al_col = 'Dominant Marketing Airline' if 'Dominant Marketing Airline' in df_wt.columns else ('항공사' if '항공사' in df_wt.columns else df_wt.columns[1])
-            wt_val_col = 'Weight' if 'Weight' in df_wt.columns else ('가중치' if '가중치' in df_wt.columns else df_wt.columns[-1])
-
-            df_wt['Route_norm'] = df_wt[wt_route_col].apply(normalize_route_code)
-            df_wt['AL_join'] = df_wt[wt_al_col].astype(str).str.strip().str.upper()
-            
-            def parse_weight_to_multiplier(val):
-                v_str = str(val).replace('%', '').strip()
-                try:
-                    num = float(v_str)
-                    w = num / 100.0 if num > 5.0 else num
-                    return (1.0 / w) if w > 0 else 1.0
-                except:
-                    return np.nan
-
-            df_wt['Multiplier'] = df_wt[wt_val_col].apply(parse_weight_to_multiplier)
-            df_wt_sub = df_wt[['Route_norm', 'AL_join', 'Multiplier']].dropna().drop_duplicates(subset=['Route_norm', 'AL_join'])
-            
-            # 항공사별 평균 가중 배수 사전 생성 (누락 노선 대비)
-            al_avg_multiplier = df_wt_sub.groupby('AL_join')['Multiplier'].mean().to_dict()
-
-            df = pd.merge(df, df_wt_sub, on=['Route_norm', 'AL_join'], how='left')
-            
-            # 노선 가중 배수 누락 시 항공사 평균 배수로 자동 보정
-            df['Weight_mult'] = df['Multiplier']
-            for al_code, avg_m in al_avg_multiplier.items():
-                df.loc[df['Weight_mult'].isna() & (df['AL_join'] == al_code), 'Weight_mult'] = avg_m
-            
-            df['Weight_mult'] = df['Weight_mult'].fillna(1.0)
-            df.drop(columns=['Multiplier', 'AL_join', 'Route_norm'], inplace=True, errors='ignore')
-            print("✅ 항공사 평균 배수 Fallback 보정 포함 조인 성공!")
-        else:
-            df['Weight_mult'] = 1.0
-
-        # Weighted_Value = Value * Multiplier
-        df['Weighted_Value'] = df['Value'] * df['Weight_mult']
-
-        b_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
-        if b_col: df['수송'] = df[b_col].astype(str).str.strip()
-
-        output_parquet = os.path.join(base_dir, 'cache_34_data.parquet')
-        df.to_parquet(output_parquet, index=False, compression='snappy')
-        print(f"🎉 스마트 가중치 매핑 파켓 저장 완료: {os.path.basename(output_parquet)} (행 수: {len(df):,}개)")
-        return True
-
-    except Exception as e:
-        print(f"❌ 오류 발생: {e}")
-        return False
-
-if __name__ == "__main__":
-    process_34_transport_data()
+if __name__ == '__main__':
+    process_batch_parquet()
