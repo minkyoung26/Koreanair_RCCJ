@@ -216,9 +216,9 @@ def get_dynamic_date_ranges_34(df_iss):
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
-if selected_group == "✈️ 3/4수송 대시보드":
+if selected_group == "✈️️ 3/4수송 대시보드":
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
-    st.markdown(f'<div class="source-header-box"><b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; <b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; <b>✈️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월)</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="source-header-box"><b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; <b>🗓️️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; <b>✈️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월)</div>', unsafe_allow_html=True)
     st.markdown("---")
     
     tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈️ 공급 M/S", "🏷️ 대리점,RBD별 발매현황", "👥 단체실적"])
@@ -227,6 +227,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if df_iss_merged is None: st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다."); st.stop()
         merged_df = df_iss_merged.copy()
         merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
+        
+        # 📌 발매 M/S 탭 전체를 강제로 KE 취항노선으로 한정 필터링
         merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
         al_col_target = next((c for c in ['Dominant Marketing Airline', 'AL', '항공사', 'Marketing Airline'] if c in merged_df.columns), None)
@@ -516,7 +518,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             sel_sup_dest_list = render_multiselect_box(sf_col3, "3. 도착 공항", opts_dest, "slicer_sup_dest_multi")
             if sel_sup_dest_list: temp_sup = temp_sup[temp_sup['도착공항'].isin(sel_sup_dest_list)]
 
-            # 📌 1900년 찌꺼기 원천 삭제
             opts_sup_m = sorted([str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan']) if sup_month_col else []
             sel_sup_month_list = render_multiselect_box(sf_col4, "4. 출발 월", opts_sup_m, "slicer_month_sup_multi")
             if sel_sup_month_list: temp_sup = temp_sup[temp_sup[sup_month_col].isin(sel_sup_month_list)]
@@ -569,10 +570,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 
                 st.markdown("---")
                 
-                # 📌 2. 공급 M/S 피벗 테이블
+                # 📌 2. 공급 M/S 피벗 테이블 (총합계 열 추가)
                 st.markdown('<div class="unified-sub-header">2. 출발기간별 주요 항공사 공급 M/S 피벗 테이블</div>', unsafe_allow_html=True)
                 
                 piv_sup = filtered_sup.pivot_table(index='Airline', columns=sup_month_col, values=val_col_sup, aggfunc='sum', fill_value=0, observed=False)
+                
+                # 📌 총합계(기간 누적) 열 추가
+                piv_sup['총합계'] = piv_sup.sum(axis=1)
+                
                 piv_sup_ms = piv_sup.divide(piv_sup.sum(axis=0).replace(0, 1), axis=1) * 100
                 al_sup_sorted = ['KE'] + [x for x in piv_sup_ms.index if x != 'KE'] if 'KE' in piv_sup_ms.index else piv_sup_ms.index
                 piv_sup_ms = piv_sup_ms.loc[al_sup_sorted].head(100)
