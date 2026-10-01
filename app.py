@@ -216,9 +216,10 @@ def get_dynamic_date_ranges_34(df_iss):
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
-if selected_group == "✈️️ 3/4수송 대시보드":
+# 📌 이모지 유니코드 에러 방지를 위해 'in' 문자열 검색 방식으로 안전하게 변경
+if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
-    st.markdown(f'<div class="source-header-box"><b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; <b>🗓️️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; <b>✈️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월)</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="source-header-box"><b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; <b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; <b>✈️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월)</div>', unsafe_allow_html=True)
     st.markdown("---")
     
     tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈️ 공급 M/S", "🏷️ 대리점,RBD별 발매현황", "👥 단체실적"])
@@ -227,8 +228,6 @@ if selected_group == "✈️️ 3/4수송 대시보드":
         if df_iss_merged is None: st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다."); st.stop()
         merged_df = df_iss_merged.copy()
         merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
-        
-        # 📌 발매 M/S 탭 전체를 강제로 KE 취항노선으로 한정 필터링
         merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
         al_col_target = next((c for c in ['Dominant Marketing Airline', 'AL', '항공사', 'Marketing Airline'] if c in merged_df.columns), None)
@@ -531,7 +530,6 @@ if selected_group == "✈️️ 3/4수송 대시보드":
 
             st.markdown("---")
             
-            # 📌 1. 공급 M/S 점유비 선형 그래프
             val_col_sup = 'Seats_num' if 'Seats' in metric_mode else 'Flights_num'
             
             if not filtered_sup.empty and sup_month_col in filtered_sup.columns:
@@ -570,12 +568,9 @@ if selected_group == "✈️️ 3/4수송 대시보드":
                 
                 st.markdown("---")
                 
-                # 📌 2. 공급 M/S 피벗 테이블 (총합계 열 추가)
                 st.markdown('<div class="unified-sub-header">2. 출발기간별 주요 항공사 공급 M/S 피벗 테이블</div>', unsafe_allow_html=True)
                 
                 piv_sup = filtered_sup.pivot_table(index='Airline', columns=sup_month_col, values=val_col_sup, aggfunc='sum', fill_value=0, observed=False)
-                
-                # 📌 총합계(기간 누적) 열 추가
                 piv_sup['총합계'] = piv_sup.sum(axis=1)
                 
                 piv_sup_ms = piv_sup.divide(piv_sup.sum(axis=0).replace(0, 1), axis=1) * 100
@@ -596,7 +591,6 @@ if selected_group == "✈️️ 3/4수송 대시보드":
                 st.markdown(sup_html, unsafe_allow_html=True)
                 st.markdown("---")
 
-            # 📌 3. 공급 스케줄 타임라인
             st.markdown('<div class="unified-sub-header">3. 노선별 운항 스케줄 타임라인 (경쟁사 포함 - 산점도)</div>', unsafe_allow_html=True)
             
             ke_operated_routes = df_sup[df_sup['Airline'] == 'KE']['노선_clean'].dropna().unique().tolist()
@@ -863,7 +857,7 @@ if selected_group == "✈️️ 3/4수송 대시보드":
 # ==========================================
 # GROUP 2: 🌐 6수송 대시보드
 # ==========================================
-elif selected_group == "🌐 6수송 대시보드":
+elif "6수송" in selected_group:
     df_6th_raw = load_6th_data_aggregated()
 
     if df_6th_raw is None:
