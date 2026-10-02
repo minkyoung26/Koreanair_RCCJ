@@ -928,10 +928,7 @@ elif "6수송" in selected_group:
     col_left_filter, col_right_data = st.columns([1, 3.5])
     
     # 📌 좌측: 필터 패널 (Slicers)
-    with col_left_filter:
-        st.markdown('<div class="filter-panel-container">', unsafe_allow_html=True)
-        st.markdown('<div style="font-size:15px; font-weight:800; color:#0f172a; border-bottom:2px solid #cbd5e1; padding-bottom:8px; margin-bottom:15px;">🔍 대시보드 슬라이서</div>', unsafe_allow_html=True)
-        
+ 
         temp_df = df_6.copy()
         df_cy_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)] if col_year_type in temp_df.columns else temp_df
 
@@ -997,8 +994,7 @@ elif "6수송" in selected_group:
         if sel_jp_apo: temp_df = temp_df[temp_df[col_jp_apo].astype(str).isin(sel_jp_apo)]
 
         opts_ov_apo = sorted([str(x).strip() for x in temp_df[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in temp_df.columns else []
-        sel_ov_apo = render_panel_multiselect(st, "해외 APO", opts_ov_apo, "slicer6_ov_apo")
-        if sel_ov_apo: temp_df = temp_df[temp_df[col_ov_apo].astype(str).isin(sel_ov_apo)]
+
 
         st.markdown('</div>', unsafe_allow_html=True)
         filtered_6th = temp_df
