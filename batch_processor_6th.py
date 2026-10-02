@@ -48,19 +48,18 @@ def load_file_and_clean_columns(file_path):
 
     col_map = {str(c).lower().replace(" ", "").replace("_", "").replace(".", ""): c for c in pdf.columns}
 
-    # 🔥 비슷한 이름에 낚이지 않도록 '엄격한 일치' 방식으로 변경
+    # 🔥 비슷한 이름에 낚이지 않도록 '엄격한 일치' 방식 유지
     def get_col_strict(*targets):
         for t in targets:
             t_clean = t.lower().replace(" ", "").replace("_", "").replace(".", "")
             if t_clean in col_map: return col_map[t_clean]
         return None
 
-    # 🌟 공항코드와 국가코드가 절대 섞이지 않도록 완벽 분리 🌟
     # 1. 국가 코드 (JP, US 등)
     c_orig_cntry_code = get_col_strict("Trip Origin Country Code", "Origin Country Code", "Orig Country Code", "출발국가코드")
     c_dest_cntry_code = get_col_strict("Trip Destination Country Code", "Destination Country Code", "Dest Country Code", "도착국가코드")
     
-    # 2. 국가 이름 (JAPAN, UNITED STATES 등)
+    # 2. 국가 이름 (JAPAN, UNITED STATES 등) - 요청하신 Name 필드 완벽 추출
     c_orig_name = get_col_strict("Trip Origin Country Name", "Origin Country Name", "Trip Origin Country", "Origin Country", "출발국가")
     c_dest_name = get_col_strict("Trip Destination Country Name", "Destination Country Name", "Trip Destination Country", "Destination Country", "도착국가")
 
@@ -76,8 +75,8 @@ def load_file_and_clean_columns(file_path):
     c_stop1 = get_col_strict("STOP1", "Stops", "Stop", "경유")
 
     print(f"  ✔️ 매핑 결과 확인:")
-    print(f"    - 출발 국가코드 컬럼 : {c_orig_cntry_code} (여기에 공항코드가 매핑되면 안됨!)")
-    print(f"    - 도착 국가코드 컬럼 : {c_dest_cntry_code}")
+    print(f"    - 출발 국가 [코드] : {c_orig_cntry_code}  |  [이름] : {c_orig_name}")
+    print(f"    - 도착 국가 [코드] : {c_dest_cntry_code}  |  [이름] : {c_dest_name}")
     print(f"    - 출발 공항코드 컬럼 : {c_orig_city}")
     print(f"    - 도착 공항코드 컬럼 : {c_dest_city}")
 
@@ -146,7 +145,7 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         elif is_d_jp: return f"{d_str}-{o_str} v.v."
         else: return f"{o_str}-{d_str} v.v."
 
-    # 🌟 올바르게 분리된 국가코드 및 이름에서 'JP' 찾기 🌟
+    # 일본(JP) 여부를 국가코드 및 국가이름 양쪽에서 교차 검증
     is_jp_expr = pl.col("Trip Origin Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN", "JAPAN"]) | \
                  pl.col("Trip Origin Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN", "JAPAN"])
     is_dest_jp_expr = pl.col("Trip Destination Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN", "JAPAN"]) | \
@@ -178,19 +177,23 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         pl.when(is_jp_expr).then(pl.col("Trip Origin Code").cast(pl.Utf8)).otherwise(pl.col("Trip Destination Code").cast(pl.Utf8)).alias("일본 APO"),
         pl.when(is_jp_expr).then(pl.col("Trip Destination Code").cast(pl.Utf8)).otherwise(pl.col("Trip Origin Code").cast(pl.Utf8)).alias("해외 APO"),
         
-        # 🔥 Dimension 매핑을 위해 일본의 '상대방 국가코드'를 추출
+        # 🔥 투트랙(Dual) 매핑 준비: 일본 상대방의 국가코드(Code)와 국가이름(Name)을 모두 추출
         pl.when(is_jp_expr).then(pl.col("Trip Destination Country Code"))
           .when(is_dest_jp_expr).then(pl.col("Trip Origin Country Code"))
           .otherwise(pl.lit(""))
-          .cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("DIM_LOOKUP_KEY_CODE"),
+          .cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("PARTNER_CNTRY_CODE"),
+          
+        pl.when(is_jp_expr).then(pl.col("Trip Destination Country Name"))
+          .when(is_dest_jp_expr).then(pl.col("Trip Origin Country Name"))
+          .otherwise(pl.lit(""))
+          .cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("PARTNER_CNTRY_NAME"),
           
         pl.col("Value").cast(pl.Utf8).str.replace_all(",", "").cast(pl.Float64, strict=False).fill_null(0.0).alias("Value_num")
     ])
 
-    # 🌟 지시하신 대로 Dimension.xlsx의 AA열(Country Code)과 AB열(Region Name) 강제 매핑 🌟
     if os.path.exists(dim_file_path):
-        print("  ✔️ Dimension 파일 처리 중 (AA열: 국가코드, AB열: 권역명 고정 매핑)...")
-        # AA:AB 열 강제 지정 (AA=첫 번째 데이터, AB=두 번째 데이터)
+        print("  ✔️ Dimension 파일 처리 중 (AA열: 국가코드/이름, AB열: 권역명 투트랙 매핑)...")
+        # 📌 지시하신 대로 Dimension.xlsx의 AA열과 AB열만 정확히 로드
         dim_df = pd.read_excel(dim_file_path, usecols="AA:AB")
         dim_df.columns = ["DIM_KEY", "RGN_NAME"]
         dim_df = dim_df.dropna(how='all')
@@ -200,15 +203,29 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
             pl.col("RGN_NAME").cast(pl.Utf8).str.strip_chars()
         ])
         
-        df_processed = df_processed.join(dim_pl, left_on="DIM_LOOKUP_KEY_CODE", right_on="DIM_KEY", how="left").with_columns([
-            pl.when(pl.col("RGN_NAME").is_not_null() & (pl.col("RGN_NAME") != "") & (pl.col("RGN_NAME") != "nan"))
-              .then(pl.lit("JPN-") + pl.col("RGN_NAME"))
+        # 🔥 투트랙 매핑 실행
+        # 1. 원본의 '국가 코드'로 먼저 찔러보기
+        df_processed = df_processed.join(dim_pl, left_on="PARTNER_CNTRY_CODE", right_on="DIM_KEY", how="left").rename({"RGN_NAME": "RGN_BY_CODE"})
+        # 2. 원본의 '국가 이름'으로 찔러보기
+        df_processed = df_processed.join(dim_pl, left_on="PARTNER_CNTRY_NAME", right_on="DIM_KEY", how="left").rename({"RGN_NAME": "RGN_BY_NAME"})
+        
+        # 3. 둘 중 하나라도 걸린 값(매칭 성공한 권역)을 최종 Region으로 확정!
+        df_processed = df_processed.with_columns([
+            pl.when(pl.col("RGN_BY_CODE").is_not_null() & (pl.col("RGN_BY_CODE") != "") & (pl.col("RGN_BY_CODE") != "nan")).then(pl.col("RGN_BY_CODE"))
+              .when(pl.col("RGN_BY_NAME").is_not_null() & (pl.col("RGN_BY_NAME") != "") & (pl.col("RGN_BY_NAME") != "nan")).then(pl.col("RGN_BY_NAME"))
+              .otherwise(pl.lit(None)).alias("FINAL_RGN")
+        ])
+
+        # JPN- 머리말 붙이고, 매칭 실패 시 '기타' 처리
+        df_processed = df_processed.with_columns([
+            pl.when(pl.col("FINAL_RGN").is_not_null())
+              .then(pl.lit("JPN-") + pl.col("FINAL_RGN"))
               .otherwise(pl.lit("기타"))
               .alias("4.OD RGN")
-        ]).drop(["RGN_NAME", "DIM_LOOKUP_KEY_CODE"])
+        ]).drop(["RGN_BY_CODE", "RGN_BY_NAME", "FINAL_RGN", "PARTNER_CNTRY_CODE", "PARTNER_CNTRY_NAME"])
     else:
         print("  🚨 Dimension.xlsx 파일을 찾을 수 없어 권역이 '기타'로 세팅됩니다.")
-        df_processed = df_processed.with_columns([pl.lit("기타").alias("4.OD RGN")]).drop(["DIM_LOOKUP_KEY_CODE"])
+        df_processed = df_processed.with_columns([pl.lit("기타").alias("4.OD RGN")]).drop(["PARTNER_CNTRY_CODE", "PARTNER_CNTRY_NAME"])
 
     final_group_cols = [
         "Ticket Purchase month", "Trip Month", "발매월_표시", "출발월_표시", "4.OD RGN", "DIRECTION", "직항/경유",
