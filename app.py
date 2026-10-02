@@ -61,8 +61,6 @@ st.markdown("""
     div[data-baseweb="popover"] div[role="listbox"] { max-height: 400px !important; overflow-y: auto !important; }
     .source-header-box { background-color: #f0f9ff; border-left: 5px solid #0284c7; padding: 12px 18px; border-radius: 6px; margin-bottom: 15px; font-size: 13.5px; color: #0f172a; font-weight: 500; }
     
-    /* 🌟 좌측 필터 패널 전용 스타일 */
-    .filter-panel-container { background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1; height: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
     .filter-label-title { font-size: 13px !important; font-weight: 700 !important; color: #334155; margin-bottom: 4px; margin-top: 8px; border-left: 3px solid #0ea5e9; padding-left: 6px; }
     
     .metric-card { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.03); margin-bottom: 10px; }
@@ -166,14 +164,12 @@ def apply_bottom_legend(fig):
     fig.update_layout(legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5, title=dict(text="")), margin=dict(b=80))
     return fig
 
-# 일반 멀티셀렉트
 def render_multiselect_box(container, label, full_list, key_name, default_vals=None):
     container.markdown(f"<b>{label}</b>", unsafe_allow_html=True)
     opts = [str(x).strip() for x in full_list if str(x).strip() != 'nan']
     default_vals = [] if default_vals is None else [x for x in default_vals if x in opts]
     return container.multiselect(label, options=opts, default=default_vals, key=key_name, label_visibility="collapsed")
 
-# 🌟 좌측 패널 전용 멀티셀렉트
 def render_panel_multiselect(container, label, full_list, key_name, default_vals=None):
     container.markdown(f'<div class="filter-label-title">{label}</div>', unsafe_allow_html=True)
     opts = [str(x).strip() for x in full_list if str(x).strip() != 'nan']
@@ -217,14 +213,14 @@ def get_dynamic_date_ranges_34(df_iss):
 
 
 # ==========================================
-# GROUP 1: ✈️ 3/4수송 대시보드 (완벽 복구)
+# GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
     st.markdown(f'<div class="source-header-box"><b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; <b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; <b>✈️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월)</div>', unsafe_allow_html=True)
     st.markdown("---")
     
-    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈️ 공급 M/S", "🏷️️ 대리점,RBD별 발매현황", "👥 단체실적"])
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈️ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
 
     with tab_34_1:
         if df_iss_merged is None: st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다."); st.stop()
@@ -505,7 +501,7 @@ if "3/4수송" in selected_group:
             else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (복구 완료)
+    # 2. ✈️ 공급 M/S 탭
     # ------------------------------------------
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
@@ -693,7 +689,7 @@ if "3/4수송" in selected_group:
                 else:
                     st.info("선택한 조건에 해당하는 스케줄 데이터가 없습니다.")
 
-    # 📌 3. 🏷️ 대리점, RBD별 발매현황 탭 (복구 완료)
+    # 📌 3. 🏷️ 대리점, RBD별 발매현황 탭
     with tab_34_3:
         RBD_HIERARCHY_LOCAL = {
             'KE': list('YBMSHEKLUQTX'), 'OZ': list('YBMHEQKSVWTLX'),
@@ -815,7 +811,7 @@ if "3/4수송" in selected_group:
                     ag_html += '</tbody></table></div>'
                     st.markdown(ag_html, unsafe_allow_html=True)
 
-    # 4. 👥 단체실적 탭 (복구 완료)
+    # 4. 👥 단체실적 탭
     with tab_34_4:
         st.subheader("👥 발매 - 항공사별/대리점별 단체 발매 현황")
         if df_iss_merged is not None:
@@ -876,7 +872,7 @@ if "3/4수송" in selected_group:
 
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (엑셀 슬라이서형 좌/우 분할 레이아웃)
+# GROUP 2: 🌐 6수송 대시보드
 # ==========================================
 elif "6수송" in selected_group:
     df_6th_raw = load_6th_data_aggregated()
@@ -917,18 +913,15 @@ elif "6수송" in selected_group:
         df_6['Val_CY_num'] = df_6['Val_num']
         df_6['Val_PY_num'] = 0.0
 
-    st.markdown(
-        '<div class="source-header-box">'
-        '<b>📌 출처:</b> DDS, Bi-Directional, 일본-미주/구주/동남아/중국/대양주'
-        '</div>', 
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
+    st.markdown('<div class="source-header-box"><b>📌 출처:</b> DDS, Bi-Directional, 일본-미주/구주/동남아/중국/대양주</div>', unsafe_allow_html=True)
     st.markdown("---")
-    # 🌟 엑셀 화면처럼 좌측(필터 1) / 우측(데이터 3.5) 비율로 분할 🌟
+    
     col_left_filter, col_right_data = st.columns([1, 3.5])
     
-    # 📌 좌측: 필터 패널 (Slicers)
- 
+    with col_left_filter:
+        st.markdown('<div style="font-size:15px; font-weight:800; color:#0f172a; border-bottom:2px solid #cbd5e1; padding-bottom:8px; margin-bottom:15px;">🔍 대시보드 슬라이서</div>', unsafe_allow_html=True)
+        
         temp_df = df_6.copy()
         df_cy_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)] if col_year_type in temp_df.columns else temp_df
 
@@ -994,19 +987,20 @@ elif "6수송" in selected_group:
         if sel_jp_apo: temp_df = temp_df[temp_df[col_jp_apo].astype(str).isin(sel_jp_apo)]
 
         opts_ov_apo = sorted([str(x).strip() for x in temp_df[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in temp_df.columns else []
+        sel_ov_apo = render_panel_multiselect(st, "해외 APO", opts_ov_apo, "slicer6_ov_apo")
+        if sel_ov_apo: temp_df = temp_df[temp_df[col_ov_apo].astype(str).isin(sel_ov_apo)]
 
-
-        st.markdown('</div>', unsafe_allow_html=True)
         filtered_6th = temp_df
 
-    # 📌 우측: 메인 데이터 테이블 패널
     with col_right_data:
-        tab6_1, tab6_2 = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "🔒 6수송 Raw Data View (관리자 전용)"])
+        is_admin = st.query_params.get("admin") == "master"
 
-        with tab6_1:
-            # ------------------------------------------
-            # 📌 테이블 1: 항공사별 월별 M/S
-            # ------------------------------------------
+        if is_admin:
+            tabs = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "📋 6수송 Raw Data View"])
+        else:
+            tabs = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교"])
+
+        with tabs[0]:
             if not filtered_6th.empty and col_al_6 in filtered_6th.columns:
                 al_agg = filtered_6th.groupby(col_al_6, observed=False)[['Val_CY_num', 'Val_PY_num']].sum().reset_index()
                 non_ke_agg = al_agg[al_agg[col_al_6] != 'KE'].sort_values(by='Val_CY_num', ascending=False)
@@ -1064,9 +1058,6 @@ elif "6수송" in selected_group:
 
             st.markdown("---")
             
-            # ------------------------------------------
-            # 📌 테이블 2: OD Region별 발매 및 M/S 현황
-            # ------------------------------------------
             st.markdown('<div class="unified-sub-header">🌍 OD Region별 발매 및 M/S 현황</div>', unsafe_allow_html=True)
             
             if not filtered_6th.empty and col_rgn in filtered_6th.columns:
@@ -1160,9 +1151,6 @@ elif "6수송" in selected_group:
                 
             st.markdown("---")
 
-            # ------------------------------------------
-            # 📌 테이블 3: Carrier별 M/S (Trip O&D 단방향 기준 TOP 20 정렬)
-            # ------------------------------------------
             st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계)</div>', unsafe_allow_html=True)
             
             if not filtered_6th.empty and col_od_simple in filtered_6th.columns:
@@ -1315,20 +1303,13 @@ elif "6수송" in selected_group:
                 else:
                     st.info("💡 실적이 존재하는 O&D Market이 없습니다.")
 
-        with tab6_2:
-            st.markdown('<div class="unified-sub-header">🔒 6수송 관리자 전용 Raw Data 조회 및 다운로드</div>', unsafe_allow_html=True)
-            
-            # 비밀번호 입력 창 생성
-            admin_pw_6th = st.text_input("🔑 관리자 비밀번호를 입력하세요:", type="password", key="admin_pw_6th_fixed")
-            
-            # 비밀번호가 일치할 때만 데이터 표출 (현재 1234로 설정됨)
-            if admin_pw_6th == "1234":
+        if is_admin:
+            with tabs[1]:
+                st.markdown('<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및 다운로드</div>', unsafe_allow_html=True)
                 if not filtered_6th.empty:
                     csv_6th_bytes = filtered_6th.to_csv(index=False).encode('utf-8-sig')
                     st.download_button("📥 필터링된 6수송 Data (CSV) 다운로드", data=csv_6th_bytes, file_name=f"6th_Freedom_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
                     st.dataframe(filtered_6th.head(100), width="stretch")
-            else:
-                st.info("ℹ️ 관리자 비밀번호 입력 시 데이터를 조회하고 다운로드할 수 있습니다.")
 
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
