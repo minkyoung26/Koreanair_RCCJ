@@ -158,6 +158,15 @@ def get_6th_last_updated_date():
         return datetime.datetime.fromtimestamp(mtime).strftime('%Y.%m.%d %H:%M')
     return "날짜 정보 없음"
 
+# 🌟 3/4수송 캐시 파일의 최신 업데이트 시간 자동 추출 함수
+def get_34_last_updated_date():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    target_path = os.path.join(base_dir, 'cache_34_data.parquet')
+    if os.path.exists(target_path):
+        mtime = os.path.getmtime(target_path)
+        return datetime.datetime.fromtimestamp(mtime).strftime('%Y.%m.%d %H:%M')
+    return "날짜 정보 없음"
+
 disk_sup = load_aux_files()
 df_iss_merged = process_any_uploaded_file(uploaded_iss) if uploaded_iss else load_fast_parquet_data_file()
 df_sup_raw = disk_sup
@@ -238,7 +247,19 @@ def get_dynamic_date_ranges_34(df_iss):
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
-    st.markdown(f'<div class="source-header-box"><b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; <b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; <b>✈️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월)</div>', unsafe_allow_html=True)
+    
+    # 🌟 3/4수송 파켓 파일 최신 업데이트 날짜 추출
+    last_updated_str_34 = get_34_last_updated_date()
+    
+    st.markdown(
+        f'<div class="source-header-box">'
+        f'<b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; '
+        f'<b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
+        f'<b>✈️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
+        f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str_34}'
+        f'</div>', 
+        unsafe_allow_html=True
+    )
     st.markdown("---")
     
     tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈️ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
