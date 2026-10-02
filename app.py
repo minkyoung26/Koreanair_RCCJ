@@ -216,7 +216,6 @@ def get_dynamic_date_ranges_34(df_iss):
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
-# 📌 이모지 유니코드 에러 방지를 위해 'in' 문자열 검색 방식으로 안전하게 변경
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
     st.markdown(f'<div class="source-header-box"><b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; <b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; <b>✈️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월)</div>', unsafe_allow_html=True)
@@ -228,6 +227,7 @@ if "3/4수송" in selected_group:
         if df_iss_merged is None: st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다."); st.stop()
         merged_df = df_iss_merged.copy()
         merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
+        
         merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
         al_col_target = next((c for c in ['Dominant Marketing Airline', 'AL', '항공사', 'Marketing Airline'] if c in merged_df.columns), None)
@@ -349,8 +349,14 @@ if "3/4수송" in selected_group:
                         week_tot = df_no_week.groupby(week_col, observed=False)[val_col].sum().reset_index()
                         week_merged = pd.merge(week_al_grp, week_tot, on=week_col, suffixes=('', '_Mkt'))
                         week_merged['MS_Percent'] = np.where(week_merged[f'{val_col}_Mkt'] > 0, (week_merged[val_col] / week_merged[f'{val_col}_Mkt']) * 100, 0)
-                        top_al_in_week = df_no_week.groupby('AL_clean', observed=False)[val_col].sum().sort_values(ascending=False).index.tolist()
-                        top_al_week_display = ['KE'] + [al for al in top_al_in_week if al != 'KE'][:5]
+                        
+                        al_totals_wk = df_no_week.groupby('AL_clean', observed=False)[val_col].sum()
+                        top_al_in_week = al_totals_wk[al_totals_wk > 0].sort_values(ascending=False).index.tolist()
+                        
+                        top_al_week_display = []
+                        if 'KE' in top_al_in_week: top_al_week_display.append('KE')
+                        top_al_week_display += [al for al in top_al_in_week if al != 'KE'][:5]
+                        
                         week_merged_top = week_merged[week_merged['AL_clean'].isin(top_al_week_display)].copy()
 
                         fig_week_ms = go.Figure()
@@ -370,7 +376,8 @@ if "3/4수송" in selected_group:
                                 name=f"★ KE (대한항공)" if is_ke else al_code, line=line_style, marker=marker_style, text=text_labels,
                                 textposition="top center", hovertemplate=f"<b>항공사: {al_code}</b><br>발매주차: %{{x}}<br>M/S 점유율: %{{y:.1f}}%<extra></extra>"
                             ))
-                        fig_week_ms.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_week), yaxis=dict(range=[0, max(week_merged_top['MS_Percent'].max() * 1.25, 15)]), height=450)
+                        if not week_merged_top.empty:
+                            fig_week_ms.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_week), yaxis=dict(range=[0, max(week_merged_top['MS_Percent'].max() * 1.25, 15)]), height=450)
                         apply_bottom_legend(fig_week_ms)
                         st.plotly_chart(fig_week_ms, width='stretch')
 
@@ -387,8 +394,14 @@ if "3/4수송" in selected_group:
                         dep_merged = pd.merge(dep_al_grp, dep_mkt_tot, on=month_col, suffixes=('', '_Mkt'))
                         dep_merged[val_col] = dep_merged[val_col].fillna(0)
                         dep_merged['MS_Percent'] = np.where(dep_merged[f'{val_col}_Mkt'] > 0, (dep_merged[val_col] / dep_merged[f'{val_col}_Mkt']) * 100, 0)
-                        top_al_in_dep = df_dep_al.groupby('AL_clean', observed=False)[val_col].sum().sort_values(ascending=False).index.tolist()
-                        top_al_display = ['KE'] + [al for al in top_al_in_dep if al != 'KE'][:5]
+                        
+                        al_totals_mo = df_dep_al.groupby('AL_clean', observed=False)[val_col].sum()
+                        top_al_in_dep = al_totals_mo[al_totals_mo > 0].sort_values(ascending=False).index.tolist()
+                        
+                        top_al_display = []
+                        if 'KE' in top_al_in_dep: top_al_display.append('KE')
+                        top_al_display += [al for al in top_al_in_dep if al != 'KE'][:5]
+                        
                         dep_merged_top = dep_merged[dep_merged['AL_clean'].isin(top_al_display)].copy()
 
                         fig_ke_dep = go.Figure()
@@ -405,7 +418,8 @@ if "3/4수송" in selected_group:
                                 name=f"★ KE (대한항공)" if is_ke else al_code, line=line_style, marker=marker_style, text=text_labels,
                                 textposition="top center", hovertemplate=f"<b>항공사: {al_code}</b><br>출발월: %{{x}}<br>점유율: %{{y:.1f}}%<extra></extra>"
                             ))
-                        fig_ke_dep.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_month), yaxis=dict(range=[0, max(dep_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
+                        if not dep_merged_top.empty:
+                            fig_ke_dep.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_month), yaxis=dict(range=[0, max(dep_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
                         apply_bottom_legend(fig_ke_dep)
                         st.plotly_chart(fig_ke_dep, width='stretch')
 
@@ -436,6 +450,8 @@ if "3/4수송" in selected_group:
             with t1:
                 if week_col and week_col in filtered_df.columns:
                     piv_w = filtered_df.pivot_table(index='AL_clean', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
+                    piv_w = piv_w[piv_w.sum(axis=1) > 0] 
+                    
                     piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
                     al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
                     piv_w_ms = piv_w_ms.loc[al_sorted].head(100)
@@ -453,6 +469,9 @@ if "3/4수송" in selected_group:
                     st.markdown(piv_w_html, unsafe_allow_html=True)
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선_clean', columns='AL_clean', values=val_col, aggfunc='sum', fill_value=0, observed=False)
+                piv_r = piv_r[piv_r.sum(axis=1) > 0] 
+                piv_r = piv_r.loc[:, piv_r.sum(axis=0) > 0] 
+                
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
                 piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
                 piv_r_ms = piv_r_ms.head(100)
@@ -541,8 +560,13 @@ if "3/4수송" in selected_group:
                 sup_merged = pd.merge(sup_al_grp, sup_mkt_tot, on=sup_month_col, suffixes=('', '_Mkt'))
                 sup_merged['MS_Percent'] = np.where(sup_merged[f'{val_col_sup}_Mkt'] > 0, (sup_merged[val_col_sup] / sup_merged[f'{val_col_sup}_Mkt']) * 100, 0)
                 
-                top_al_in_sup = filtered_sup.groupby('Airline', observed=False)[val_col_sup].sum().sort_values(ascending=False).index.tolist()
-                top_sup_display = ['KE'] + [al for al in top_al_in_sup if al != 'KE'][:5]
+                al_sup_totals = filtered_sup.groupby('Airline', observed=False)[val_col_sup].sum()
+                valid_al_sup = al_sup_totals[al_sup_totals > 0].sort_values(ascending=False).index.tolist()
+                
+                top_sup_display = []
+                if 'KE' in valid_al_sup: top_sup_display.append('KE')
+                top_sup_display += [al for al in valid_al_sup if al != 'KE'][:5]
+                
                 sup_merged_top = sup_merged[sup_merged['Airline'].isin(top_sup_display)].copy()
 
                 fig_sup_line = go.Figure()
@@ -562,7 +586,8 @@ if "3/4수송" in selected_group:
                         name=f"★ KE (대한항공)" if is_ke else al_code, line=line_style, marker=marker_style, text=text_labels,
                         textposition="top center", hovertemplate=f"<b>항공사: {al_code}</b><br>출발월: %{{x}}<br>공급 M/S: %{{y:.1f}}%<extra></extra>"
                     ))
-                fig_sup_line.update_layout(yaxis_title="Supply Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_sup_m), yaxis=dict(range=[0, max(sup_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
+                if not sup_merged_top.empty:
+                    fig_sup_line.update_layout(yaxis_title="Supply Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_sup_m), yaxis=dict(range=[0, max(sup_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
                 apply_bottom_legend(fig_sup_line)
                 st.plotly_chart(fig_sup_line, width='stretch')
                 
@@ -572,6 +597,7 @@ if "3/4수송" in selected_group:
                 
                 piv_sup = filtered_sup.pivot_table(index='Airline', columns=sup_month_col, values=val_col_sup, aggfunc='sum', fill_value=0, observed=False)
                 piv_sup['총합계'] = piv_sup.sum(axis=1)
+                piv_sup = piv_sup[piv_sup['총합계'] > 0] 
                 
                 piv_sup_ms = piv_sup.divide(piv_sup.sum(axis=0).replace(0, 1), axis=1) * 100
                 al_sup_sorted = ['KE'] + [x for x in piv_sup_ms.index if x != 'KE'] if 'KE' in piv_sup_ms.index else piv_sup_ms.index
@@ -846,7 +872,7 @@ if "3/4수송" in selected_group:
                         top_ag_sub = al_sub[al_sub['Value'] > 0].sort_values(by='Value', ascending=False).head(100).reset_index(drop=True)
                         if not top_ag_sub.empty:
                             top_ag_sub.index = range(1, len(top_ag_sub) + 1)
-                            with st.expander(f"✈️ 항공사: **{al_code}**  |  총 단체 실적: **{al_tot_val:,.0f}**건", expanded=(al_code == 'KE')):
+                            with st.expander(f"✈️️ 항공사: **{al_code}**  |  총 단체 실적: **{al_tot_val:,.0f}**건", expanded=(al_code == 'KE')):
                                 g_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:80px;">순위</th><th class="header-main">여행사(대리점)명</th><th class="header-main" style="width:200px;">단체 예약 실적 (석)</th></tr></thead><tbody>'
                                 g_html += f'<tr class="row-group-header-custom"><td style="text-align:center;">-</td><td style="text-align:center; font-weight:800;">★ {al_code} 전체 총합계</td><td style="text-align:center;"><b>{al_tot_val:,.0f}</b></td></tr>'
                                 for r_idx, ag_row in top_ag_sub.iterrows():
@@ -899,30 +925,39 @@ elif "6수송" in selected_group:
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황 (종속형 순차 필터링 적용)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="unified-sub-header">✈️️ 6수송 발매 M/S 현황 (종속형 순차 필터링 적용)</div>', unsafe_allow_html=True)
         
         temp_df = df_6.copy()
 
         f6_col1, f6_col2, f6_col3, f6_col4, f6_col5, f6_col6 = st.columns(6)
         
-        opts_pur_m_all = sorted([str(x).strip() for x in temp_df[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in temp_df.columns else []
-        opts_pur_m_2026 = [x for x in opts_pur_m_all if x.startswith('2026')]
-        pur_label = "1. 금년 발매월" + get_dynamic_range_label(opts_pur_m_2026)
+        # 🔥 금년/전년 구분값을 활용한 다이내믹 텍스트 생성 로직
+        df_cy_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)] if col_year_type in temp_df.columns else temp_df
+
+        opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_only[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in df_cy_only.columns else []
+        pur_label = "1. 금년 발매월" + get_dynamic_range_label(opts_pur_m_cy)
         
-        sel_pur_m_disp = render_multiselect_box(f6_col1, pur_label, opts_pur_m_2026, "slicer6_pur_m_disp")
+        sel_pur_m_disp = render_multiselect_box(f6_col1, pur_label, opts_pur_m_cy, "slicer6_pur_m_disp")
         if sel_pur_m_disp: 
-            sel_months = [x.split('-')[1] for x in sel_pur_m_disp if '-' in x]
-            target_pur_m = [f"2026-{m}" for m in sel_months] + [f"2025-{m}" for m in sel_months]
+            target_pur_m = []
+            for val in sel_pur_m_disp:
+                target_pur_m.append(val)
+                if '-' in val and len(val) == 7:
+                    y, mo = val.split('-')
+                    target_pur_m.append(f"{int(y)-1}-{mo}") # YOY용 PY 매핑
             temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(target_pur_m)]
 
-        opts_trip_m_all = sorted([str(x).strip() for x in temp_df[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=False) if col_trip_m_disp in temp_df.columns else []
-        opts_trip_m_2026 = [x for x in opts_trip_m_all if x.startswith('2026')]
-        trip_label = "2. 금년 출발월" + get_dynamic_range_label(opts_trip_m_2026)
+        opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_only[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=False) if col_trip_m_disp in df_cy_only.columns else []
+        trip_label = "2. 금년 출발월" + get_dynamic_range_label(opts_trip_m_cy)
         
-        sel_trip_m_disp = render_multiselect_box(f6_col2, trip_label, opts_trip_m_2026, "slicer6_trip_m_disp")
+        sel_trip_m_disp = render_multiselect_box(f6_col2, trip_label, opts_trip_m_cy, "slicer6_trip_m_disp")
         if sel_trip_m_disp: 
-            sel_months = [x.split('-')[1] for x in sel_trip_m_disp if '-' in x]
-            target_trip_m = [f"2026-{m}" for m in sel_months] + [f"2025-{m}" for m in sel_months]
+            target_trip_m = []
+            for val in sel_trip_m_disp:
+                target_trip_m.append(val)
+                if '-' in val and len(val) == 7:
+                    y, mo = val.split('-')
+                    target_trip_m.append(f"{int(y)-1}-{mo}") # YOY용 PY 매핑
             temp_df = temp_df[temp_df[col_trip_m_disp].astype(str).isin(target_trip_m)]
 
         opts_rgn = sorted([str(x).strip() for x in temp_df[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in temp_df.columns else []
