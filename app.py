@@ -479,29 +479,39 @@ if "3/4수송" in selected_group:
                     st.markdown(piv_w_html, unsafe_allow_html=True)
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선_clean', columns='AL_clean', values=val_col, aggfunc='sum', fill_value=0, observed=False)
+                
+                # 1. 모든 노선에 대해 실적이 아예 없는 노선(행) 제거
                 piv_r = piv_r[piv_r.sum(axis=1) > 0] 
+                
+                # 2. 🔥 [핵심 수정] 선택된 필터 조건에서 실적(합계)이 0인 항공사(열) 제거
                 piv_r = piv_r.loc[:, piv_r.sum(axis=0) > 0] 
                 
-                cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
-                piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
-                piv_r_ms = piv_r_ms.head(100)
-                piv_r_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:100px;">노선_clean</th>'
-                for col_al in piv_r_ms.columns:
-                    is_ke_c = (str(col_al).upper() == 'KE')
-                    th_style = ' style="background-color: #9fc5e8 !important; color: #0f172a !important;"' if is_ke_c else ''
-                    k_span = '<span style="color:#0f172a !important; font-weight:bold;">' if is_ke_c else '<span>'
-                    piv_r_html += f'<th class="header-main"{th_style}>{k_span}{col_al}</span></th>'
-                piv_r_html += '</tr></thead><tbody>'
-                for route_idx, row_item in piv_r_ms.iterrows():
-                    piv_r_html += f'<tr><td style="font-weight:700;">{route_idx}</td>'
-                    for al_col_name, val_ms in row_item.items():
-                        is_ke_c = (str(al_col_name).upper() == 'KE')
-                        td_style = ' style="background-color: #ffffff !important;"'
-                        k_span = '<span class="txt-ke-bold">' if is_ke_c else '<span>'
-                        piv_r_html += f'<td{td_style}>{k_span}{val_ms:.1f}%</span></td>'
-                    piv_r_html += '</tr>'
-                piv_r_html += '</tbody></table></div>'
-                st.markdown(piv_r_html, unsafe_allow_html=True)
+                if not piv_r.empty:
+                    # KE를 맨 앞에 두고 나머지 항공사 정렬
+                    cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
+                    piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
+                    piv_r_ms = piv_r_ms.head(100)
+                    
+                    piv_r_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:120px;">노선</th>'
+                    for col_al in piv_r_ms.columns:
+                        is_ke_c = (str(col_al).upper() == 'KE')
+                        th_style = ' style="background-color: #9fc5e8 !important; color: #0f172a !important;"' if is_ke_c else ''
+                        k_span = '<span style="color:#0f172a !important; font-weight:bold;">' if is_ke_c else '<span>'
+                        piv_r_html += f'<th class="header-main"{th_style}>{k_span}{col_al}</span></th>'
+                    piv_r_html += '</tr></thead><tbody>'
+                    
+                    for route_idx, row_item in piv_r_ms.iterrows():
+                        piv_r_html += f'<tr><td style="font-weight:700;">{route_idx}</td>'
+                        for al_col_name, val_ms in row_item.items():
+                            is_ke_c = (str(al_col_name).upper() == 'KE')
+                            td_style = ' style="background-color: #ffffff !important;"'
+                            k_span = '<span class="txt-ke-bold">' if is_ke_c else '<span>'
+                            piv_r_html += f'<td{td_style}>{k_span}{val_ms:.1f}%</span></td>'
+                        piv_r_html += '</tr>'
+                    piv_r_html += '</tbody></table></div>'
+                    st.markdown(piv_r_html, unsafe_allow_html=True)
+                else:
+                    st.info("💡 선택 조건에 해당하는 실적 데이터가 없습니다.")
 
         with tab3:
             st.subheader("🔒 관리자 전용 Raw Data 조회 및 다운로드")
