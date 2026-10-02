@@ -1000,7 +1000,7 @@ elif "6수송" in selected_group:
 
     # 📌 우측: 메인 데이터 테이블 패널
     with col_right_data:
-        tab6_1, tab6_2 = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "📋 6수송 Raw Data View"])
+        tab6_1, tab6_2 = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "🔒 6수송 Raw Data View (관리자 전용)"]
 
         with tab6_1:
             # ------------------------------------------
@@ -1315,11 +1315,19 @@ elif "6수송" in selected_group:
                     st.info("💡 실적이 존재하는 O&D Market이 없습니다.")
 
         with tab6_2:
-            st.markdown('<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및 다운로드</div>', unsafe_allow_html=True)
-            if not filtered_6th.empty:
-                csv_6th_bytes = filtered_6th.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 필터링된 6수송 Data (CSV) 다운로드", data=csv_6th_bytes, file_name=f"6th_Freedom_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
-                st.dataframe(filtered_6th.head(100), width="stretch")
+            st.markdown('<div class="unified-sub-header">🔒 6수송 관리자 전용 Raw Data 조회 및 다운로드</div>', unsafe_allow_html=True)
+            
+            # 비밀번호 입력 창 생성
+            admin_pw_6th = st.text_input("🔑 관리자 비밀번호를 입력하세요:", type="password", key="admin_pw_6th_fixed")
+            
+            # 비밀번호가 일치할 때만 데이터 표출 (현재 1234로 설정됨)
+            if admin_pw_6th == "1234":
+                if not filtered_6th.empty:
+                    csv_6th_bytes = filtered_6th.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button("📥 필터링된 6수송 Data (CSV) 다운로드", data=csv_6th_bytes, file_name=f"6th_Freedom_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
+                    st.dataframe(filtered_6th.head(100), width="stretch")
+            else:
+                st.info("ℹ️ 관리자 비밀번호 입력 시 데이터를 조회하고 다운로드할 수 있습니다.")
 
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
