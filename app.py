@@ -917,8 +917,13 @@ elif "6수송" in selected_group:
         df_6['Val_CY_num'] = df_6['Val_num']
         df_6['Val_PY_num'] = 0.0
 
-    st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
-    
+    st.markdown(
+        '<div class="source-header-box">'
+        '<b>📌 출처:</b> DDS, Bi-Directional, 일본-미주/구주/동남아/중국/대양주'
+        '</div>', 
+        unsafe_allow_html=True
+    )
+    st.markdown("---")
     # 🌟 엑셀 화면처럼 좌측(필터 1) / 우측(데이터 3.5) 비율로 분할 🌟
     col_left_filter, col_right_data = st.columns([1, 3.5])
     
