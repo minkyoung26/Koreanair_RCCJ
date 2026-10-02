@@ -79,7 +79,7 @@ st.markdown("""
     table.custom-piv-table td span.yoy-dash, table.yoy-table td span.yoy-dash { color: #64748b !important; font-weight: 500 !important; }
     table.custom-piv-table td span.txt-ke-bold, table.yoy-table td span.txt-ke-bold { color: #0b5394 !important; font-weight: 800 !important; }
 
-    /* 🌟 추가된 파란 바탕 + 하단 빨간줄 총계 전용 클래스 */
+    /* 파란 바탕 + 하단 빨간줄 총계 행 디자인 */
     tr.total-row-blue td {
         background-color: #0284c7 !important;
         color: #ffffff !important;
@@ -148,6 +148,15 @@ def load_6th_data_aggregated():
             try: return optimize_df(pd.read_parquet(sp, engine='pyarrow'))
             except: pass
     return None
+
+# 🌟 6수송 캐시 파일의 최신 업데이트 시간 자동 추출 함수
+def get_6th_last_updated_date():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    target_path = os.path.join(base_dir, 'cache_6th_data.parquet')
+    if os.path.exists(target_path):
+        mtime = os.path.getmtime(target_path)
+        return datetime.datetime.fromtimestamp(mtime).strftime('%Y.%m.%d %H:%M')
+    return "날짜 정보 없음"
 
 disk_sup = load_aux_files()
 df_iss_merged = process_any_uploaded_file(uploaded_iss) if uploaded_iss else load_fast_parquet_data_file()
@@ -477,22 +486,18 @@ if "3/4수송" in selected_group:
                         piv_w_html += '</tr>'
                     piv_w_html += '</tbody></table></div>'
                     st.markdown(piv_w_html, unsafe_allow_html=True)
+            
+            # 🌟 [가독성 개선] 실적 0인 항공사 컬럼 자동 제거 및 줄바꿈 방지 스타일 적용
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선_clean', columns='AL_clean', values=val_col, aggfunc='sum', fill_value=0, observed=False)
-                
-                # 1. 모든 노선에 대해 실적이 아예 없는 노선(행) 제거
                 piv_r = piv_r[piv_r.sum(axis=1) > 0] 
-                
-                # 2. 🔥 [핵심] 선택 조건 내 발매 실적이 0보다 큰(>0) 항공사(열)만 남기기
-                piv_r = piv_r.loc[:, piv_r.sum(axis=0) > 0] 
+                piv_r = piv_r.loc[:, piv_r.sum(axis=0) > 0] # 실적 > 0 인 항공사만 표출
                 
                 if not piv_r.empty:
-                    # KE를 맨 앞에 두고 나머지 항공사 정렬
                     cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
                     piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
                     piv_r_ms = piv_r_ms.head(100)
                     
-                    # 🔥 [가독성 개선] white-space: nowrap 적용 및 Cell 최소 폭 보장
                     piv_r_html = '<div class="custom-piv-container" style="overflow-x: auto;"><table class="custom-piv-table" style="width: auto; min-width: 100%;"><thead><tr><th class="header-main" style="min-width: 100px; white-space: nowrap;">노선</th>'
                     for col_al in piv_r_ms.columns:
                         is_ke_c = (str(col_al).upper() == 'KE')
@@ -936,8 +941,17 @@ elif "6수송" in selected_group:
         df_6['Val_CY_num'] = df_6['Val_num']
         df_6['Val_PY_num'] = 0.0
 
-    st.markdown('<div class="unified-sub-header">✈️ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
-    st.markdown('<div class="source-header-box"><b>📌 출처:</b> DDS, Bi-Directional, 일본-미주/구주/동남아/중국/대양주</div>', unsafe_allow_html=True)
+    # 🌟 파일 생성 일시 자동으로 읽어오기
+    last_updated_str = get_6th_last_updated_date()
+
+    st.markdown('<div class="unified-sub-header">✈️️ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="source-header-box">'
+        f'<b>📌 출처:</b> DDS, Bi-Directional, 일본-미주/구주/동남아/중국/대양주 &nbsp;|&nbsp; '
+        f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str}'
+        f'</div>', 
+        unsafe_allow_html=True
+    )
     st.markdown("---")
     
     col_left_filter, col_right_data = st.columns([1, 3.5])
@@ -1155,7 +1169,6 @@ elif "6수송" in selected_group:
                 g_k_ms_py = (g_k_py / g_mkt_py * 100) if g_mkt_py > 0 else 0
                 g_k_ms_yoy = g_k_ms_cy - g_k_ms_py
 
-                # 🌟 파란색 바탕 + 하단 빨간줄 총계 행 적용
                 rgn_html += '<tr class="total-row-blue">'
                 rgn_html += '<td style="text-align:center;">총계</td>'
                 rgn_html += f'<td>{g_mkt_cy:,.0f}</td>'
@@ -1306,7 +1319,6 @@ elif "6수송" in selected_group:
                     od_matrix_html += get_yoy_td_html(tot_ke_ms_yoy, True, bg_color=bg_sub)
                     od_matrix_html += '</tr>'
 
-                    # 🌟 파란색 바탕 + 하단 빨간줄 총계 행 적용
                     od_matrix_html += '<tr class="total-row-blue">'
                     od_matrix_html += '<td colspan="2" style="text-align:center;">선택 필터 전체 총계</td>'
                     od_matrix_html += f'<td>{grand_mkt_cy:,.0f}</td>'
