@@ -5,14 +5,14 @@ import os
 import csv
 
 def find_header_row_index(file_path):
-    keywords = ["trip destination", "ticket purchase", "trip market", "dominant marketing airline", "trip origin", "stop1"]
+    keywords = ["trip", "ticket", "market", "airline", "origin", "destination", "value", "pax"]
     encoding = 'utf-8-sig'
     try:
         with open(file_path, 'r', encoding='utf-8-sig', errors='ignore') as f:
             reader = csv.reader(f)
             for idx, row in enumerate(reader):
                 row_str = " ".join(row).lower()
-                if ("trip" in row_str or "ticket" in row_str or "market" in row_str) and ("origin" in row_str or "destination" in row_str or "airline" in row_str):
+                if any(k in row_str for k in keywords):
                     return idx, encoding
     except Exception: pass
 
@@ -21,7 +21,7 @@ def find_header_row_index(file_path):
         reader = csv.reader(f)
         for idx, row in enumerate(reader):
             row_str = " ".join(row).lower()
-            if ("trip" in row_str or "ticket" in row_str or "market" in row_str) and ("origin" in row_str or "destination" in row_str or "airline" in row_str):
+            if any(k in row_str for k in keywords):
                 return idx, encoding
 
     return 0, 'utf-8-sig'
@@ -41,58 +41,74 @@ def make_unique_col_names(cols):
 
 def load_file_and_clean_columns(file_path):
     skip_rows, encoding = find_header_row_index(file_path)
-    print(f"  └ '{os.path.basename(file_path)}' 읽기 및 필드 정밀 추출 중...")
+    print(f"\n📂 '{os.path.basename(file_path)}' 파일 분석 시작 (헤더 시작점: {skip_rows}행)...")
 
     pdf = pd.read_csv(file_path, skiprows=skip_rows, encoding=encoding, low_memory=False, on_bad_lines='skip')
     pdf.columns = make_unique_col_names(pdf.columns)
 
     col_map = {c.lower().replace(" ", "").replace("_", "").replace(".", ""): c for c in pdf.columns}
 
-    # 🔥 어떤 이름으로 바뀌어 있어도 찰떡같이 찾아내는 스마트 컬럼 추출기
+    # 🔥 어떤 이름이 들어와도 찾아내는 스마트 추출기
     def get_col(*targets):
-        for target in targets:
-            cleaned = target.lower().replace(" ", "").replace("_", "").replace(".", "")
-            if cleaned in col_map: return col_map[cleaned]
-            for k, v in col_map.items():
-                if cleaned in k or k in cleaned: return v
+        cols = pdf.columns
+        for t in targets:
+            t_clean = t.lower().replace(" ", "").replace("_", "").replace(".", "")
+            if t_clean in col_map: return col_map[t_clean]
+        for t in targets:
+            t_clean = t.lower().replace(" ", "").replace("_", "").replace(".", "")
+            if len(t_clean) >= 4:
+                for c in cols:
+                    c_clean = c.lower().replace(" ", "").replace("_", "").replace(".", "")
+                    if t_clean in c_clean or c_clean in t_clean:
+                        return c
         return None
 
-    c_pur_m = get_col("Ticket Purchase Month-YYYY MM", "Ticket Purchase month")
+    c_pur_m = get_col("Ticket Purchase Month-YYYY MM", "Ticket Purchase month", "Purchase Month")
     c_trip_m = get_col("Trip Month-YYYY MM", "Trip Month")
-    c_orig_code_only = get_col("Trip Origin Country Code", "Trip Origin Country Name Code")
-    c_dest_code_only = get_col("Trip Destination Country Code", "Trip Destination Country Name Code")
-    c_orig_name = get_col("Trip Origin Country Name", "Trip Origin Country")
-    c_dest_name = get_col("Trip Destination Country Name", "Trip Destination Country")
-    c_dest_code = get_col("Trip Destination Code", "Trip Destination City")
-    c_orig_code = get_col("Trip Origin Code", "Trip Origin City")
-    c_market = get_col("Trip Market", "Trip O&D", "Market")
-    c_airline = get_col("Dominant Marketing Airline", "Marketing Airline", "Airline")
+    c_orig_code = get_col("Trip Origin Country Code", "Origin Country Code", "Orig Country", "출발국가코드")
+    c_dest_code = get_col("Trip Destination Country Code", "Destination Country Code", "Dest Country", "도착국가코드")
+    c_orig_name = get_col("Trip Origin Country Name", "Origin Country Name", "출발국가")
+    c_dest_name = get_col("Trip Destination Country Name", "Destination Country Name", "도착국가")
     
-    # 🔥 Value 컬럼명이 Pax, Passengers 등으로 변경되었을 때를 완벽 대비
-    c_value = get_col("Value", "Pax", "Passengers", "Passenger", "Bookings", "Tickets", "Total")
-    c_stop1 = get_col("STOP1", "Stops")
+    # 🔥 이 부분의 동의어를 대폭 늘렸습니다!
+    c_orig_city = get_col("Trip Origin Code", "Origin Code", "Trip Origin", "Origin", "출발공항", "출발")
+    c_dest_city = get_col("Trip Destination Code", "Destination Code", "Trip Destination", "Destination", "Dest", "도착공항", "도착")
+    c_market = get_col("Trip Market", "Trip O&D", "Market", "O&D", "노선")
+    c_airline = get_col("Dominant Marketing Airline", "Marketing Airline", "Airline", "Carrier", "항공사")
+    c_value = get_col("Value", "Pax", "Passengers", "Passenger", "Bookings", "Tickets", "Total", "수송", "실적")
+    c_stop1 = get_col("STOP1", "Stops", "Stop", "경유")
+
+    # 🔥 터미널에 어떤 컬럼으로 매칭되었는지 명확히 보여줍니다
+    print(f"  ✔️ 매핑 결과 확인:")
+    print(f"    - 출발월 컬럼 : {c_trip_m}")
+    print(f"    - 출발공항 컬럼 : {c_orig_city}")
+    print(f"    - 도착공항 컬럼 : {c_dest_city}")
+    print(f"    - 실적(값) 컬럼 : {c_value}")
+
+    if not c_orig_city or not c_dest_city:
+        print("    🚨 [치명적 경고] 출발공항 또는 도착공항 컬럼을 찾지 못했습니다! 결과가 0행이 될 수 있습니다.")
 
     clean_pdf = pd.DataFrame()
     clean_pdf["Ticket Purchase month"] = pdf[c_pur_m] if c_pur_m else ""
     clean_pdf["Trip Month"] = pdf[c_trip_m] if c_trip_m else ""
-    clean_pdf["Trip Origin Country Code"] = pdf[c_orig_code_only] if c_orig_code_only else ""
-    clean_pdf["Trip Destination Country Code"] = pdf[c_dest_code_only] if c_dest_code_only else ""
+    clean_pdf["Trip Origin Country Code"] = pdf[c_orig_code] if c_orig_code else ""
+    clean_pdf["Trip Destination Country Code"] = pdf[c_dest_code] if c_dest_code else ""
     clean_pdf["Trip Origin Country Name"] = pdf[c_orig_name] if c_orig_name else ""
     clean_pdf["Trip Destination Country Name"] = pdf[c_dest_name] if c_dest_name else ""
-    clean_pdf["Trip Origin Code"] = pdf[c_orig_code] if c_orig_code else ""
-    clean_pdf["Trip Destination Code"] = pdf[c_dest_code] if c_dest_code else ""
+    clean_pdf["Trip Origin Code"] = pdf[c_orig_city] if c_orig_city else ""
+    clean_pdf["Trip Destination Code"] = pdf[c_dest_city] if c_dest_city else ""
     clean_pdf["Trip Market"] = pdf[c_market] if c_market else ""
     clean_pdf["Dominant Marketing Airline"] = pdf[c_airline] if c_airline else ""
     clean_pdf["Value"] = pdf[c_value] if c_value else 0
     clean_pdf["STOP1"] = pdf[c_stop1] if c_stop1 else ""
 
-    # 📌 결측치 및 빈 행 제거
     clean_pdf = clean_pdf.dropna(subset=["Trip Origin Code", "Trip Destination Code"])
     clean_pdf = clean_pdf[
         (~clean_pdf["Trip Origin Code"].astype(str).str.lower().isin(['nan', 'none', '', 'null'])) &
         (~clean_pdf["Trip Destination Code"].astype(str).str.lower().isin(['nan', 'none', '', 'null']))
     ]
-
+    
+    print(f"  ✔️ 전처리 후 남은 데이터: {len(clean_pdf):,}행")
     return pl.from_pandas(clean_pdf)
 
 def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, output_parquet_path="cache_6th_data.parquet"):
@@ -104,6 +120,10 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
     df_cy = load_file_and_clean_columns(cy_file_path).with_columns([pl.lit("금년").alias("금년/전년")])
     df_py = load_file_and_clean_columns(py_file_path).with_columns([pl.lit("전년").alias("금년/전년")])
     
+    if len(df_cy) == 0 and len(df_py) == 0:
+        print("\n❌ 금년/전년 데이터가 모두 0행입니다. 컬럼 매핑 실패가 원인이니, 위쪽 '매핑 결과 확인' 로그의 None 값을 확인하세요!")
+        return
+
     df_merged = pl.concat([df_cy, df_py], how="diagonal")
 
     month_dict = {"jan":"01","feb":"02","mar":"03","apr":"04","may":"05","jun":"06","jul":"07","aug":"08","sep":"09","oct":"10","nov":"11","dec":"12"}
@@ -134,14 +154,16 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         d_c = str(d_cntry_code).upper().strip()
         o_str = str(o_code).strip()
         d_str = str(d_code).strip()
-        is_o_jp = o_c in ["JP", "JPN"]
-        is_d_jp = d_c in ["JP", "JPN"]
+        is_o_jp = o_c in ["JP", "JPN", "JAPAN"]
+        is_d_jp = d_c in ["JP", "JPN", "JAPAN"]
 
         if is_o_jp: return f"{o_str}-{d_str} v.v."
         elif is_d_jp: return f"{d_str}-{o_str} v.v."
         else: return f"{o_str}-{d_str} v.v."
 
-    is_jp_expr = pl.col("Trip Origin Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN"])
+    is_jp_expr = pl.col("Trip Origin Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN", "JAPAN"]) | pl.col("Trip Origin Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JAPAN"])
+    is_dest_jp_expr = pl.col("Trip Destination Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN", "JAPAN"]) | pl.col("Trip Destination Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JAPAN"])
+
     is_direct_expr = pl.col("STOP1").cast(pl.Utf8).str.strip_chars().str.to_lowercase().is_in(['', 'nan', 'none', 'null']) | pl.col("STOP1").is_null()
 
     df_processed = df_merged.with_columns([
@@ -151,7 +173,10 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         pl.col("Ticket Purchase month").cast(pl.Utf8).str.slice(-2, 2).map_elements(lambda x: f"{x}월" if x else "", return_dtype=pl.Utf8).alias("발매월_표시"),
         pl.col("Trip Month").cast(pl.Utf8).str.slice(-2, 2).map_elements(lambda x: f"{x}월" if x else "", return_dtype=pl.Utf8).alias("출발월_표시"),
 
-        pl.when(is_jp_expr).then(pl.lit("일본발")).otherwise(pl.lit("일본행")).alias("DIRECTION"),
+        pl.when(is_jp_expr).then(pl.lit("일본발"))
+          .when(is_dest_jp_expr).then(pl.lit("일본행"))
+          .otherwise(pl.lit("기타")).alias("DIRECTION"),
+          
         pl.when(is_direct_expr).then(pl.lit("직항")).otherwise(pl.lit("경유")).alias("직항/경유"),
 
         pl.struct(["Trip Market", "Trip Origin Code", "Trip Destination Code"]).map_elements(
@@ -165,16 +190,20 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         pl.when(is_jp_expr).then(pl.col("Trip Origin Code").cast(pl.Utf8)).otherwise(pl.col("Trip Destination Code").cast(pl.Utf8)).alias("일본 APO"),
         pl.when(is_jp_expr).then(pl.col("Trip Destination Code").cast(pl.Utf8)).otherwise(pl.col("Trip Origin Code").cast(pl.Utf8)).alias("해외 APO"),
         
-        pl.when(is_jp_expr)
-          .then(pl.col("Trip Destination Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars())
-          .otherwise(pl.col("Trip Origin Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars())
-          .alias("DIM_LOOKUP_KEY"),
+        pl.when(is_jp_expr).then(pl.col("Trip Destination Country Code"))
+          .when(is_dest_jp_expr).then(pl.col("Trip Origin Country Code"))
+          .otherwise(pl.lit(""))
+          .cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("DIM_LOOKUP_KEY_CODE"),
+          
+        pl.when(is_jp_expr).then(pl.col("Trip Destination Country Name"))
+          .when(is_dest_jp_expr).then(pl.col("Trip Origin Country Name"))
+          .otherwise(pl.lit(""))
+          .cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("DIM_LOOKUP_KEY_NAME"),
           
         pl.col("Value").cast(pl.Utf8).str.replace_all(",", "").cast(pl.Float64, strict=False).fill_null(0.0).alias("Value_num")
     ])
 
     if os.path.exists(dim_file_path):
-        # 🔥 Dimension 양식 변경 완벽 대응 (위치 무관 자동 스캔)
         dim_df = pd.read_excel(dim_file_path) if dim_file_path.endswith(('.xlsx', '.xls')) else pd.read_csv(dim_file_path)
         
         c_key, c_val = None, None
@@ -190,21 +219,27 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
         else:
             dim_df = dim_df.iloc[:, :2]
             
-        dim_pl = pl.from_pandas(dim_df.dropna(how='all'))
+        dim_df = dim_df.dropna(how='all')
+        
+        sample_keys = dim_df.iloc[:, 0].dropna().astype(str).str.strip()
+        is_dim_code = sample_keys.str.len().max() <= 3 if not sample_keys.empty else True
+        lookup_col = "DIM_LOOKUP_KEY_CODE" if is_dim_code else "DIM_LOOKUP_KEY_NAME"
+
+        dim_pl = pl.from_pandas(dim_df)
         dim_pl = dim_pl.rename({dim_pl.columns[0]: "DIM_KEY", dim_pl.columns[1]: "RGN_NAME"})
         dim_pl = dim_pl.with_columns([
             pl.col("DIM_KEY").cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("DIM_KEY"),
             pl.col("RGN_NAME").cast(pl.Utf8).str.strip_chars().alias("RGN_NAME")
         ])
         
-        df_processed = df_processed.join(dim_pl, left_on="DIM_LOOKUP_KEY", right_on="DIM_KEY", how="left").with_columns([
+        df_processed = df_processed.join(dim_pl, left_on=lookup_col, right_on="DIM_KEY", how="left").with_columns([
             pl.when(pl.col("RGN_NAME").is_not_null() & (pl.col("RGN_NAME") != "") & (pl.col("RGN_NAME") != "nan"))
               .then(pl.lit("JPN-") + pl.col("RGN_NAME"))
               .otherwise(pl.lit("기타"))
               .alias("4.OD RGN")
-        ]).drop(["RGN_NAME", "DIM_LOOKUP_KEY"])
+        ]).drop(["RGN_NAME", "DIM_LOOKUP_KEY_CODE", "DIM_LOOKUP_KEY_NAME"])
     else:
-        df_processed = df_processed.with_columns([pl.lit("기타").alias("4.OD RGN")]).drop(["DIM_LOOKUP_KEY"])
+        df_processed = df_processed.with_columns([pl.lit("기타").alias("4.OD RGN")]).drop(["DIM_LOOKUP_KEY_CODE", "DIM_LOOKUP_KEY_NAME"])
 
     final_group_cols = [
         "Ticket Purchase month", "Trip Month", "발매월_표시", "출발월_표시", "4.OD RGN", "DIRECTION", "직항/경유",
@@ -214,7 +249,7 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
 
     df_aggregated = df_processed.group_by(final_group_cols).agg([pl.col("Value_num").sum().alias("Value")])
     df_aggregated.write_parquet(output_parquet_path, compression="snappy")
-    print(f"🎉 성공! 캐시 파켓 파일('{output_parquet_path}')이 에러 없이 생성되었습니다! ({len(df_aggregated):,}행)")
+    print(f"\n🎉 성공! 캐시 파켓 파일('{output_parquet_path}')이 에러 없이 생성되었습니다! ({len(df_aggregated):,}행)")
 
 if __name__ == "__main__":
     process_and_aggregate_6th_data("6수송_금년.csv", "6수송_전년.csv", "Dimension.xlsx")
