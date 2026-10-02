@@ -483,7 +483,7 @@ if "3/4수송" in selected_group:
                 # 1. 모든 노선에 대해 실적이 아예 없는 노선(행) 제거
                 piv_r = piv_r[piv_r.sum(axis=1) > 0] 
                 
-                # 2. 🔥 [핵심 수정] 선택된 필터 조건에서 실적(합계)이 0인 항공사(열) 제거
+                # 2. 🔥 [핵심] 선택 조건 내 발매 실적이 0보다 큰(>0) 항공사(열)만 남기기
                 piv_r = piv_r.loc[:, piv_r.sum(axis=0) > 0] 
                 
                 if not piv_r.empty:
@@ -492,19 +492,20 @@ if "3/4수송" in selected_group:
                     piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
                     piv_r_ms = piv_r_ms.head(100)
                     
-                    piv_r_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:120px;">노선</th>'
+                    # 🔥 [가독성 개선] white-space: nowrap 적용 및 Cell 최소 폭 보장
+                    piv_r_html = '<div class="custom-piv-container" style="overflow-x: auto;"><table class="custom-piv-table" style="width: auto; min-width: 100%;"><thead><tr><th class="header-main" style="min-width: 100px; white-space: nowrap;">노선</th>'
                     for col_al in piv_r_ms.columns:
                         is_ke_c = (str(col_al).upper() == 'KE')
-                        th_style = ' style="background-color: #9fc5e8 !important; color: #0f172a !important;"' if is_ke_c else ''
+                        th_style = ' style="background-color: #9fc5e8 !important; color: #0f172a !important; min-width: 70px; white-space: nowrap;"' if is_ke_c else ' style="min-width: 70px; white-space: nowrap;"'
                         k_span = '<span style="color:#0f172a !important; font-weight:bold;">' if is_ke_c else '<span>'
                         piv_r_html += f'<th class="header-main"{th_style}>{k_span}{col_al}</span></th>'
                     piv_r_html += '</tr></thead><tbody>'
                     
                     for route_idx, row_item in piv_r_ms.iterrows():
-                        piv_r_html += f'<tr><td style="font-weight:700;">{route_idx}</td>'
+                        piv_r_html += f'<tr><td style="font-weight:700; white-space: nowrap;">{route_idx}</td>'
                         for al_col_name, val_ms in row_item.items():
                             is_ke_c = (str(al_col_name).upper() == 'KE')
-                            td_style = ' style="background-color: #ffffff !important;"'
+                            td_style = ' style="background-color: #ffffff !important; white-space: nowrap; padding: 8px 12px;"'
                             k_span = '<span class="txt-ke-bold">' if is_ke_c else '<span>'
                             piv_r_html += f'<td{td_style}>{k_span}{val_ms:.1f}%</span></td>'
                         piv_r_html += '</tr>'
