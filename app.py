@@ -1000,7 +1000,7 @@ elif "6수송" in selected_group:
 
     # 📌 우측: 메인 데이터 테이블 패널
     with col_right_data:
-        tab6_1, tab6_2 = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "🔒 6수송 Raw Data View (관리자 전용)"]
+        tab6_1, tab6_2 = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "🔒 6수송 Raw Data View (관리자 전용)"])
 
         with tab6_1:
             # ------------------------------------------
