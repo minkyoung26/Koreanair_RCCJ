@@ -78,20 +78,20 @@ st.markdown("""
     table.custom-piv-table td span.yoy-down, table.yoy-table td span.yoy-down { color: #dc2626 !important; font-weight: 700 !important; }
     table.custom-piv-table td span.yoy-dash, table.yoy-table td span.yoy-dash { color: #64748b !important; font-weight: 500 !important; }
     table.custom-piv-table td span.txt-ke-bold, table.yoy-table td span.txt-ke-bold { color: #0b5394 !important; font-weight: 800 !important; }
-/* 🌟 추가할 총계 전용 디자인 클래스 */
+
+    /* 🌟 추가된 파란 바탕 + 하단 빨간줄 총계 전용 클래스 */
     tr.total-row-blue td {
-        background-color: #0284c7 !important; /* 파란색 바탕 */
-        color: #ffffff !important;            /* 흰색 텍스트 */
-        border-bottom: 3px solid #ef4444 !important; /* 하단 빨간색 테두리 */
+        background-color: #0284c7 !important;
+        color: #ffffff !important;
+        border-bottom: 3px solid #ef4444 !important;
         font-weight: 800 !important;
     }
-    /* 파란 바탕 위에서 증감(YOY) 색상이 잘 보이도록 밝은 톤으로 조정 */
     tr.total-row-blue td span.yoy-up { color: #a5f3fc !important; font-weight: 900 !important; }
     tr.total-row-blue td span.yoy-down { color: #fecaca !important; font-weight: 900 !important; }
     tr.total-row-blue td span.yoy-dash { color: #f1f5f9 !important; }
     tr.total-row-blue td span.txt-ke-bold { color: #ffffff !important; font-weight: 900 !important;}
 </style>
-""", unsafe_allow_html=bg_grand = "#e2e8f0")
+""", unsafe_allow_html=True)
 
 st.sidebar.header("📁 실시간 데이터 업로드")
 uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=['parquet', 'csv', 'xlsx'], key="sb_uploader_iss")
@@ -1144,7 +1144,7 @@ elif "6수송" in selected_group:
                 g_k_ms_py = (g_k_py / g_mkt_py * 100) if g_mkt_py > 0 else 0
                 g_k_ms_yoy = g_k_ms_cy - g_k_ms_py
 
-                # 🌟 [수정 후] 파란색 디자인 적용 및 괄호 삭제
+                # 🌟 파란색 바탕 + 하단 빨간줄 총계 행 적용
                 rgn_html += '<tr class="total-row-blue">'
                 rgn_html += '<td style="text-align:center;">총계</td>'
                 rgn_html += f'<td>{g_mkt_cy:,.0f}</td>'
@@ -1156,12 +1156,6 @@ elif "6수송" in selected_group:
                 rgn_html += get_yoy_td_html(g_k_yoy)
                 rgn_html += f'<td><span class="txt-ke-bold">{g_k_ms_cy:.1f}%</span></td>'
                 rgn_html += get_yoy_td_html(g_k_ms_yoy, True)
-                rgn_html += '</tr>'
-                
-                rgn_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold" style="color:#0f172a !important;">{g_k_cy:,.0f}</span></td>'
-                rgn_html += get_yoy_td_html(g_k_yoy, bg_color=bg_grand)
-                rgn_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold" style="color:#0f172a !important;">{g_k_ms_cy:.1f}%</span></td>'
-                rgn_html += get_yoy_td_html(g_k_ms_yoy, True, bg_color=bg_grand)
                 rgn_html += '</tr>'
                 
                 rgn_html += '</tbody></table></div>'
@@ -1288,7 +1282,7 @@ elif "6수송" in selected_group:
 
                     bg_sub = "#e2e8f0"
                     od_matrix_html += f'<tr style="border-top:2px solid #94a3b8 !important;">'
-                    od_matrix_html += f'<td colspan="2" style="font-weight:800 !important; text-align:center; background-color:{bg_sub} !important;">[TOP 20 소계]</td>'
+                    od_matrix_html += f'<td colspan="2" style="font-weight:800 !important; text-align:center; background-color:{bg_sub} !important;">TOP 20 소계</td>'
                     od_matrix_html += f'<td style="font-weight:800 !important; background-color:{bg_sub} !important;">{tot_mkt_cy:,.0f}</td>'
                     od_matrix_html += get_yoy_td_html(tot_mkt_yoy, bg_color=bg_sub)
                     od_matrix_html += f'<td style="font-weight:800 !important; background-color:{bg_sub} !important;">{tot_sel_cy:,.0f}</td>'
@@ -1301,19 +1295,19 @@ elif "6수송" in selected_group:
                     od_matrix_html += get_yoy_td_html(tot_ke_ms_yoy, True, bg_color=bg_sub)
                     od_matrix_html += '</tr>'
 
-                    bg_grand = "#cbd5e1"
-                    od_matrix_html += f'<tr style="border-top:2px solid #64748b !important;">'
-                    od_matrix_html += f'<td colspan="2" style="font-weight:800 !important; text-align:center; color:#0f172a !important; background-color:{bg_grand} !important;">[선택 필터 전체 총계]</td>'
-                    od_matrix_html += f'<td style="font-weight:800 !important; color:#0f172a !important; background-color:{bg_grand} !important;">{grand_mkt_cy:,.0f}</td>'
-                    od_matrix_html += get_yoy_td_html(grand_mkt_yoy, bg_color=bg_grand)
-                    od_matrix_html += f'<td style="font-weight:800 !important; color:#0f172a !important; background-color:{bg_grand} !important;">{grand_sel_cy:,.0f}</td>'
-                    od_matrix_html += get_yoy_td_html(grand_sel_yoy, bg_color=bg_grand)
-                    od_matrix_html += f'<td style="font-weight:800 !important; color:#0f172a !important; background-color:{bg_grand} !important;">{grand_sel_ms_cy:.1f}%</td>'
-                    od_matrix_html += get_yoy_td_html(grand_sel_ms_yoy, True, bg_color=bg_grand)
-                    od_matrix_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold" style="color:#0f172a !important;">{grand_ke_cy:,.0f}</span></td>'
-                    od_matrix_html += get_yoy_td_html(grand_ke_yoy, bg_color=bg_grand)
-                    od_matrix_html += f'<td style="text-align:center !important; background-color:{bg_grand} !important;"><span class="txt-ke-bold" style="color:#0f172a !important;">{grand_ke_ms_cy:.1f}%</span></td>'
-                    od_matrix_html += get_yoy_td_html(grand_ke_ms_yoy, True, bg_color=bg_grand)
+                    # 🌟 파란색 바탕 + 하단 빨간줄 총계 행 적용
+                    od_matrix_html += '<tr class="total-row-blue">'
+                    od_matrix_html += '<td colspan="2" style="text-align:center;">선택 필터 전체 총계</td>'
+                    od_matrix_html += f'<td>{grand_mkt_cy:,.0f}</td>'
+                    od_matrix_html += get_yoy_td_html(grand_mkt_yoy)
+                    od_matrix_html += f'<td>{grand_sel_cy:,.0f}</td>'
+                    od_matrix_html += get_yoy_td_html(grand_sel_yoy)
+                    od_matrix_html += f'<td>{grand_sel_ms_cy:.1f}%</td>'
+                    od_matrix_html += get_yoy_td_html(grand_sel_ms_yoy, True)
+                    od_matrix_html += f'<td><span class="txt-ke-bold">{grand_ke_cy:,.0f}</span></td>'
+                    od_matrix_html += get_yoy_td_html(grand_ke_yoy)
+                    od_matrix_html += f'<td><span class="txt-ke-bold">{grand_ke_ms_cy:.1f}%</span></td>'
+                    od_matrix_html += get_yoy_td_html(grand_ke_ms_yoy, True)
                     od_matrix_html += '</tr>'
 
                     od_matrix_html += '</tbody></table></div>'
