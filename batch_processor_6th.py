@@ -25,7 +25,7 @@ def process_and_create_6th_parquet():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
     print("=" * 70)
-    print("🚀 [6수송 파케 생성기] cache_6th_data.parquet 생성 파이프라인")
+    print("🚀 [6수송 파케 완전 생성기] cache_6th_data.parquet 경량화 가공")
     print("=" * 70)
 
     # 1. 파일 검색
@@ -52,7 +52,6 @@ def process_and_create_6th_parquet():
             df = pd.read_excel(f_path) if f_path.endswith(('.xlsx', '.xls')) else pd.read_csv(f_path, low_memory=False)
             df.columns = [str(c).strip() for c in df.columns]
             
-            # 명시적 연도 구분 필드 주입
             df['금년/전년'] = '금년'
             df['발매_연도구분'] = '금년 발매'
             df['출발_연도구분'] = '금년 출발'
@@ -70,7 +69,6 @@ def process_and_create_6th_parquet():
             df = pd.read_excel(f_path) if f_path.endswith(('.xlsx', '.xls')) else pd.read_csv(f_path, low_memory=False)
             df.columns = [str(c).strip() for c in df.columns]
             
-            # 명시적 연도 구분 필드 주입
             df['금년/전년'] = '전년'
             df['발매_연도구분'] = '전년 발매'
             df['출발_연도구분'] = '전년 출발'
@@ -81,11 +79,11 @@ def process_and_create_6th_parquet():
             print(f"  ├─ ❌ 실패: {fname} | {e}")
 
     if not df_cy_list and not df_py_list:
-        print("\n❌ 원천 CSV/XLSX 파일을 찾지 못했습니다. 파일명을 확인해 주세요.")
+        print("\n❌ 원천 CSV/XLSX 파일을 찾지 못했습니다. 폴더 안의 파일명을 확인해주세요.")
         sys.exit(1)
 
     # 4. 데이터 통합 및 주요 키 칼럼 정제
-    print("\n⚙️ [3/3] 데이터 병합 및 표준화 키 생성 중...")
+    print("\n⚙️ [3/3] 데이터 병합 및 사전 집계 최적화 중...")
     df_merged = pd.concat(df_cy_list + df_py_list, ignore_index=True)
 
     col_pur_m = find_column_by_candidates(df_merged.columns, ["ticketpurchasemonth", "purchasemonth", "발매월", "발매일자", "issuemonth"])
@@ -106,8 +104,7 @@ def process_and_create_6th_parquet():
             errors='coerce'
         ).fillna(0.0)
 
-    # CRITICAL: Streamlit Oh No 크래시 원인 차단
-    # category 데이터 타입을 완전히 제거하고 순수 문자열 및 원시 수치형으로 변환
+    # 카테고리(category) 타입을 전부 제거하고 순수 표준 문자열로 전환
     for col in df_merged.columns:
         if str(df_merged[col].dtype) == 'category' or df_merged[col].dtype == 'object':
             df_merged[col] = df_merged[col].astype(str).fillna('')
@@ -116,22 +113,35 @@ def process_and_create_6th_parquet():
         elif 'float' in str(df_merged[col].dtype):
             df_merged[col] = df_merged[col].fillna(0.0).astype('float64')
 
-    # 파일 Lock 및 인덱스 꼬임 방지를 위한 원자적 저장(Atomic Rename)
+    # 사전 집계 가공 (대시보드 "Oh, No!" 메모리 충돌 완전 방어)
+    group_cols = [
+        'Ticket Purchase month', 'Trip Month', '4.OD RGN', 'DIRECTION', 
+        '직항/경유', 'Trip Origin Country Code', 'Trip Destination Country Code', 
+        '일본 APO', '해외 APO', 'Trip O&D', 'Trip O&D Market', 
+        'Dominant Marketing Airline', '금년/전년', '발매_연도구분', '출발_연도구분',
+        'Pur_YM_Key', 'Trip_YM_Key'
+    ]
+    existing_cols = [c for c in group_cols if c in df_merged.columns]
+    
+    if 'Value' in df_merged.columns and existing_cols:
+        df_final = df_merged.groupby(existing_cols, observed=False, as_index=False)['Value'].sum()
+    else:
+        df_final = df_merged
+
+    # 안전 교체 저장 (File Lock 에러 차단)
     output_path = os.path.join(base_dir, "cache_6th_data.parquet")
     temp_path = os.path.join(base_dir, "cache_6th_data_tmp.parquet")
     
-    df_merged.to_parquet(temp_path, engine='pyarrow', index=False)
+    df_final.to_parquet(temp_path, engine='pyarrow', index=False)
     
     if os.path.exists(output_path):
-        try:
-            os.remove(output_path)
-        except Exception:
-            pass
+        try: os.remove(output_path)
+        except: pass
     os.rename(temp_path, output_path)
 
     print("\n" + "=" * 70)
-    print(f"🎉 cache_6th_data.parquet 파일 가공이 완료되었습니다!")
-    print(f"📊 저장된 총 행 수: {len(df_merged):,} 행")
+    print(f"🎉 파케 파일(cache_6th_data.parquet)이 성공적으로 생성되었습니다!")
+    print(f"📊 압축 저장된 레코드 수: {len(df_final):,} 행 (원천 {len(df_merged):,}행 최적화 완료)")
     print(f"⏱️ 소요시간: {time.time() - start_time:.2f}초")
     print("=" * 70)
 
