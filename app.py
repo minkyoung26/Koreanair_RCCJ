@@ -6,12 +6,11 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 import os
-import glob
 
 # 1. Page Config
 st.set_page_config(
     page_title="일본노선 발매/공급 Market Share",
-    page_icon="✈️",
+    page_icon="✈️️",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -130,43 +129,33 @@ def load_aux_files():
             except: pass
     return None
 
-# 🔥 [크래시 방지 핵심] 캐시 장치 제거 및 안전 직접 로드
+# 🔥 [Oh No 크래시 원천 해결] 170만 행을 대시보드 필수 차원으로 1차 경량 집계 로드
+@st.cache_data(ttl=3600, show_spinner="🌐 6수송 데이터를 최적화 로딩 중...")
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_6th_data.parquet')
     
     if os.path.exists(target_path):
         try:
-            # 1. 파케 파일 로드
             df = pd.read_parquet(target_path, engine='pyarrow')
             if df is not None and not df.empty:
-                # 2. 🔥 [핵심] PyArrow C-Extension 메모리 락 및 충돌 원천 차단
-                # 메모리 포인터 연결을 끊고 순수 파이썬 DataFrame 메모리로 완전히 복사
-                df = df.copy()
-                for c in df.columns:
-                    if str(df[c].dtype) == 'category' or df[c].dtype == 'object':
-                        df[c] = df[c].astype(str)
+                group_cols = [
+                    'Ticket Purchase month', 'Trip Month', '4.OD RGN', 'DIRECTION', 
+                    '직항/경유', 'Trip Origin Country Code', 'Trip Destination Country Code', 
+                    '일본 APO', '해외 APO', 'Trip O&D', 'Trip O&D Market', 
+                    'Dominant Marketing Airline', '금년/전년', '발매_연도구분', '출발_연도구분',
+                    'Pur_YM_Key', 'Trip_YM_Key'
+                ]
+                existing_cols = [c for c in group_cols if c in df.columns]
+                val_col = 'Value' if 'Value' in df.columns else None
+                
+                if val_col and existing_cols:
+                    df_agg = df.groupby(existing_cols, observed=False, as_index=False)[val_col].sum()
+                    return df_agg
                 return df
         except Exception as e:
-            st.error(f"⚠️ 파케 로딩 중 예외 발생: {e}")
-            
-    # 3. 만약 파케 로드 실패 시 원천 CSV 직접 로드 (Emergency Fallback)
-    all_files = glob.glob(os.path.join(base_dir, "*.csv"))
-    df_list = []
-    for f in all_files:
-        if "6수송" in f and "cache" not in f:
-            try:
-                tmp = pd.read_csv(f, low_memory=False)
-                tmp.columns = [str(col).strip() for col in tmp.columns]
-                is_cy = "금년" in f or "CY" in f.upper()
-                tmp['금년/전년'] = '금년' if is_cy else '전년'
-                tmp['발매_연도구분'] = '금년 발매' if is_cy else '전년 발매'
-                tmp['출발_연도구분'] = '금년 출발' if is_cy else '전년 출발'
-                df_list.append(tmp)
-            except: pass
-    if df_list:
-        return pd.concat(df_list, ignore_index=True)
-        
+            st.error(f"⚠️ Parquet 데이터 로드 실패: {e}")
+            return None
     return None
 
 def get_34_last_updated_date():
@@ -282,14 +271,14 @@ if "3/4수송" in selected_group:
         f'<div class="source-header-box">'
         f'<b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; '
         f'<b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
-        f'<b>✈️️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
+        f'<b>✈ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
         f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str_34}'
         f'</div>', 
         unsafe_allow_html=True
     )
     st.markdown("---")
     
-    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
 
     with tab_34_1:
         if df_iss_merged is None: st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다."); st.stop()
@@ -573,7 +562,7 @@ if "3/4수송" in selected_group:
                 csv_data = filtered_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button("📥 필터링된 발매 Raw Data (CSV) 전체 다운로드", data=csv_data, file_name=f"Ticketing_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
                 st.dataframe(filtered_df.head(100), width='stretch')
-            else: st.info("ℹ️️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
+            else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
     # 2. ✈️ 공급 M/S 탭
@@ -953,8 +942,8 @@ elif "6수송" in selected_group:
     df_6th_raw = load_6th_data_aggregated()
 
     if df_6th_raw is None or df_6th_raw.empty:
-        st.error("❌ 6수송 캐시 파켓 파일(`cache_6th_data.parquet`)이 없거나 읽을 수 없습니다.")
-        st.info("👉 터미널에서 `python batch_processor_6th.py`를 한 번 실행해 주세요!")
+        st.error("❌ 6수송 캐시 파켓 파일(`cache_6th_data.parquet`)이 없거나 비어 있습니다.")
+        st.info("👉 터미널에서 `python batch_processor_6th.py`를 실행하여 파케 파일을 먼저 생성해주세요!")
         st.stop()
 
     df_6 = df_6th_raw.copy()
@@ -980,7 +969,7 @@ elif "6수송" in selected_group:
     col_val_6 = get_actual_col("Value") or "Value"
     col_year_type = get_actual_col("금년/전년") or "금년/전년"
 
-    # 🔥 안전한 구분 필드 태깅
+    # 구분 필드 자동 보완
     if col_year_type not in df_6.columns:
         if 'source_file' in df_6.columns:
             df_6[col_year_type] = np.where(df_6['source_file'].astype(str).str.contains('금년|CY', na=False), '금년', '전년')
