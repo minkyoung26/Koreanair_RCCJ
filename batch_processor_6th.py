@@ -10,7 +10,7 @@ def normalize_ym_key(val_str):
     if pd.isna(val_str):
         return ""
     s = str(val_str).replace('-', '').replace('.', '').replace('/', '').replace('월', '').strip()
-    return s[:6] if len(s) >= 6 and s[:6].isdigit() else s
+    return s[:6] if len(s) >= 6 and s[:6].isdigit() else str(val_str).strip()
 
 def find_column_by_candidates(columns, candidates):
     for c in columns:
@@ -25,7 +25,7 @@ def process_and_create_6th_parquet():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
     print("=" * 70)
-    print("🚀 [6수송 파케 생성기] 금년(CY) 원천 데이터 태깅 완전 고정 배치")
+    print("🚀 [6수송 파케 생성기] 금년/전년 출처 기반 태깅 및 매칭 키 완전 보정")
     print("=" * 70)
 
     all_files = glob.glob(os.path.join(base_dir, "*.csv")) + glob.glob(os.path.join(base_dir, "*.xlsx"))
@@ -43,26 +43,25 @@ def process_and_create_6th_parquet():
 
     df_cy_list, df_py_list = [], []
 
-    # 1. 6수송_금년.csv 로드 -> 무조건 '금년'으로 강제 주입
-    print(f"\n📂 [1/3] 금년(CY) 파일 로드... ({len(cy_files)}개)")
+    # 1. 6수송_금년.csv 로드
+    print(f"\n📂 [1/3] 금년(CY) 원천 로드... ({len(cy_files)}개 파일)")
     for f_path in cy_files:
         fname = os.path.basename(f_path)
         try:
             df = pd.read_excel(f_path) if f_path.endswith(('.xlsx', '.xls')) else pd.read_csv(f_path, low_memory=False)
             df.columns = [str(c).strip() for c in df.columns]
             
-            # 🔥 원천 날짜 표기와 상관없이 금년 파일 데이터는 무조건 '금년'으로 태깅
             df['금년/전년'] = '금년'
             df['발매_연도구분'] = '금년 발매'
             df['출발_연도구분'] = '금년 출발'
             df['source_file'] = fname
             df_cy_list.append(df)
-            print(f"  ├─ 🟢 성공 (금년 고정): {fname} ({len(df):,}행)")
+            print(f"  ├─ 🟢 성공 (금년 지정): {fname} ({len(df):,}행)")
         except Exception as e:
             print(f"  ├─ ❌ 실패: {fname} | {e}")
 
-    # 2. 6수송_전년.csv 로드 -> 무조건 '전년'으로 강제 주입
-    print(f"\n📂 [2/3] 전년(PY) 파일 로드... ({len(py_files)}개)")
+    # 2. 6수송_전년.csv 로드
+    print(f"\n📂 [2/3] 전년(PY) 원천 로드... ({len(py_files)}개 파일)")
     for f_path in py_files:
         fname = os.path.basename(f_path)
         try:
@@ -74,7 +73,7 @@ def process_and_create_6th_parquet():
             df['출발_연도구분'] = '전년 출발'
             df['source_file'] = fname
             df_py_list.append(df)
-            print(f"  ├─ 🟢 성공 (전년 고정): {fname} ({len(df):,}행)")
+            print(f"  ├─ 🟢 성공 (전년 지정): {fname} ({len(df):,}행)")
         except Exception as e:
             print(f"  ├─ ❌ 실패: {fname} | {e}")
 
@@ -82,7 +81,7 @@ def process_and_create_6th_parquet():
         print("\n❌ 원천 CSV/XLSX 파일을 찾지 못했습니다.")
         sys.exit(1)
 
-    print("\n⚙️ [3/3] 데이터 병합 및 표준 키 처리 중...")
+    print("\n⚙️ [3/3] 데이터 통합 및 YM 매칭 키 정제 중...")
     df_merged = pd.concat(df_cy_list + df_py_list, ignore_index=True)
 
     col_pur_m = find_column_by_candidates(df_merged.columns, ["ticketpurchasemonth", "purchasemonth", "발매월", "발매일자", "issuemonth"])
@@ -111,7 +110,6 @@ def process_and_create_6th_parquet():
         elif 'float' in str(df_merged[col].dtype):
             df_merged[col] = df_merged[col].fillna(0.0).astype('float64')
 
-    # 대시보드 경량 사전 집계
     group_cols = [
         'Ticket Purchase month', 'Trip Month', '4.OD RGN', 'DIRECTION', 
         '직항/경유', 'Trip Origin Country Code', 'Trip Destination Country Code', 
@@ -137,8 +135,8 @@ def process_and_create_6th_parquet():
     os.rename(temp_path, output_path)
 
     print("\n" + "=" * 70)
-    print(f"🎉 성공적으로 금년/전년 고정 태깅 파케 파일이 저장되었습니다!")
-    print(f"📊 총 레코드 수: {len(df_final):,} 행")
+    print(f"🎉 성공적으로 보정된 파케 파일이 저장되었습니다!")
+    print(f"📊 총 저장 행 수: {len(df_final):,} 행")
     print(f"⏱️ 소요시간: {time.time() - start_time:.2f}초")
     print("=" * 70)
 
