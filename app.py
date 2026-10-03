@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 import os
+import glob
 
 # 1. Page Config
 st.set_page_config(
@@ -103,14 +104,18 @@ def clean_transport_column(df):
     if b_col: df['수송'] = df[b_col].astype(str).str.strip()
     return df
 
-# 🔥 [3/4수송 경로 감지 강화] cache_34_data.parquet 안정적 로드
-@st.cache_data(ttl=3600, show_spinner="3/4수송 데이터를 읽어오는 중...")
+# 🔥 [경로 탐색 보완] cache_34_data.parquet 파일 완벽 탐색
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    for sp in [os.path.join(base_dir, 'cache_34_data.parquet'), 'cache_34_data.parquet']:
-        if os.path.exists(sp):
+    candidates = [
+        os.path.join(base_dir, 'cache_34_data.parquet'),
+        'cache_34_data.parquet',
+        os.path.join(os.getcwd(), 'cache_34_data.parquet')
+    ]
+    for target_path in candidates:
+        if os.path.exists(target_path):
             try:
-                df = pd.read_parquet(sp, engine='pyarrow')
+                df = pd.read_parquet(target_path, engine='pyarrow')
                 if df is not None and not df.empty:
                     return clean_transport_column(df)
             except Exception: pass
@@ -126,7 +131,7 @@ def process_any_uploaded_file(file_obj):
 
 def load_aux_files():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    for sp in [os.path.join(base_dir, '공급.csv'), '공급.csv']:
+    for sp in [os.path.join(base_dir, '공급.csv'), '공급.csv', os.path.join(os.getcwd(), '공급.csv')]:
         if os.path.exists(sp):
             try:
                 df = pd.read_csv(sp, low_memory=False)
@@ -134,14 +139,18 @@ def load_aux_files():
             except: pass
     return None
 
-# 🔥 [6수송 로드 최적화]
-@st.cache_data(ttl=3600, show_spinner="🌐 6수송 데이터를 읽어오는 중...")
+# 🔥 [6수송 로드 완벽 최적화]
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    for sp in [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']:
-        if os.path.exists(sp):
+    candidates = [
+        os.path.join(base_dir, 'cache_6th_data.parquet'),
+        'cache_6th_data.parquet',
+        os.path.join(os.getcwd(), 'cache_6th_data.parquet')
+    ]
+    for target_path in candidates:
+        if os.path.exists(target_path):
             try:
-                df = pd.read_parquet(sp, engine='pyarrow')
+                df = pd.read_parquet(target_path, engine='pyarrow')
                 if df is not None and not df.empty:
                     return df
             except Exception: pass
@@ -250,7 +259,7 @@ def get_dynamic_date_ranges_34(df_iss):
 
 
 # ==========================================
-# GROUP 1: ✈️️ 3/4수송 대시보드
+# GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
@@ -260,18 +269,18 @@ if "3/4수송" in selected_group:
         f'<div class="source-header-box">'
         f'<b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; '
         f'<b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
-        f'<b>✈ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
+        f'<b>✈️️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
         f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str_34}'
         f'</div>', 
         unsafe_allow_html=True
     )
     st.markdown("---")
     
-    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
 
     with tab_34_1:
         if df_iss_merged is None: 
-            st.warning("❌ 3/4수송 데이터(`cache_34_data.parquet`)를 찾을 수 없습니다.")
+            st.warning("❌ 3/4수송 데이터(cache_34_data.parquet)를 찾을 수 없습니다.")
             st.stop()
             
         merged_df = df_iss_merged.copy()
