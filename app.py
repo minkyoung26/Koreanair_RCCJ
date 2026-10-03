@@ -98,9 +98,17 @@ uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=
 uploaded_sup = st.sidebar.file_uploader("2. 공급 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_sup")
 uploaded_6th = st.sidebar.file_uploader("3. 6수송 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_6th")
 
+def find_column_by_candidates(columns, candidates):
+    for c in columns:
+        cleaned_col = str(c).lower().replace(" ", "").replace("_", "").replace(".", "")
+        for cand in candidates:
+            if cand in cleaned_col:
+                return c
+    return None
+
 def clean_transport_column(df):
     if df is None: return df
-    b_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
+    b_col = find_column_by_candidates(df.columns, ['수송', 'bound'])
     if b_col: df['수송'] = df[b_col].astype(str).str.strip()
     return df
 
@@ -249,10 +257,10 @@ def get_dash_td(bg_color="", bg_class=""):
 
 def get_dynamic_date_ranges_34(df_iss):
     if df_iss is None or df_iss.empty: return issue_range_str, dep_range_str
-    m_col = '출발월' if '출발월' in df_iss.columns else ('출발 월' if '출발 월' in df_iss.columns else 'Trip Month')
-    dep_str = f"{sorted([str(x).strip() for x in df_iss[m_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[m_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if m_col in df_iss.columns else dep_range_str
-    w_col = '발매주차_일자' if '발매주차_일자' in df_iss.columns else ('발매 주차' if '발매 주차' in df_iss.columns else 'Purchase Month')
-    iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col in df_iss.columns else issue_range_str
+    m_col = find_column_by_candidates(df_iss.columns, ['출발월', 'tripmonth', 'travelmonth'])
+    dep_str = f"{sorted([str(x).strip() for x in df_iss[m_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[m_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if m_col else dep_range_str
+    w_col = find_column_by_candidates(df_iss.columns, ['발매주차', 'issueweek', 'purchaseweek'])
+    iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col else issue_range_str
     return iss_str, dep_str
 
 
@@ -283,23 +291,20 @@ if "3/4수송" in selected_group:
             
         merged_df = df_iss_merged.copy()
         
-        # 🔥 [KeyError: '노선' 예방 핵심 방어 로직]
-        route_col_target = next((c for c in ['노선', '노선_clean', 'Route', 'ROUTE', 'Route_Clean'] if c in merged_df.columns), None)
-        if route_col_target:
-            merged_df['노선_clean'] = merged_df[route_col_target].astype(str).str.strip()
-        else:
-            merged_df['노선_clean'] = ""
+        # 🔥 [KeyError 완벽 방지 동적 컬럼 바인딩]
+        route_col_target = find_column_by_candidates(merged_df.columns, ['노선', 'route'])
+        merged_df['노선_clean'] = merged_df[route_col_target].astype(str).str.strip() if route_col_target else ""
 
         merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
-        al_col_target = next((c for c in ['Dominant Marketing Airline', 'AL', '항공사', 'Marketing Airline'] if c in merged_df.columns), None)
+        al_col_target = find_column_by_candidates(merged_df.columns, ['dominantmarketingairline', 'al', '항공사', 'marketingairline', 'carrier'])
         merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target else ''
 
-        region_col = next((c for c in merged_df.columns if str(c).replace(" ", "") in ['일본권역', '권역', 'JapanRegion', 'Region']), None)
-        bound_raw_col = next((c for c in merged_df.columns if str(c).replace(" ", "") in ['Bound', 'BOUND', '방향', '바운드']), None)
-        week_col = '발매주차_일자' if '발매주차_일자' in merged_df.columns else ('발매 주차' if '발매 주차' in merged_df.columns else '발매주차')
-        month_col = '출발월' if '출발월' in merged_df.columns else ('출발 월' if '출발 월' in merged_df.columns else None)
-        bound_col = '수송' if '수송' in merged_df.columns else ('Bound' if 'Bound' in merged_df.columns else None)
+        region_col = find_column_by_candidates(merged_df.columns, ['일본권역', '권역', 'japanregion', 'region'])
+        bound_raw_col = find_column_by_candidates(merged_df.columns, ['bound', '방향', '바운드'])
+        week_col = find_column_by_candidates(merged_df.columns, ['발매주차', 'issueweek', 'purchaseweek'])
+        month_col = find_column_by_candidates(merged_df.columns, ['출발월', 'tripmonth', 'travelmonth'])
+        bound_col = find_column_by_candidates(merged_df.columns, ['수송', 'bound'])
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
@@ -307,35 +312,36 @@ if "3/4수송" in selected_group:
             temp_df_34 = merged_df.copy()
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             
-            opts_rgn = sorted([str(x).strip() for x in temp_df_34[region_col].dropna().unique() if str(x).strip() != 'nan']) if region_col else []
+            opts_rgn = sorted([str(x).strip() for x in temp_df_34[region_col].dropna().unique() if str(x).strip() != 'nan']) if region_col and region_col in temp_df_34.columns else []
             sel_region_list = render_multiselect_box(f_col1, "1. 일본권역", opts_rgn, "slicer_region_multi")
-            if sel_region_list: temp_df_34 = temp_df_34[temp_df_34[region_col].astype(str).str.strip().isin(sel_region_list)]
+            if sel_region_list and region_col: temp_df_34 = temp_df_34[temp_df_34[region_col].astype(str).str.strip().isin(sel_region_list)]
 
             opts_route = sorted([str(x).strip() for x in temp_df_34['노선_clean'].dropna().unique() if str(x).strip() != 'nan'])
             sel_route_list = render_multiselect_box(f_col2, "2. KE취항노선", opts_route, "slicer_route_multi")
             if sel_route_list: temp_df_34 = temp_df_34[temp_df_34['노선_clean'].isin(sel_route_list)]
 
-            opts_week = sorted([str(x).strip() for x in temp_df_34[week_col].dropna().unique() if str(x).strip() != 'nan']) if week_col else []
+            opts_week = sorted([str(x).strip() for x in temp_df_34[week_col].dropna().unique() if str(x).strip() != 'nan']) if week_col and week_col in temp_df_34.columns else []
             sel_week_list = render_multiselect_box(f_col3, "3. 발매 주차", opts_week, "slicer_week_multi")
-            if sel_week_list: temp_df_34 = temp_df_34[temp_df_34[week_col].astype(str).str.strip().isin(sel_week_list)]
+            if sel_week_list and week_col: temp_df_34 = temp_df_34[temp_df_34[week_col].astype(str).str.strip().isin(sel_week_list)]
 
-            opts_month = sorted([str(x).strip() for x in temp_df_34[month_col].dropna().unique() if str(x).strip() != 'nan']) if month_col else []
+            opts_month = sorted([str(x).strip() for x in temp_df_34[month_col].dropna().unique() if str(x).strip() != 'nan']) if month_col and month_col in temp_df_34.columns else []
             sel_month_list = render_multiselect_box(f_col4, "4. 출발 월", opts_month, "slicer_month_multi")
-            if sel_month_list: temp_df_34 = temp_df_34[temp_df_34[month_col].astype(str).str.strip().isin(sel_month_list)]
+            if sel_month_list and month_col: temp_df_34 = temp_df_34[temp_df_34[month_col].astype(str).str.strip().isin(sel_month_list)]
 
             f_col5, f_col6, f_col7, f_col8 = st.columns(4)
             
-            opts_bound = sorted([str(x).strip() for x in temp_df_34[bound_col].dropna().unique() if str(x).strip() != 'nan']) if bound_col else []
+            opts_bound = sorted([str(x).strip() for x in temp_df_34[bound_col].dropna().unique() if str(x).strip() != 'nan']) if bound_col and bound_col in temp_df_34.columns else []
             sel_bound_list = render_multiselect_box(f_col5, "5. 수송 구분", opts_bound, "slicer_bound_multi")
-            if sel_bound_list: temp_df_34 = temp_df_34[temp_df_34[bound_col].astype(str).str.strip().isin(sel_bound_list)]
+            if sel_bound_list and bound_col: temp_df_34 = temp_df_34[temp_df_34[bound_col].astype(str).str.strip().isin(sel_bound_list)]
 
-            opts_bound_raw = sorted([str(x).strip() for x in temp_df_34[bound_raw_col].dropna().unique() if str(x).strip() != 'nan']) if bound_raw_col else []
+            opts_bound_raw = sorted([str(x).strip() for x in temp_df_34[bound_raw_col].dropna().unique() if str(x).strip() != 'nan']) if bound_raw_col and bound_raw_col in temp_df_34.columns else []
             sel_bound_raw_list = render_multiselect_box(f_col6, "6. Bound", opts_bound_raw, "slicer_bound_raw_multi")
-            if sel_bound_raw_list: temp_df_34 = temp_df_34[temp_df_34[bound_raw_col].astype(str).str.strip().isin(sel_bound_raw_list)]
+            if sel_bound_raw_list and bound_raw_col: temp_df_34 = temp_df_34[temp_df_34[bound_raw_col].astype(str).str.strip().isin(sel_bound_raw_list)]
 
-            opts_tt = sorted([str(x).strip() for x in temp_df_34['Ticket Type'].dropna().unique() if str(x).strip() != 'nan']) if 'Ticket Type' in temp_df_34.columns else []
+            tt_col = find_column_by_candidates(temp_df_34.columns, ['tickettype', 'triptype'])
+            opts_tt = sorted([str(x).strip() for x in temp_df_34[tt_col].dropna().unique() if str(x).strip() != 'nan']) if tt_col and tt_col in temp_df_34.columns else []
             sel_tt_list = render_multiselect_box(f_col7, "7. Trip Type", opts_tt, "slicer_tt_multi")
-            if sel_tt_list: temp_df_34 = temp_df_34[temp_df_34['Ticket Type'].astype(str).str.strip().isin(sel_tt_list)]
+            if sel_tt_list and tt_col: temp_df_34 = temp_df_34[temp_df_34[tt_col].astype(str).str.strip().isin(sel_tt_list)]
 
             opts_al = sorted([str(x).strip() for x in temp_df_34['AL_clean'].dropna().unique() if str(x).strip() != 'nan'])
             opts_al = ['KE'] + [x for x in opts_al if x != 'KE'] if 'KE' in opts_al else opts_al
@@ -343,6 +349,9 @@ if "3/4수송" in selected_group:
             if sel_al_list: temp_df_34 = temp_df_34[temp_df_34['AL_clean'].isin(sel_al_list)]
 
         filtered_df = temp_df_34.copy()
+
+        val_col_raw = find_column_by_candidates(filtered_df.columns, ['value', 'pax', '수송량', '발매량', '실적']) or 'Value'
+        filtered_df['Value'] = pd.to_numeric(filtered_df[val_col_raw].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if val_col_raw in filtered_df.columns else 0.0
 
         if apply_weight_toggle:
             filtered_df['Mult_map'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
@@ -490,7 +499,7 @@ if "3/4수송" in selected_group:
                 c3, c4 = st.columns(2)
                 ke_only_df = filtered_df[filtered_df['AL_clean'] == 'KE']
                 with c3:
-                    if bound_col:
+                    if bound_col and bound_col in ke_only_df.columns:
                         st.markdown('<div class="unified-sub-header">4. 수송 구분별 점유비 (KE 한정)</div>', unsafe_allow_html=True)
                         bound_pie_df = ke_only_df.groupby(bound_col, observed=False)[val_col].sum().reset_index()
                         fig3 = px.pie(bound_pie_df, values=val_col, names=bound_col, hole=0.4)
@@ -498,10 +507,11 @@ if "3/4수송" in selected_group:
                         apply_bottom_legend(fig3)
                         st.plotly_chart(fig3, width='stretch')
                 with c4:
-                    if 'Ticket Type' in merged_df.columns:
+                    tt_col = find_column_by_candidates(merged_df.columns, ['tickettype', 'triptype'])
+                    if tt_col and tt_col in ke_only_df.columns:
                         st.markdown('<div class="unified-sub-header">5. Trip Type별 점유비 (KE 한정)</div>', unsafe_allow_html=True)
-                        tt_pie_df = ke_only_df.groupby('Ticket Type', observed=False)[val_col].sum().reset_index()
-                        fig4 = px.pie(tt_pie_df, values=val_col, names='Ticket Type', hole=0.4)
+                        tt_pie_df = ke_only_df.groupby(tt_col, observed=False)[val_col].sum().reset_index()
+                        fig4 = px.pie(tt_pie_df, values=val_col, names=tt_col, hole=0.4)
                         fig4.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>Trip Type: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig4)
                         st.plotly_chart(fig4, width='stretch')
@@ -577,22 +587,18 @@ if "3/4수송" in selected_group:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
         if df_sup is not None:
             df_sup.columns = [str(c).strip() for c in df_sup.columns]
-            al_col = next((c for c in ['Op Airline Code', 'Mkt Al', 'Airline', 'Op Airline', 'CARRIER', '항공사'] if c in df_sup.columns), None)
+            al_col = find_column_by_candidates(df_sup.columns, ['opairline', 'mktal', 'airline', 'carrier', '항공사'])
             df_sup['Airline'] = df_sup[al_col] if al_col else 'Unknown'
             
-            # 공급 데이터 노선 처리
-            sup_route_col = next((c for c in ['노선', 'Route', 'ROUTE'] if c in df_sup.columns), None)
-            if sup_route_col: 
-                df_sup['노선_clean'] = df_sup[sup_route_col].astype(str).str.strip()
-            else:
-                df_sup['노선_clean'] = ""
+            sup_route_col = find_column_by_candidates(df_sup.columns, ['노선', 'route'])
+            df_sup['노선_clean'] = df_sup[sup_route_col].astype(str).str.strip() if sup_route_col else ""
 
             df_sup['KE_취항여부'] = np.where(df_sup['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER), '취항', '미취항')
             df_sup['출발공항'] = df_sup['노선_clean'].apply(lambda x: KOREA_APO_MAP.get(str(x).split('/')[0].strip().upper(), '기타') if '/' in str(x) else '기타')
             df_sup['도착공항'] = df_sup['노선_clean'].apply(lambda x: str(x).split('/')[1].strip().upper() if '/' in str(x) else str(x).strip().upper())
             df_sup['Seats_num'] = pd.to_numeric(df_sup['Seats'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if 'Seats' in df_sup.columns else 0
             df_sup['Flights_num'] = pd.to_numeric(df_sup['Flights'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if 'Flights' in df_sup.columns else 1
-            sup_month_col = next((c for c in ['출발월', '출발 월', 'Travel Month'] if c in df_sup.columns), None)
+            sup_month_col = find_column_by_candidates(df_sup.columns, ['출발월', 'travelmonth', 'depmonth'])
 
             temp_sup = df_sup.copy()
             st.markdown('<div class="unified-sub-header">🔍 공급 대시보드 필터 설정</div>', unsafe_allow_html=True)
@@ -611,9 +617,9 @@ if "3/4수송" in selected_group:
             sel_sup_dest_list = render_multiselect_box(sf_col3, "3. 도착 공항", opts_dest, "slicer_sup_dest_multi")
             if sel_sup_dest_list: temp_sup = temp_sup[temp_sup['도착공항'].isin(sel_sup_dest_list)]
 
-            opts_sup_m = sorted([str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan']) if sup_month_col else []
+            opts_sup_m = sorted([str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan']) if sup_month_col and sup_month_col in temp_sup.columns else []
             sel_sup_month_list = render_multiselect_box(sf_col4, "4. 출발 월", opts_sup_m, "slicer_month_sup_multi")
-            if sel_sup_month_list: temp_sup = temp_sup[temp_sup[sup_month_col].isin(sel_sup_month_list)]
+            if sel_sup_month_list and sup_month_col: temp_sup = temp_sup[temp_sup[sup_month_col].isin(sel_sup_month_list)]
 
             opts_sup_al = sorted([str(x) for x in temp_sup['Airline'].dropna().unique()])
             opts_sup_al = ['KE'] + [x for x in opts_sup_al if x != 'KE'] if 'KE' in opts_sup_al else opts_sup_al
@@ -625,7 +631,7 @@ if "3/4수송" in selected_group:
             st.markdown("---")
             val_col_sup = 'Seats_num' if 'Seats' in metric_mode else 'Flights_num'
             
-            if not filtered_sup.empty and sup_month_col in filtered_sup.columns:
+            if not filtered_sup.empty and sup_month_col and sup_month_col in filtered_sup.columns:
                 st.markdown('<div class="unified-sub-header">1. 출발기간별 주요 항공사 공급 M/S 점유비 추이</div>', unsafe_allow_html=True)
                 sup_al_grp = filtered_sup.groupby([sup_month_col, 'Airline'], observed=False)[val_col_sup].sum().reset_index()
                 sup_mkt_tot = filtered_sup.groupby(sup_month_col, observed=False)[val_col_sup].sum().reset_index()
@@ -703,7 +709,7 @@ if "3/4수송" in selected_group:
                 df_schedule_route = filtered_sup[filtered_sup['노선_clean'] == selected_single_route].copy() if '노선_clean' in filtered_sup.columns else filtered_sup[filtered_sup['노선'] == selected_single_route].copy()
                 
                 with tl_col2:
-                    if sup_month_col and not df_schedule_route.empty:
+                    if sup_month_col and sup_month_col in df_schedule_route.columns and not df_schedule_route.empty:
                         avail_tl_months = sorted([str(x) for x in df_schedule_route[sup_month_col].dropna().unique() if '1900' not in str(x)])
                         sel_tl_months = st.multiselect("🗓️ 출발 월 필터 (미선택 시 전체):", options=avail_tl_months, default=[])
                         if sel_tl_months:
@@ -780,17 +786,14 @@ if "3/4수송" in selected_group:
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
             
-            agency_route_col = next((c for c in ['노선', '노선_clean', 'Route', 'ROUTE'] if c in df_agency.columns), None)
-            if agency_route_col:
-                df_agency['노선_clean'] = df_agency[agency_route_col].astype(str).str.strip()
-            else:
-                df_agency['노선_clean'] = ""
+            agency_route_col = find_column_by_candidates(df_agency.columns, ['노선', 'route'])
+            df_agency['노선_clean'] = df_agency[agency_route_col].astype(str).str.strip() if agency_route_col else ""
 
             df_agency = df_agency[df_agency['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
-            week_col_a = '발매주차_일자' if '발매주차_일자' in df_agency.columns else ('발매 주차' if '발매 주차' in df_agency.columns else '발매주차')
-            month_col_a = '출발월' if '출발월' in df_agency.columns else ('출발 월' if '출발 월' in df_agency.columns else None)
-            bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
+            week_col_a = find_column_by_candidates(df_agency.columns, ['발매주차', 'issueweek', 'purchaseweek'])
+            month_col_a = find_column_by_candidates(df_agency.columns, ['출발월', 'tripmonth', 'travelmonth'])
+            bound_col_a = find_column_by_candidates(df_agency.columns, ['수송', 'bound'])
 
             temp_ag = df_agency.copy()
             with st.expander("🔍 **대리점 & RBD 분석 피벗 슬라이서 필터 설정**", expanded=True):
@@ -799,23 +802,25 @@ if "3/4수송" in selected_group:
                 sel_route_ag_list = render_multiselect_box(ac1, "1. 노선", opts_r_ag, "slicer_route_ag_multi")
                 if sel_route_ag_list: temp_ag = temp_ag[temp_ag['노선_clean'].isin(sel_route_ag_list)]
 
-                opts_m_ag = sorted([str(x) for x in temp_ag[month_col_a].dropna().unique()]) if month_col_a else []
+                opts_m_ag = sorted([str(x) for x in temp_ag[month_col_a].dropna().unique()]) if month_col_a and month_col_a in temp_ag.columns else []
                 sel_month_ag_list = render_multiselect_box(ac2, "2. 출발 월", opts_m_ag, "slicer_month_ag_multi")
-                if sel_month_ag_list: temp_ag = temp_ag[temp_ag[month_col_a].astype(str).isin(sel_month_ag_list)]
+                if sel_month_ag_list and month_col_a: temp_ag = temp_ag[temp_ag[month_col_a].astype(str).isin(sel_month_ag_list)]
 
-                opts_b_ag = sorted([str(x) for x in temp_ag[bound_col_a].dropna().unique()]) if bound_col_a else []
+                opts_b_ag = sorted([str(x) for x in temp_ag[bound_col_a].dropna().unique()]) if bound_col_a and bound_col_a in temp_ag.columns else []
                 sel_bound_ag_list = render_multiselect_box(ac3, "3. 수송 구분", opts_b_ag, "slicer_bound_ag_multi")
-                if sel_bound_ag_list: temp_ag = temp_ag[temp_ag[bound_col_a].astype(str).isin(sel_bound_ag_list)]
+                if sel_bound_ag_list and bound_col_a: temp_ag = temp_ag[temp_ag[bound_col_a].astype(str).isin(sel_bound_ag_list)]
 
                 ac4, ac5 = st.columns(2)
-                opts_tt_ag = sorted([str(x) for x in temp_ag['Ticket Type'].dropna().unique()]) if 'Ticket Type' in temp_ag.columns else []
+                tt_col_ag = find_column_by_candidates(temp_ag.columns, ['tickettype', 'triptype'])
+                opts_tt_ag = sorted([str(x) for x in temp_ag[tt_col_ag].dropna().unique()]) if tt_col_ag and tt_col_ag in temp_ag.columns else []
                 sel_tt_ag_list = render_multiselect_box(ac4, "4. TRIP TYPE", opts_tt_ag, "slicer_tt_ag_multi")
-                if sel_tt_ag_list: temp_ag = temp_ag[temp_ag['Ticket Type'].astype(str).isin(sel_tt_ag_list)]
+                if sel_tt_ag_list and tt_col_ag: temp_ag = temp_ag[temp_ag[tt_col_ag].astype(str).isin(sel_tt_ag_list)]
 
-                opts_al_ag = sorted([str(x) for x in temp_ag['Dominant Marketing Airline'].dropna().unique()])
+                al_col_ag = find_column_by_candidates(temp_ag.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
+                opts_al_ag = sorted([str(x) for x in temp_ag[al_col_ag].dropna().unique()]) if al_col_ag and al_col_ag in temp_ag.columns else []
                 opts_al_ag = ['KE'] + [x for x in opts_al_ag if x != 'KE'] if 'KE' in opts_al_ag else opts_al_ag
                 sel_al_ag_list = render_multiselect_box(ac5, "5. 항공사", opts_al_ag, "slicer_al_ag_multi")
-                if sel_al_ag_list: temp_ag = temp_ag[temp_ag['Dominant Marketing Airline'].astype(str).isin(sel_al_ag_list)]
+                if sel_al_ag_list and al_col_ag: temp_ag = temp_ag[temp_ag[al_col_ag].astype(str).isin(sel_al_ag_list)]
 
             df_ag_filtered = temp_ag
             open_attr = "open" if st.toggle("📂 전체 항목 펼쳐보기", value=True, key="expand_toggle_all_key_fixed") else ""
@@ -823,9 +828,14 @@ if "3/4수송" in selected_group:
             sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매현황", "🏢 대리점별 판매현황 (상위 20개 대리점)"])
 
             with sub_tab_rbd:
-                if not df_ag_filtered.empty and 'O&D RBKD' in df_ag_filtered.columns and week_col_a:
+                al_col_ag = find_column_by_candidates(df_ag_filtered.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
+                rbd_col_ag = find_column_by_candidates(df_ag_filtered.columns, ['rbkd', 'rbd', 'bookingclass'])
+                val_col_ag = find_column_by_candidates(df_ag_filtered.columns, ['value', 'pax', '수송량', '발매량', '실적']) or 'Value'
+                df_ag_filtered['Value'] = pd.to_numeric(df_ag_filtered[val_col_ag].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if val_col_ag in df_ag_filtered.columns else 0.0
+
+                if not df_ag_filtered.empty and rbd_col_ag and week_col_a and al_col_ag:
                     week_list = sorted([str(x) for x in df_ag_filtered[week_col_a].dropna().unique()], reverse=True)
-                    ag_al_sum = df_ag_filtered.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
+                    ag_al_sum = df_ag_filtered.groupby(al_col_ag, observed=False)['Value'].sum().sort_values(ascending=False)
                     ag_al_list = ['KE'] + [str(x) for x in ag_al_sum.index if x != 'KE' and ag_al_sum[x] > 0]
                     sub_col_w = 80.0 / (len(week_list) + 1)
 
@@ -834,10 +844,10 @@ if "3/4수송" in selected_group:
                     rbd_html += f'<th class="header-main" style="width:{sub_col_w:.2f}%;">총합계</th></tr></thead><tbody>'
 
                     for al_code in ag_al_list:
-                        al_sub = df_ag_filtered[df_ag_filtered['Dominant Marketing Airline'] == al_code]
+                        al_sub = df_ag_filtered[df_ag_filtered[al_col_ag] == al_code]
                         al_tot_pax = al_sub['Value'].sum()
                         if al_tot_pax > 0:
-                            piv_rbd = al_sub.pivot_table(index='O&D RBKD', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
+                            piv_rbd = al_sub.pivot_table(index=rbd_col_ag, columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
                             piv_rbd['총합계'] = piv_rbd.sum(axis=1)
                             piv_rbd = piv_rbd[piv_rbd['총합계'] > 0]
 
@@ -860,9 +870,11 @@ if "3/4수송" in selected_group:
                     st.markdown(rbd_html, unsafe_allow_html=True)
 
             with sub_tab_agency:
-                if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
+                agency_col_target = find_column_by_candidates(df_ag_filtered.columns, ['agency', '대리점', '여행사'])
+                al_col_ag = find_column_by_candidates(df_ag_filtered.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
+                if not df_ag_filtered.empty and agency_col_target and week_col_a and al_col_ag:
                     week_list_ag = sorted([str(x) for x in df_ag_filtered[week_col_a].dropna().unique()], reverse=True)
-                    agency_totals = df_ag_filtered.groupby('Travel Agency Name', observed=False)['Value'].sum().sort_values(ascending=False)
+                    agency_totals = df_ag_filtered.groupby(agency_col_target, observed=False)['Value'].sum().sort_values(ascending=False)
                     top_20_agencies = [ag for ag in agency_totals.index if agency_totals[ag] > 0][:20]
                     sub_col_w_ag = 80.0 / (len(week_list_ag) + 1)
 
@@ -871,11 +883,11 @@ if "3/4수송" in selected_group:
                     ag_html += f'<th class="header-main" style="width:{sub_col_w_ag:.2f}%;">총 판매량</th></tr></thead><tbody>'
 
                     for ag_name in top_20_agencies:
-                        ag_sub = df_ag_filtered[df_ag_filtered['Travel Agency Name'] == ag_name]
+                        ag_sub = df_ag_filtered[df_ag_filtered[agency_col_target] == ag_name]
                         ag_tot_val = ag_sub['Value'].sum()
                         if ag_tot_val > 0:
-                            ag_al_totals = ag_sub.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
-                            piv_ag_sub = ag_sub.pivot_table(index='Dominant Marketing Airline', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
+                            ag_al_totals = ag_sub.groupby(al_col_ag, observed=False)['Value'].sum().sort_values(ascending=False)
+                            piv_ag_sub = ag_sub.pivot_table(index=al_col_ag, columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
                             piv_ag_sub['총합계'] = piv_ag_sub.sum(axis=1)
                             piv_ag_sub = piv_ag_sub.reindex([al for al in ag_al_totals.index if ag_al_totals[al] > 0]).dropna(how='all')
 
@@ -900,16 +912,13 @@ if "3/4수송" in selected_group:
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
             
-            grp_route_col = next((c for c in ['노선', '노선_clean', 'Route', 'ROUTE'] if c in df_grp_raw.columns), None)
-            if grp_route_col:
-                df_grp_raw['노선_clean'] = df_grp_raw[grp_route_col].astype(str).str.strip()
-            else:
-                df_grp_raw['노선_clean'] = ""
+            grp_route_col = find_column_by_candidates(df_grp_raw.columns, ['노선', 'route'])
+            df_grp_raw['노선_clean'] = df_grp_raw[grp_route_col].astype(str).str.strip() if grp_route_col else ""
 
             df_grp_raw = df_grp_raw[df_grp_raw['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
-            g_m_col = next((c for c in ['출발월', '출발 월'] if c in df_grp_raw.columns), None)
-            g_b_col = next((c for c in ['수송', 'Bound'] if c in df_grp_raw.columns), None)
+            g_m_col = find_column_by_candidates(df_grp_raw.columns, ['출발월', 'tripmonth', 'travelmonth'])
+            g_b_col = find_column_by_candidates(df_grp_raw.columns, ['수송', 'bound'])
 
             temp_grp = df_grp_raw.copy()
             with st.expander("🔍 **단체 실적 분석 피벗 슬라이서 필터 설정**", expanded=True):
@@ -918,46 +927,56 @@ if "3/4수송" in selected_group:
                 sel_g_route_list = render_multiselect_box(gc1, "1. 노선", opts_g_route, "slicer_g_route_multi")
                 if sel_g_route_list: temp_grp = temp_grp[temp_grp['노선_clean'].isin(sel_g_route_list)]
 
-                opts_g_m = sorted([str(x) for x in temp_grp[g_m_col].dropna().unique()]) if g_m_col else []
+                opts_g_m = sorted([str(x) for x in temp_grp[g_m_col].dropna().unique()]) if g_m_col and g_m_col in temp_grp.columns else []
                 sel_g_month_list = render_multiselect_box(gc2, "2. 출발 월", opts_g_m, "slicer_g_month_multi")
-                if sel_g_month_list: temp_grp = temp_grp[temp_grp[g_m_col].astype(str).isin(sel_g_month_list)]
+                if sel_g_month_list and g_m_col: temp_grp = temp_grp[temp_grp[g_m_col].astype(str).isin(sel_g_month_list)]
 
-                opts_g_b = sorted([str(x) for x in temp_grp[g_b_col].dropna().unique()]) if g_b_col else []
+                opts_g_b = sorted([str(x) for x in temp_grp[g_b_col].dropna().unique()]) if g_b_col and g_b_col in temp_grp.columns else []
                 sel_g_bound_list = render_multiselect_box(gc3, "3. 수송 구분", opts_g_b, "slicer_g_bound_multi")
-                if sel_g_bound_list: temp_grp = temp_grp[temp_grp[g_b_col].astype(str).isin(sel_g_bound_list)]
+                if sel_g_bound_list and g_b_col: temp_grp = temp_grp[temp_grp[g_b_col].astype(str).isin(sel_g_bound_list)]
 
                 gc4, gc5 = st.columns(2)
-                opts_g_tt = sorted([str(x) for x in temp_grp['Ticket Type'].dropna().unique()]) if 'Ticket Type' in temp_grp.columns else []
+                tt_g_col = find_column_by_candidates(temp_grp.columns, ['tickettype', 'triptype'])
+                opts_g_tt = sorted([str(x) for x in temp_grp[tt_g_col].dropna().unique()]) if tt_g_col and tt_g_col in temp_grp.columns else []
                 sel_g_tt_list = render_multiselect_box(gc4, "4. TRIP TYPE", opts_g_tt, "slicer_g_tt_multi")
-                if sel_g_tt_list: temp_grp = temp_grp[temp_grp['Ticket Type'].astype(str).isin(sel_g_tt_list)]
+                if sel_g_tt_list and tt_g_col: temp_grp = temp_grp[temp_grp[tt_g_col].astype(str).isin(sel_g_tt_list)]
 
-                opts_g_al = sorted([str(x) for x in temp_grp['Dominant Marketing Airline'].dropna().unique()]) if 'Dominant Marketing Airline' in temp_grp.columns else []
-                opts_g_al = ['KE'] + [x for x in opts_g_al if x != 'KE'] if 'KE' in opts_g_al else opts_al
+                al_g_col = find_column_by_candidates(temp_grp.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
+                opts_g_al = sorted([str(x) for x in temp_grp[al_g_col].dropna().unique()]) if al_g_col and al_g_col in temp_grp.columns else []
+                opts_g_al = ['KE'] + [x for x in opts_g_al if x != 'KE'] if 'KE' in opts_g_al else opts_g_al
                 sel_g_al_list = render_multiselect_box(gc5, "5. 항공사", opts_g_al, "slicer_g_al_multi")
-                if sel_g_al_list: temp_grp = temp_grp[temp_grp['Dominant Marketing Airline'].astype(str).isin(sel_g_al_list)]
+                if sel_g_al_list and al_g_col: temp_grp = temp_grp[temp_grp[al_g_col].astype(str).isin(sel_g_al_list)]
 
-            is_grp_cond = (((temp_grp['Dominant Marketing Airline'] == '7C') & (temp_grp['O&D RBKD'] == 'V')) | ((temp_grp['Dominant Marketing Airline'] != '7C') & (temp_grp['O&D RBKD'] == 'G')))
-            df_grp_filtered = temp_grp[is_grp_cond].copy()
+            rbd_g_col = find_column_by_candidates(temp_grp.columns, ['rbkd', 'rbd', 'bookingclass'])
+            al_g_col = find_column_by_candidates(temp_grp.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
+            ag_g_col = find_column_by_candidates(temp_grp.columns, ['agency', '대리점', '여행사'])
 
-            if not df_grp_filtered.empty and 'Travel Agency Name' in df_grp_filtered.columns:
-                ag_sum_df = df_grp_filtered.groupby(['Dominant Marketing Airline', 'Travel Agency Name'], observed=False)['Value'].sum().reset_index()
-                al_totals = ag_sum_df.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
-                al_sorted_list = ['KE'] + [str(x) for x in al_totals.index if x != 'KE' and al_totals[x] > 0]
+            if rbd_g_col and al_g_col and ag_g_col:
+                is_grp_cond = (((temp_grp[al_g_col] == '7C') & (temp_grp[rbd_g_col] == 'V')) | ((temp_grp[al_g_col] != '7C') & (temp_grp[rbd_g_col] == 'G')))
+                df_grp_filtered = temp_grp[is_grp_cond].copy()
 
-                for al_code in al_sorted_list:
-                    al_sub = ag_sum_df[ag_sum_df['Dominant Marketing Airline'] == al_code]
-                    al_tot_val = al_sub['Value'].sum()
-                    if al_tot_val > 0:
-                        top_ag_sub = al_sub[al_sub['Value'] > 0].sort_values(by='Value', ascending=False).head(100).reset_index(drop=True)
-                        if not top_ag_sub.empty:
-                            top_ag_sub.index = range(1, len(top_ag_sub) + 1)
-                            with st.expander(f"✈ 항공사: **{al_code}**  |  총 단체 실적: **{al_tot_val:,.0f}**건", expanded=(al_code == 'KE')):
-                                g_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:80px;">순위</th><th class="header-main">여행사(대리점)명</th><th class="header-main" style="width:200px;">단체 예약 실적 (석)</th></tr></thead><tbody>'
-                                g_html += f'<tr class="row-group-header-custom"><td style="text-align:center;">-</td><td style="text-align:center; font-weight:800;">★ {al_code} 전체 총합계</td><td style="text-align:center;"><b>{al_tot_val:,.0f}</b></td></tr>'
-                                for r_idx, ag_row in top_ag_sub.iterrows():
-                                    g_html += f'<tr><td style="text-align:center;">{r_idx}위</td><td style="text-align:center; font-weight:600;">{ag_row["Travel Agency Name"]}</td><td style="text-align:center; font-weight:700;">{ag_row["Value"]:,.0f}</td></tr>'
-                                g_html += '</tbody></table></div>'
-                                st.markdown(g_html, unsafe_allow_html=True)
+                if not df_grp_filtered.empty:
+                    val_g_col = find_column_by_candidates(df_grp_filtered.columns, ['value', 'pax', '수송량', '발매량', '실적']) or 'Value'
+                    df_grp_filtered['Value'] = pd.to_numeric(df_grp_filtered[val_g_col].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if val_g_col in df_grp_filtered.columns else 0.0
+
+                    ag_sum_df = df_grp_filtered.groupby([al_g_col, ag_g_col], observed=False)['Value'].sum().reset_index()
+                    al_totals = ag_sum_df.groupby(al_g_col, observed=False)['Value'].sum().sort_values(ascending=False)
+                    al_sorted_list = ['KE'] + [str(x) for x in al_totals.index if x != 'KE' and al_totals[x] > 0]
+
+                    for al_code in al_sorted_list:
+                        al_sub = ag_sum_df[ag_sum_df[al_g_col] == al_code]
+                        al_tot_val = al_sub['Value'].sum()
+                        if al_tot_val > 0:
+                            top_ag_sub = al_sub[al_sub['Value'] > 0].sort_values(by='Value', ascending=False).head(100).reset_index(drop=True)
+                            if not top_ag_sub.empty:
+                                top_ag_sub.index = range(1, len(top_ag_sub) + 1)
+                                with st.expander(f"✈ 항공사: **{al_code}**  |  총 단체 실적: **{al_tot_val:,.0f}**건", expanded=(al_code == 'KE')):
+                                    g_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:80px;">순위</th><th class="header-main">여행사(대리점)명</th><th class="header-main" style="width:200px;">단체 예약 실적 (석)</th></tr></thead><tbody>'
+                                    g_html += f'<tr class="row-group-header-custom"><td style="text-align:center;">-</td><td style="text-align:center; font-weight:800;">★ {al_code} 전체 총합계</td><td style="text-align:center;"><b>{al_tot_val:,.0f}</b></td></tr>'
+                                    for r_idx, ag_row in top_ag_sub.iterrows():
+                                        g_html += f'<tr><td style="text-align:center;">{r_idx}위</td><td style="text-align:center; font-weight:600;">{ag_row[ag_g_col]}</td><td style="text-align:center; font-weight:700;">{ag_row["Value"]:,.0f}</td></tr>'
+                                    g_html += '</tbody></table></div>'
+                                    st.markdown(g_html, unsafe_allow_html=True)
 
 
 # ==========================================
@@ -1356,7 +1375,7 @@ elif "6수송" in selected_group:
                     tot_ke_py = df_top20_all[df_top20_all[col_al_6] == 'KE']['Val_PY_num'].sum()
                     tot_ke_yoy = ((tot_ke_cy - tot_ke_py) / tot_ke_py * 100) if tot_ke_py > 0 else 0
                     tot_ke_ms_cy = (tot_ke_cy / tot_mkt_cy * 100) if tot_mkt_cy > 0 else 0
-                    tot_ke_ms_py = (tot_ke_py / tot_mkt_py * 100) if tot_ke_py > 0 else 0
+                    tot_ke_ms_py = (tot_ke_py / tot_mkt_py * 100) if tot_mkt_py > 0 else 0
                     tot_ke_ms_yoy = tot_ke_ms_cy - tot_ke_ms_py
 
                     od_matrix_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead>'
