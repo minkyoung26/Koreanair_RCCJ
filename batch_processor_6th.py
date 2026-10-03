@@ -6,11 +6,19 @@ import glob
 import sys
 import time
 
-def normalize_ym_key(val_str):
-    if pd.isna(val_str):
-        return ""
+def extract_month_key(val_str):
+    """
+    '2025-03', '25.03월', '202603' 등 다양한 날짜에서 순수 '월 번호(01~12)'만 추출
+    """
+    if pd.isna(val_str): return ""
     s = str(val_str).replace('-', '').replace('.', '').replace('/', '').replace('월', '').strip()
-    return s[:6] if len(s) >= 6 and s[:6].isdigit() else str(val_str).strip()
+    if len(s) >= 6 and s.isdigit():
+        return s[4:6]  # YYYYMM -> MM
+    elif len(s) == 4 and s.isdigit():
+        return s[2:4]  # YYMM -> MM
+    elif len(s) <= 2 and s.isdigit():
+        return s.zfill(2)
+    return ""
 
 def find_column_by_candidates(columns, candidates):
     for c in columns:
@@ -25,7 +33,7 @@ def process_and_create_6th_parquet():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
     print("=" * 70)
-    print("🚀 [6수송 파케 생성기] 금년/전년 출처 기반 태깅 및 매칭 키 완전 보정")
+    print("🚀 [6수송 파케 생성기] 금년/전년 엄격 분리 및 전년비(YOY) 매칭 키 가공")
     print("=" * 70)
 
     all_files = glob.glob(os.path.join(base_dir, "*.csv")) + glob.glob(os.path.join(base_dir, "*.xlsx"))
@@ -43,45 +51,43 @@ def process_and_create_6th_parquet():
 
     df_cy_list, df_py_list = [], []
 
-    # 1. 6수송_금년.csv 로드
-    print(f"\n📂 [1/3] 금년(CY) 원천 로드... ({len(cy_files)}개 파일)")
+    # 1. 금년 파일 (CY) -> '금년' 전용 태깅
+    print(f"\n📂 [1/3] 금년(CY) 데이터 읽는 중... ({len(cy_files)}개 파일)")
     for f_path in cy_files:
         fname = os.path.basename(f_path)
         try:
             df = pd.read_excel(f_path) if f_path.endswith(('.xlsx', '.xls')) else pd.read_csv(f_path, low_memory=False)
             df.columns = [str(c).strip() for c in df.columns]
-            
             df['금년/전년'] = '금년'
             df['발매_연도구분'] = '금년 발매'
             df['출발_연도구분'] = '금년 출발'
             df['source_file'] = fname
             df_cy_list.append(df)
-            print(f"  ├─ 🟢 성공 (금년 지정): {fname} ({len(df):,}행)")
+            print(f"  ├─ 🟢 금년 태깅 성공: {fname} ({len(df):,}행)")
         except Exception as e:
-            print(f"  ├─ ❌ 실패: {fname} | {e}")
+            print(f"  ├─ ❌ 금년 로드 실패: {fname} | {e}")
 
-    # 2. 6수송_전년.csv 로드
-    print(f"\n📂 [2/3] 전년(PY) 원천 로드... ({len(py_files)}개 파일)")
+    # 2. 전년 파일 (PY) -> '전년' 전용 태깅
+    print(f"\n📂 [2/3] 전년(PY) 데이터 읽는 중... ({len(py_files)}개 파일)")
     for f_path in py_files:
         fname = os.path.basename(f_path)
         try:
             df = pd.read_excel(f_path) if f_path.endswith(('.xlsx', '.xls')) else pd.read_csv(f_path, low_memory=False)
             df.columns = [str(c).strip() for c in df.columns]
-            
             df['금년/전년'] = '전년'
             df['발매_연도구분'] = '전년 발매'
             df['출발_연도구분'] = '전년 출발'
             df['source_file'] = fname
             df_py_list.append(df)
-            print(f"  ├─ 🟢 성공 (전년 지정): {fname} ({len(df):,}행)")
+            print(f"  ├─ 🟢 전년 태깅 성공: {fname} ({len(df):,}행)")
         except Exception as e:
-            print(f"  ├─ ❌ 실패: {fname} | {e}")
+            print(f"  ├─ ❌ 전년 로드 실패: {fname} | {e}")
 
     if not df_cy_list and not df_py_list:
-        print("\n❌ 원천 CSV/XLSX 파일을 찾지 못했습니다.")
+        print("\n❌ 원천 파일을 찾지 못했습니다.")
         sys.exit(1)
 
-    print("\n⚙️ [3/3] 데이터 통합 및 YM 매칭 키 정제 중...")
+    print("\n⚙️ [3/3] 데이터 통합 및 전년비 매칭용 월 키 추출 중...")
     df_merged = pd.concat(df_cy_list + df_py_list, ignore_index=True)
 
     col_pur_m = find_column_by_candidates(df_merged.columns, ["ticketpurchasemonth", "purchasemonth", "발매월", "발매일자", "issuemonth"])
@@ -93,8 +99,9 @@ def process_and_create_6th_parquet():
     if col_trip_m and col_trip_m != 'Trip Month':
         df_merged['Trip Month'] = df_merged[col_trip_m]
 
-    df_merged['Pur_YM_Key'] = df_merged['Ticket Purchase month'].apply(normalize_ym_key) if 'Ticket Purchase month' in df_merged.columns else ""
-    df_merged['Trip_YM_Key'] = df_merged['Trip Month'].apply(normalize_ym_key) if 'Trip Month' in df_merged.columns else ""
+    # 전년비 매칭용 pure month 키 (01~12)
+    df_merged['Pur_M_Num'] = df_merged['Ticket Purchase month'].apply(extract_month_key) if 'Ticket Purchase month' in df_merged.columns else ""
+    df_merged['Trip_M_Num'] = df_merged['Trip Month'].apply(extract_month_key) if 'Trip Month' in df_merged.columns else ""
 
     if col_val:
         df_merged['Value'] = pd.to_numeric(
@@ -115,7 +122,7 @@ def process_and_create_6th_parquet():
         '직항/경유', 'Trip Origin Country Code', 'Trip Destination Country Code', 
         '일본 APO', '해외 APO', 'Trip O&D', 'Trip O&D Market', 
         'Dominant Marketing Airline', '금년/전년', '발매_연도구분', '출발_연도구분',
-        'Pur_YM_Key', 'Trip_YM_Key'
+        'Pur_M_Num', 'Trip_M_Num'
     ]
     existing_cols = [c for c in group_cols if c in df_merged.columns]
     
@@ -135,9 +142,11 @@ def process_and_create_6th_parquet():
     os.rename(temp_path, output_path)
 
     print("\n" + "=" * 70)
-    print(f"🎉 성공적으로 보정된 파케 파일이 저장되었습니다!")
-    print(f"📊 총 저장 행 수: {len(df_final):,} 행")
-    print(f"⏱️ 소요시간: {time.time() - start_time:.2f}초")
+    print(f"🎉 성공적으로 금년/전년이 명확히 구분된 파케 파일이 저장되었습니다!")
+    print(f"📊 총 레코드 수: {len(df_final):,} 행")
+    print(f"  ├─ 금년(CY) 레코드: {len(df_final[df_final['금년/전년']=='금년']):,} 행")
+    print(f"  └─ 전년(PY) 레코드: {len(df_final[df_final['금년/전년']=='전년']):,} 행")
+    print(f"⏱️️ 소요시간: {time.time() - start_time:.2f}초")
     print("=" * 70)
 
 if __name__ == "__main__":
