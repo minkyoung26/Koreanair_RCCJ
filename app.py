@@ -149,7 +149,15 @@ def load_6th_data_aggregated():
             except: pass
     return None
 
-# 🌟 6수송 캐시 파일의 최신 업데이트 시간 자동 추출 함수
+# 🌟 3/4수송 및 6수송 캐시 파일의 최신 업데이트 시간 자동 추출 함수
+def get_34_last_updated_date():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    target_path = os.path.join(base_dir, 'cache_34_data.parquet')
+    if os.path.exists(target_path):
+        mtime = os.path.getmtime(target_path)
+        return datetime.datetime.fromtimestamp(mtime).strftime('%Y.%m.%d %H:%M')
+    return "날짜 정보 없음"
+
 def get_6th_last_updated_date():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_6th_data.parquet')
@@ -158,14 +166,27 @@ def get_6th_last_updated_date():
         return datetime.datetime.fromtimestamp(mtime).strftime('%Y.%m.%d %H:%M')
     return "날짜 정보 없음"
 
-# 🌟 3/4수송 캐시 파일의 최신 업데이트 시간 자동 추출 함수
-def get_34_last_updated_date():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    target_path = os.path.join(base_dir, 'cache_34_data.parquet')
-    if os.path.exists(target_path):
-        mtime = os.path.getmtime(target_path)
-        return datetime.datetime.fromtimestamp(mtime).strftime('%Y.%m.%d %H:%M')
-    return "날짜 정보 없음"
+# 🌟 6수송 금년(CY) 파일 기준 동적 월 범위 라벨 생성 함수
+def get_dynamic_range_label_6th(opts):
+    if not opts: return ""
+    clean_yms = []
+    for x in opts:
+        st_x = str(x).replace("월", "").strip()
+        if "-" in st_x and len(st_x) >= 7:
+            parts = st_x.split("-")
+            if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                clean_yms.append((int(parts[0]), int(parts[1])))
+    if not clean_yms: return ""
+    
+    min_y, min_m = min(clean_yms)
+    max_y, max_m = max(clean_yms)
+    min_yy = str(min_y)[-2:]
+    max_yy = str(max_y)[-2:]
+    
+    if min_y == max_y and min_m == max_m:
+        return f" ({min_yy}년 {min_m}월)"
+    else:
+        return f" ({min_yy}년 {min_m}월~{max_yy}년 {max_m}월)"
 
 disk_sup = load_aux_files()
 df_iss_merged = process_any_uploaded_file(uploaded_iss) if uploaded_iss else load_fast_parquet_data_file()
@@ -206,19 +227,6 @@ def render_panel_multiselect(container, label, full_list, key_name, default_vals
     default_vals = [] if default_vals is None else [x for x in default_vals if x in opts]
     return container.multiselect(label, options=opts, default=default_vals, key=key_name, label_visibility="collapsed")
 
-def get_dynamic_range_label(opts):
-    if not opts: return ""
-    valid_opts = [x for x in opts if '-' in x and len(x) == 7]
-    if not valid_opts: return ""
-    min_opt = min(valid_opts)
-    max_opt = max(valid_opts)
-    y1, m1 = min_opt[2:4], int(min_opt[5:7])
-    y2, m2 = max_opt[2:4], int(max_opt[5:7])
-    if y1 == y2:
-        return f" ({y1}년 {m1}월~{m2}월)"
-    else:
-        return f" ({y1}년 {m1}월~{y2}년 {m2}월)"
-
 def get_yoy_td_html(val, is_percentage_point=False, bg_color="", bg_class=""):
     unit = "%p" if is_percentage_point else "%"
     class_str = f' class="{bg_class}"' if bg_class else ''
@@ -247,8 +255,6 @@ def get_dynamic_date_ranges_34(df_iss):
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
-    
-    # 🌟 3/4수송 파켓 파일 최신 업데이트 날짜 추출
     last_updated_str_34 = get_34_last_updated_date()
     
     st.markdown(
@@ -508,11 +514,10 @@ if "3/4수송" in selected_group:
                     piv_w_html += '</tbody></table></div>'
                     st.markdown(piv_w_html, unsafe_allow_html=True)
             
-            # 🌟 [가독성 개선] 실적 0인 항공사 컬럼 자동 제거 및 줄바꿈 방지 스타일 적용
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선_clean', columns='AL_clean', values=val_col, aggfunc='sum', fill_value=0, observed=False)
                 piv_r = piv_r[piv_r.sum(axis=1) > 0] 
-                piv_r = piv_r.loc[:, piv_r.sum(axis=0) > 0] # 실적 > 0 인 항공사만 표출
+                piv_r = piv_r.loc[:, piv_r.sum(axis=0) > 0] 
                 
                 if not piv_r.empty:
                     cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
@@ -962,10 +967,9 @@ elif "6수송" in selected_group:
         df_6['Val_CY_num'] = df_6['Val_num']
         df_6['Val_PY_num'] = 0.0
 
-    # 🌟 파일 생성 일시 자동으로 읽어오기
     last_updated_str = get_6th_last_updated_date()
 
-    st.markdown('<div class="unified-sub-header">✈️️ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
+    st.markdown('<div class="unified-sub-header">✈ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
     st.markdown(
         f'<div class="source-header-box">'
         f'<b>📌 출처:</b> DDS, Bi-Directional, 일본-미주/구주/동남아/중국/대양주 &nbsp;|&nbsp; '
@@ -981,30 +985,40 @@ elif "6수송" in selected_group:
         st.markdown('<div style="font-size:15px; font-weight:800; color:#0f172a; border-bottom:2px solid #cbd5e1; padding-bottom:8px; margin-bottom:15px;">🔍 대시보드 슬라이서</div>', unsafe_allow_html=True)
         
         temp_df = df_6.copy()
+        
+        # 🔥 [금년 데이터 기준 동적 라벨 산출용 데이터셋]
         df_cy_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)] if col_year_type in temp_df.columns else temp_df
 
-        opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_only[col_pur_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=True) if col_pur_m_disp in df_cy_only.columns else []
-        pur_label = "발매월" + get_dynamic_range_label(opts_pur_m_cy)
+        # 1. 발매월 동적 필터 라벨 (금년 파일 범위 반영)
+        opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=True) if col_pur_m_disp in df_cy_only.columns else []
+        pur_range_label = get_dynamic_range_label_6th(opts_pur_m_cy)
+        pur_label = f"발매월{pur_range_label}"
+        
         sel_pur_m_disp = render_panel_multiselect(st, pur_label, opts_pur_m_cy, "slicer6_pur_m_disp")
         if sel_pur_m_disp: 
             target_pur_m = []
             for val in sel_pur_m_disp:
                 target_pur_m.append(val)
-                if '-' in val and len(val) == 7:
-                    y, mo = val.split('-')
-                    target_pur_m.append(f"{int(y)-1}-{mo}")
+                if '-' in val and len(val) >= 7:
+                    parts = val.split('-')
+                    if parts[0].isdigit():
+                        target_pur_m.append(f"{int(parts[0])-1}-{parts[1]}")
             temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(target_pur_m)]
 
-        opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_only[col_trip_m_disp].dropna().unique() if str(x).strip() != 'nan' and str(x).strip() != ''], reverse=False) if col_trip_m_disp in df_cy_only.columns else []
-        trip_label = "출발월" + get_dynamic_range_label(opts_trip_m_cy)
+        # 2. 출발월 동적 필터 라벨 (금년 파일 범위 반영)
+        opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in df_cy_only.columns else []
+        trip_range_label = get_dynamic_range_label_6th(opts_trip_m_cy)
+        trip_label = f"출발월{trip_range_label}"
+        
         sel_trip_m_disp = render_panel_multiselect(st, trip_label, opts_trip_m_cy, "slicer6_trip_m_disp")
         if sel_trip_m_disp: 
             target_trip_m = []
             for val in sel_trip_m_disp:
                 target_trip_m.append(val)
-                if '-' in val and len(val) == 7:
-                    y, mo = val.split('-')
-                    target_trip_m.append(f"{int(y)-1}-{mo}")
+                if '-' in val and len(val) >= 7:
+                    parts = val.split('-')
+                    if parts[0].isdigit():
+                        target_trip_m.append(f"{int(parts[0])-1}-{parts[1]}")
             temp_df = temp_df[temp_df[col_trip_m_disp].astype(str).isin(target_trip_m)]
 
         opts_rgn = sorted([str(x).strip() for x in temp_df[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in temp_df.columns else []
