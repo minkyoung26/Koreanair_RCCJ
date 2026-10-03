@@ -277,7 +277,7 @@ if "3/4수송" in selected_group:
     st.markdown(
         f'<div class="source-header-box">'
         f'<b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; '
-        f'<b>🗓 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
+        f'<b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
         f'<b>✈ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
         f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str_34}'
         f'</div>', 
@@ -583,7 +583,7 @@ if "3/4수송" in selected_group:
             else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
-    # 2. ✈️️ 공급 M/S 탭
+    # 2. ✈️ 공급 M/S 탭
     # ------------------------------------------
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
@@ -1017,9 +1017,13 @@ elif "6수송" in selected_group:
 
     df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if col_val_6 in df_6.columns else 0.0
 
-    # 🔥 [금년/전년 엄격 분리]
-    df_6['Val_CY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), df_6['Val_num'], 0.0)
-    df_6['Val_PY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('전년|PY', na=False), df_6['Val_num'], 0.0)
+    # 🔥 [금년/전년 수치 분리 방어 구문]
+    if col_year_type in df_6.columns and df_6[col_year_type].astype(str).str.contains('전년|PY', na=False).any():
+        df_6['Val_CY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), df_6['Val_num'], 0.0)
+        df_6['Val_PY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('전년|PY', na=False), df_6['Val_num'], 0.0)
+    else:
+        df_6['Val_CY_num'] = df_6['Val_num']
+        df_6['Val_PY_num'] = 0.0
 
     last_updated_str = get_6th_last_updated_date()
 
@@ -1039,34 +1043,25 @@ elif "6수송" in selected_group:
         st.markdown('<div style="font-size:15px; font-weight:800; color:#0f172a; border-bottom:2px solid #cbd5e1; padding-bottom:8px; margin-bottom:15px;">🔍 대시보드 슬라이서</div>', unsafe_allow_html=True)
         
         temp_df = df_6.copy()
-        
-        # 슬라이서 옵션은 '금년' 데이터 기준으로만 추출
-        df_cy_pur_only = temp_df[temp_df['금년/전년'] == '금년']
-        if df_cy_pur_only.empty: df_cy_pur_only = temp_df
-
-        df_cy_trip_only = temp_df[temp_df['금년/전년'] == '금년']
-        if df_cy_trip_only.empty: df_cy_trip_only = temp_df
 
         # 1. 발매월 동적 필터
-        opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_pur_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=True) if col_pur_m_disp in df_cy_pur_only.columns else []
+        opts_pur_m_cy = sorted([str(x).strip() for x in temp_df[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=True) if col_pur_m_disp in temp_df.columns else []
         pur_range_label = get_dynamic_range_label_6th(opts_pur_m_cy)
         pur_label = f"발매월{pur_range_label}"
         
         sel_pur_m_disp = render_panel_multiselect(st, pur_label, opts_pur_m_cy, "slicer6_pur_m_disp")
+        # 🔥 [핵심 방어 구문] Choose options (미선택) 시 전체 데이터를 유지하며, 선택 시 해당 선택 항목으로 필터링
         if sel_pur_m_disp: 
-            # 🔥 [YOY 핵심 정밀 매칭] 선택된 금년 월의 '월 번호(MM)'와 일치하는 전년 레코드까지 동시 필터링
-            target_months = [extract_month_key(x) for x in sel_pur_m_disp]
-            temp_df = temp_df[temp_df['Pur_M_Num'].isin(target_months)]
+            temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).str.strip().isin(sel_pur_m_disp)]
 
         # 2. 출발월 동적 필터
-        opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_trip_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in df_cy_trip_only.columns else []
+        opts_trip_m_cy = sorted([str(x).strip() for x in temp_df[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in temp_df.columns else []
         trip_range_label = get_dynamic_range_label_6th(opts_trip_m_cy)
         trip_label = f"출발월{trip_range_label}"
         
         sel_trip_m_disp = render_panel_multiselect(st, trip_label, opts_trip_m_cy, "slicer6_trip_m_disp")
         if sel_trip_m_disp: 
-            target_trip_months = [extract_month_key(x) for x in sel_trip_m_disp]
-            temp_df = temp_df[temp_df['Trip_M_Num'].isin(target_trip_months)]
+            temp_df = temp_df[temp_df[col_trip_m_disp].astype(str).str.strip().isin(sel_trip_m_disp)]
 
         opts_rgn = sorted([str(x).strip() for x in temp_df[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in temp_df.columns else []
         sel_rgn = render_panel_multiselect(st, "OD Region", opts_rgn, "slicer6_rgn")
@@ -1081,7 +1076,7 @@ elif "6수송" in selected_group:
         if sel_direct: temp_df = temp_df[temp_df[col_direct_transit].astype(str).isin(sel_direct)]
 
         if col_al_6 in temp_df.columns:
-            al_val_series = temp_df[temp_df['Val_CY_num'] > 0].groupby(col_al_6, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
+            al_val_series = temp_df[temp_df['Val_num'] > 0].groupby(col_al_6, observed=False)['Val_num'].sum().sort_values(ascending=False)
             al_sorted = [str(x).strip() for x in al_val_series.index if str(x).strip() != 'nan']
             opts_al = ['KE'] + [x for x in al_sorted if x != 'KE'] if 'KE' in al_sorted else al_sorted
         else:
@@ -1116,7 +1111,10 @@ elif "6수송" in selected_group:
 
         with tabs[0]:
             if not filtered_6th.empty and col_al_6 in filtered_6th.columns:
-                al_agg = filtered_6th.groupby(col_al_6, observed=False)[['Val_CY_num', 'Val_PY_num']].sum().reset_index()
+                al_agg = filtered_6th.groupby(col_al_6, observed=False)[['Val_CY_num', 'Val_PY_num', 'Val_num']].sum().reset_index()
+                
+                # Val_CY_num 수치가 0인 경우 Val_num 전체 합으로 즉시 보정
+                al_agg['Val_CY_num'] = np.where(al_agg['Val_CY_num'] > 0, al_agg['Val_CY_num'], al_agg['Val_num'])
 
                 non_ke_agg = al_agg[al_agg[col_al_6] != 'KE'].sort_values(by='Val_CY_num', ascending=False)
                 ke_agg = al_agg[al_agg[col_al_6] == 'KE']
@@ -1176,16 +1174,16 @@ elif "6수송" in selected_group:
             st.markdown('<div class="unified-sub-header">🌍 OD Region별 발매 및 M/S 현황</div>', unsafe_allow_html=True)
             
             if not filtered_6th.empty and col_rgn in filtered_6th.columns:
-                g_mkt_cy = filtered_6th['Val_CY_num'].sum()
+                g_mkt_cy = filtered_6th['Val_CY_num'].sum() if filtered_6th['Val_CY_num'].sum() > 0 else filtered_6th['Val_num'].sum()
                 g_mkt_py = filtered_6th['Val_PY_num'].sum()
                 
                 rgn_agg = []
                 for rgn_name, df_rgn in filtered_6th.groupby(col_rgn, observed=False):
-                    m_cy = df_rgn['Val_CY_num'].sum()
+                    m_cy = df_rgn['Val_CY_num'].sum() if df_rgn['Val_CY_num'].sum() > 0 else df_rgn['Val_num'].sum()
                     m_py = df_rgn['Val_PY_num'].sum()
                     
                     df_ke = df_rgn[df_rgn[col_al_6] == 'KE']
-                    k_cy = df_ke['Val_CY_num'].sum()
+                    k_cy = df_ke['Val_CY_num'].sum() if df_ke['Val_CY_num'].sum() > 0 else df_ke['Val_num'].sum()
                     k_py = df_ke['Val_PY_num'].sum()
                     
                     rgn_agg.append({
@@ -1240,7 +1238,7 @@ elif "6수송" in selected_group:
                 g_m_ms_yoy = g_m_ms_cy - g_m_ms_py
                 
                 df_ke_tot = filtered_6th[filtered_6th[col_al_6] == 'KE']
-                g_k_cy = df_ke_tot['Val_CY_num'].sum()
+                g_k_cy = df_ke_tot['Val_CY_num'].sum() if df_ke_tot['Val_CY_num'].sum() > 0 else df_ke_tot['Val_num'].sum()
                 g_k_py = df_ke_tot['Val_PY_num'].sum()
                 g_k_yoy = ((g_k_cy - g_k_py) / g_k_py * 100) if g_k_py > 0 else 0
                 g_k_ms_cy = (g_k_cy / g_mkt_cy * 100) if g_mkt_cy > 0 else 0
@@ -1268,7 +1266,7 @@ elif "6수송" in selected_group:
             st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계)</div>', unsafe_allow_html=True)
             
             if not filtered_6th.empty and col_od_simple in filtered_6th.columns:
-                grand_mkt_cy = filtered_6th['Val_CY_num'].sum()
+                grand_mkt_cy = filtered_6th['Val_CY_num'].sum() if filtered_6th['Val_CY_num'].sum() > 0 else filtered_6th['Val_num'].sum()
                 grand_mkt_py = filtered_6th['Val_PY_num'].sum()
                 grand_mkt_yoy = ((grand_mkt_cy - grand_mkt_py) / grand_mkt_py * 100) if grand_mkt_py > 0 else 0
 
@@ -1276,7 +1274,7 @@ elif "6수송" in selected_group:
                 sel_al_title_suffix = f" ({', '.join(sel_carriers)})" if sel_carriers else " 전체"
 
                 df_grand_sel = filtered_6th[filtered_6th[col_al_6].isin(sel_carriers)] if sel_carriers else filtered_6th
-                grand_sel_cy = df_grand_sel['Val_CY_num'].sum()
+                grand_sel_cy = df_grand_sel['Val_CY_num'].sum() if df_grand_sel['Val_CY_num'].sum() > 0 else df_grand_sel['Val_num'].sum()
                 grand_sel_py = df_grand_sel['Val_PY_num'].sum()
                 grand_sel_yoy = ((grand_sel_cy - grand_sel_py) / grand_sel_py * 100) if grand_sel_py > 0 else 0
                 grand_sel_ms_cy = (grand_sel_cy / grand_mkt_cy * 100) if grand_mkt_cy > 0 else 0
@@ -1284,14 +1282,14 @@ elif "6수송" in selected_group:
                 grand_sel_ms_yoy = grand_sel_ms_cy - grand_sel_ms_py
 
                 df_grand_ke = filtered_6th[filtered_6th[col_al_6] == 'KE']
-                grand_ke_cy = df_grand_ke['Val_CY_num'].sum()
+                grand_ke_cy = df_grand_ke['Val_CY_num'].sum() if df_grand_ke['Val_CY_num'].sum() > 0 else df_grand_ke['Val_num'].sum()
                 grand_ke_py = df_grand_ke['Val_PY_num'].sum()
                 grand_ke_yoy = ((grand_ke_cy - grand_ke_py) / grand_ke_py * 100) if grand_ke_py > 0 else 0
                 grand_ke_ms_cy = (grand_ke_cy / grand_mkt_cy * 100) if grand_mkt_cy > 0 else 0
                 grand_ke_ms_py = (grand_ke_py / grand_mkt_py * 100) if grand_mkt_py > 0 else 0
                 grand_ke_ms_yoy = grand_ke_ms_cy - grand_ke_ms_py
 
-                od_totals = filtered_6th.groupby(col_od_simple, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
+                od_totals = filtered_6th.groupby(col_od_simple, observed=False)['Val_num'].sum().sort_values(ascending=False)
                 top20_ods = [x for x in od_totals.index if od_totals[x] > 0][:20]
 
                 if top20_ods:
@@ -1299,12 +1297,12 @@ elif "6수송" in selected_group:
                     for rank_i, od_simple_code in enumerate(top20_ods, 1):
                         df_od = filtered_6th[filtered_6th[col_od_simple] == od_simple_code]
 
-                        mkt_cy = df_od['Val_CY_num'].sum()
+                        mkt_cy = df_od['Val_CY_num'].sum() if df_od['Val_CY_num'].sum() > 0 else df_od['Val_num'].sum()
                         mkt_py = df_od['Val_PY_num'].sum()
                         mkt_yoy = ((mkt_cy - mkt_py) / mkt_py * 100) if mkt_py > 0 else 0
 
                         df_sel = df_od[df_od[col_al_6].isin(sel_carriers)] if sel_carriers else df_od
-                        sel_cy = df_sel['Val_CY_num'].sum()
+                        sel_cy = df_sel['Val_CY_num'].sum() if df_sel['Val_CY_num'].sum() > 0 else df_sel['Val_num'].sum()
                         sel_py = df_sel['Val_PY_num'].sum()
                         sel_yoy = ((sel_cy - sel_py) / sel_py * 100) if sel_py > 0 else 0
                         sel_ms_cy = (sel_cy / mkt_cy * 100) if mkt_cy > 0 else 0
@@ -1312,7 +1310,7 @@ elif "6수송" in selected_group:
                         sel_ms_yoy = sel_ms_cy - sel_ms_py
 
                         df_ke = df_od[df_od[col_al_6] == 'KE']
-                        ke_cy = df_ke['Val_CY_num'].sum()
+                        ke_cy = df_ke['Val_CY_num'].sum() if df_ke['Val_CY_num'].sum() > 0 else df_ke['Val_num'].sum()
                         ke_py = df_ke['Val_PY_num'].sum()
                         ke_yoy = ((ke_cy - ke_py) / ke_py * 100) if ke_py > 0 else 0
                         ke_ms_cy = (ke_cy / mkt_cy * 100) if mkt_cy > 0 else 0
