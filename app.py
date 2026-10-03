@@ -165,7 +165,7 @@ def get_6th_last_updated_date():
         return datetime.datetime.fromtimestamp(mtime).strftime('%Y.%m.%d %H:%M')
     return "날짜 정보 없음"
 
-# 🌟 6수송 금년 파일 출처 전용 동적 월 범위 산출 함수
+# 🌟 안전한 동적 월 범위 산출 함수
 def get_dynamic_range_label_6th(opts):
     if not opts: return ""
     clean_yms = []
@@ -173,7 +173,7 @@ def get_dynamic_range_label_6th(opts):
         st_x = str(x).replace("월", "").strip()
         if "-" in st_x and len(st_x) >= 7:
             parts = st_x.split("-")
-            if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
                 clean_yms.append((int(parts[0]), int(parts[1])))
     if not clean_yms: return ""
     
@@ -957,16 +957,7 @@ elif "6수송" in selected_group:
     col_val_6 = get_actual_col("Value") or "Value"
     col_year_type = get_actual_col("금년/전년") or "금년/전년"
 
-    # 🔥 [핵심] 파일 출처 명시적 판정 및 전용 구분 필드 신설
-    if col_year_type not in df_6.columns:
-        if 'source_file' in df_6.columns:
-            df_6[col_year_type] = np.where(df_6['source_file'].astype(str).str.contains('금년|CY', na=False), '금년', '전년')
-        else:
-            df_6[col_year_type] = '금년'
-
-    df_6['발매_연도구분'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), '금년 발매', '전년 발매')
-    df_6['출발_연도구분'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), '금년 출발', '전년 출발')
-
+    # 🔥 [안전한 금년/전년 분리 로직]
     df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if col_val_6 in df_6.columns else 0.0
 
     if col_year_type in df_6.columns:
@@ -995,11 +986,15 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
         
-        # 🔥 [명시적 '금년 발매' 데이터셋에서 동적 기간 추출]
-        df_cy_pur_only = temp_df[temp_df['발매_연도구분'] == '금년 발매']
+        # 🔥 [안전한 금년 전용 필터링]
+        if col_year_type in temp_df.columns:
+            df_cy_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)]
+            if df_cy_only.empty: df_cy_only = temp_df
+        else:
+            df_cy_only = temp_df
 
-        # 1. 발매월 동적 필터 라벨 (금년 파일 출처 전용)
-        opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_pur_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=True) if col_pur_m_disp in df_cy_pur_only.columns else []
+        # 1. 발매월 동적 필터 라벨 (안전한 옵션 가공)
+        opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=True) if col_pur_m_disp in df_cy_only.columns else []
         pur_range_label = get_dynamic_range_label_6th(opts_pur_m_cy)
         pur_label = f"발매월{pur_range_label}"
         
@@ -1014,11 +1009,8 @@ elif "6수송" in selected_group:
                         target_pur_m.append(f"{int(parts[0])-1}-{parts[1]}")
             temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(target_pur_m)]
 
-        # 🔥 [명시적 '금년 출발' 데이터셋에서 동적 기간 추출]
-        df_cy_trip_only = temp_df[temp_df['출발_연도구분'] == '금년 출발']
-
-        # 2. 출발월 동적 필터 라벨 (금년 파일 출처 전용)
-        opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_trip_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in df_cy_trip_only.columns else []
+        # 2. 출발월 동적 필터 라벨 (안전한 옵션 가공)
+        opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in df_cy_only.columns else []
         trip_range_label = get_dynamic_range_label_6th(opts_trip_m_cy)
         trip_label = f"출발월{trip_range_label}"
         
@@ -1077,7 +1069,6 @@ elif "6수송" in selected_group:
         filtered_6th = temp_df
 
     with col_right_data:
-        # 🔥 [요청 반영] Raw Data 뷰 탭을 비밀 URL 없이 기본 표출 설정
         tabs = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "📋 6수송 Raw Data View"])
 
         with tabs[0]:
