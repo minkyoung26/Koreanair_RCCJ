@@ -139,6 +139,7 @@ def load_aux_files():
             except: pass
     return None
 
+# 🔥 [핵심] 안전성 강화된 6수송 데이터 로드 함수
 @st.cache_data(ttl=3600, show_spinner="🌐 6수송 집계 데이터를 로드하는 중...")
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -148,8 +149,9 @@ def load_6th_data_aggregated():
             df = pd.read_parquet(target_path, engine='pyarrow')
             if df is not None and not df.empty:
                 return df
-        except Exception:
-            pass
+        except Exception as e:
+            st.error(f"⚠ Parquet 로드 중 예외 발생: {e}")
+            return None
     return None
 
 def get_34_last_updated_date():
@@ -265,7 +267,7 @@ if "3/4수송" in selected_group:
         f'<div class="source-header-box">'
         f'<b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; '
         f'<b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
-        f'<b>✈️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
+        f'<b>✈️️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
         f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str_34}'
         f'</div>', 
         unsafe_allow_html=True
@@ -937,7 +939,7 @@ elif "6수송" in selected_group:
 
     if df_6th_raw is None or df_6th_raw.empty:
         st.error("❌ 6수송 캐시 파켓 파일(`cache_6th_data.parquet`)이 없거나 비어 있습니다.")
-        st.info("👉 터미널에서 `python batch_processor_6th.py`를 먼저 한번 실행하여 파케 파일을 새로 생성해 주세요!")
+        st.info("👉 터미널에서 `python batch_processor_6th.py`를 실행하여 파케 파일을 먼저 생성해주세요!")
         st.stop()
 
     df_6 = df_6th_raw.copy()
@@ -963,7 +965,7 @@ elif "6수송" in selected_group:
     col_val_6 = get_actual_col("Value") or "Value"
     col_year_type = get_actual_col("금년/전년") or "금년/전년"
 
-    # 🔥 [방어형 태깅] 구분 필드 없는 경우 자동 보완
+    # 🔥 [방어형 태깅] 구분 필드 자동 보완
     if col_year_type not in df_6.columns:
         if 'source_file' in df_6.columns:
             df_6[col_year_type] = np.where(df_6['source_file'].astype(str).str.contains('금년|CY', na=False), '금년', '전년')
@@ -1004,7 +1006,7 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
         
-        # 🔥 [안전한 금년 데이터 추출: 빈 프레임 완벽 방지]
+        # 🔥 [안전한 금년 전용 서브셋 추출 - 빈 프레임 절대 방지]
         df_cy_pur_only = temp_df[temp_df['발매_연도구분'] == '금년 발매']
         if df_cy_pur_only.empty:
             df_cy_pur_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)]
@@ -1242,7 +1244,7 @@ elif "6수송" in selected_group:
                 rgn_html += get_yoy_td_html(g_k_ms_yoy, True)
                 rgn_html += '</tr>'
                 
-                rgn_html += '</tbody></table> destruction'
+                rgn_html += '</tbody></table></div>'
                 st.markdown(rgn_html, unsafe_allow_html=True)
                 
             st.markdown("---")
