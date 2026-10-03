@@ -181,14 +181,14 @@ def get_6th_last_updated_date():
 def normalize_ym_key(val_str):
     if pd.isna(val_str): return ""
     s = str(val_str).replace('-', '').replace('.', '').replace('/', '').replace('월', '').strip()
-    return s[:6] if len(s) >= 6 and s[:6].isdigit() else ""
+    return s[:6] if len(s) >= 6 and s[:6].isdigit() else s
 
 def get_dynamic_range_label_6th(opts):
     if not opts: return ""
     clean_yms = []
     for x in opts:
         norm_key = normalize_ym_key(x)
-        if norm_key:
+        if norm_key and len(norm_key) >= 6 and norm_key[:6].isdigit():
             clean_yms.append((int(norm_key[:4]), int(norm_key[4:6])))
     if not clean_yms: return ""
     
@@ -274,7 +274,7 @@ if "3/4수송" in selected_group:
     st.markdown(
         f'<div class="source-header-box">'
         f'<b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; '
-        f'<b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
+        f'<b>🗓️️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
         f'<b>✈ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
         f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str_34}'
         f'</div>', 
@@ -291,7 +291,6 @@ if "3/4수송" in selected_group:
             
         merged_df = df_iss_merged.copy()
         
-        # 🔥 [KeyError 완벽 방지 동적 컬럼 바인딩]
         route_col_target = find_column_by_candidates(merged_df.columns, ['노선', 'route'])
         merged_df['노선_clean'] = merged_df[route_col_target].astype(str).str.strip() if route_col_target else ""
 
@@ -578,7 +577,7 @@ if "3/4수송" in selected_group:
                 csv_data = filtered_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button("📥 필터링된 발매 Raw Data (CSV) 전체 다운로드", data=csv_data, file_name=f"Ticketing_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
                 st.dataframe(filtered_df.head(100), width='stretch')
-            else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
+            else: st.info("ℹ️️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
     # 2. ✈️ 공급 M/S 탭
@@ -1053,16 +1052,13 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
         
-        df_cy_pur_only = temp_df[temp_df['발매_연도구분'] == '금년 발매']
+        # 🔥 [핵심] '금년' 고정 태깅 데이터셋에서 발매월/출발월 옵션 추출
+        df_cy_pur_only = temp_df[temp_df['금년/전년'] == '금년']
         if df_cy_pur_only.empty:
-            df_cy_pur_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)]
-        if df_cy_pur_only.empty: 
             df_cy_pur_only = temp_df
 
-        df_cy_trip_only = temp_df[temp_df['출발_연도구분'] == '금년 출발']
+        df_cy_trip_only = temp_df[temp_df['금년/전년'] == '금년']
         if df_cy_trip_only.empty:
-            df_cy_trip_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)]
-        if df_cy_trip_only.empty: 
             df_cy_trip_only = temp_df
 
         # 1. 발매월 동적 필터
@@ -1077,8 +1073,9 @@ elif "6수송" in selected_group:
                 k = normalize_ym_key(val)
                 if k:
                     target_pur_keys.add(k)
-                    y, m = int(k[:4]), k[4:6]
-                    target_pur_keys.add(f"{y-1}{m}")
+                    if len(k) >= 6 and k[:4].isdigit():
+                        y, m = int(k[:4]), k[4:6]
+                        target_pur_keys.add(f"{y-1}{m:02d}")
             if 'Pur_YM_Key' in temp_df.columns:
                 temp_df = temp_df[temp_df['Pur_YM_Key'].isin(target_pur_keys)]
 
@@ -1094,8 +1091,9 @@ elif "6수송" in selected_group:
                 k = normalize_ym_key(val)
                 if k:
                     target_trip_keys.add(k)
-                    y, m = int(k[:4]), k[4:6]
-                    target_trip_keys.add(f"{y-1}{m}")
+                    if len(k) >= 6 and k[:4].isdigit():
+                        y, m = int(k[:4]), k[4:6]
+                        target_trip_keys.add(f"{y-1}{m:02d}")
             if 'Trip_YM_Key' in temp_df.columns:
                 temp_df = temp_df[temp_df['Trip_YM_Key'].isin(target_trip_keys)]
 
