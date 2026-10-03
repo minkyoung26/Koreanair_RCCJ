@@ -165,16 +165,18 @@ def get_6th_last_updated_date():
         return datetime.datetime.fromtimestamp(mtime).strftime('%Y.%m.%d %H:%M')
     return "날짜 정보 없음"
 
-# 🌟 안전한 동적 월 범위 산출 함수
+# 🌟 날짜 텍스트를 숫자 'YYYYMM' 6자리 표준값으로 정제하는 헬퍼 함수
+def normalize_ym_key(val_str):
+    s = str(val_str).replace('-', '').replace('.', '').replace('월', '').strip()
+    return s[:6] if len(s) >= 6 and s[:6].isdigit() else ""
+
 def get_dynamic_range_label_6th(opts):
     if not opts: return ""
     clean_yms = []
     for x in opts:
-        st_x = str(x).replace("월", "").strip()
-        if "-" in st_x and len(st_x) >= 7:
-            parts = st_x.split("-")
-            if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
-                clean_yms.append((int(parts[0]), int(parts[1])))
+        norm_key = normalize_ym_key(x)
+        if norm_key:
+            clean_yms.append((int(norm_key[:4]), int(norm_key[4:6])))
     if not clean_yms: return ""
     
     min_y, min_m = min(clean_yms)
@@ -267,7 +269,7 @@ if "3/4수송" in selected_group:
     )
     st.markdown("---")
     
-    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈️ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈️️ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
 
     with tab_34_1:
         if df_iss_merged is None: st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다."); st.stop()
@@ -957,7 +959,10 @@ elif "6수송" in selected_group:
     col_val_6 = get_actual_col("Value") or "Value"
     col_year_type = get_actual_col("금년/전년") or "금년/전년"
 
-    # 🔥 [안전한 금년/전년 분리 로직]
+    # 🌟 검색 성능 및 매칭 유연성을 위한 '표준 연월 키' 생성
+    df_6['Pur_YM_Key'] = df_6[col_pur_m_disp].apply(normalize_ym_key) if col_pur_m_disp in df_6.columns else ""
+    df_6['Trip_YM_Key'] = df_6[col_trip_m_disp].apply(normalize_ym_key) if col_trip_m_disp in df_6.columns else ""
+
     df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if col_val_6 in df_6.columns else 0.0
 
     if col_year_type in df_6.columns:
@@ -986,44 +991,45 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
         
-        # 🔥 [안전한 금년 전용 필터링]
-        if col_year_type in temp_df.columns:
-            df_cy_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)]
-            if df_cy_only.empty: df_cy_only = temp_df
-        else:
-            df_cy_only = temp_df
+        # 금년 전용 서브셋 (라벨 추출용)
+        df_cy_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)] if col_year_type in temp_df.columns else temp_df
+        if df_cy_only.empty: df_cy_only = temp_df
 
-        # 1. 발매월 동적 필터 라벨 (안전한 옵션 가공)
+        # ------------------------------------------
+        # 1. 발매월 동적 라벨 및 필터링 (매칭 안전화)
+        # ------------------------------------------
         opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=True) if col_pur_m_disp in df_cy_only.columns else []
         pur_range_label = get_dynamic_range_label_6th(opts_pur_m_cy)
         pur_label = f"발매월{pur_range_label}"
         
         sel_pur_m_disp = render_panel_multiselect(st, pur_label, opts_pur_m_cy, "slicer6_pur_m_disp")
         if sel_pur_m_disp: 
-            target_pur_m = []
+            target_pur_keys = set()
             for val in sel_pur_m_disp:
-                target_pur_m.append(val)
-                if '-' in val and len(val) >= 7:
-                    parts = val.split('-')
-                    if parts[0].isdigit():
-                        target_pur_m.append(f"{int(parts[0])-1}-{parts[1]}")
-            temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(target_pur_m)]
+                k = normalize_ym_key(val)
+                if k:
+                    target_pur_keys.add(k) # 금년 YYYYMM
+                    y, m = int(k[:4]), k[4:6]
+                    target_pur_keys.add(f"{y-1}{m}") # 전년 YYYYMM 대조 키
+            temp_df = temp_df[temp_df['Pur_YM_Key'].isin(target_pur_keys)]
 
-        # 2. 출발월 동적 필터 라벨 (안전한 옵션 가공)
+        # ------------------------------------------
+        # 2. 출발월 동적 라벨 및 필터링 (매칭 안전화)
+        # ------------------------------------------
         opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in df_cy_only.columns else []
         trip_range_label = get_dynamic_range_label_6th(opts_trip_m_cy)
         trip_label = f"출발월{trip_range_label}"
         
         sel_trip_m_disp = render_panel_multiselect(st, trip_label, opts_trip_m_cy, "slicer6_trip_m_disp")
         if sel_trip_m_disp: 
-            target_trip_m = []
+            target_trip_keys = set()
             for val in sel_trip_m_disp:
-                target_trip_m.append(val)
-                if '-' in val and len(val) >= 7:
-                    parts = val.split('-')
-                    if parts[0].isdigit():
-                        target_trip_m.append(f"{int(parts[0])-1}-{parts[1]}")
-            temp_df = temp_df[temp_df[col_trip_m_disp].astype(str).isin(target_trip_m)]
+                k = normalize_ym_key(val)
+                if k:
+                    target_trip_keys.add(k) # 금년 YYYYMM
+                    y, m = int(k[:4]), k[4:6]
+                    target_trip_keys.add(f"{y-1}{m}") # 전년 YYYYMM 대조 키
+            temp_df = temp_df[temp_df['Trip_YM_Key'].isin(target_trip_keys)]
 
         opts_rgn = sorted([str(x).strip() for x in temp_df[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in temp_df.columns else []
         sel_rgn = render_panel_multiselect(st, "OD Region", opts_rgn, "slicer6_rgn")
