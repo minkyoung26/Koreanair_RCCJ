@@ -103,12 +103,17 @@ def clean_transport_column(df):
     if b_col: df['수송'] = df[b_col].astype(str).str.strip()
     return df
 
+# 🔥 [3/4수송 경로 감지 강화] cache_34_data.parquet 안정적 로드
+@st.cache_data(ttl=3600, show_spinner="3/4수송 데이터를 읽어오는 중...")
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    target_path = os.path.join(base_dir, 'cache_34_data.parquet')
-    if os.path.exists(target_path):
-        try: return clean_transport_column(pd.read_parquet(target_path))
-        except: pass
+    for sp in [os.path.join(base_dir, 'cache_34_data.parquet'), 'cache_34_data.parquet']:
+        if os.path.exists(sp):
+            try:
+                df = pd.read_parquet(sp, engine='pyarrow')
+                if df is not None and not df.empty:
+                    return clean_transport_column(df)
+            except Exception: pass
     return None
 
 def process_any_uploaded_file(file_obj):
@@ -129,33 +134,17 @@ def load_aux_files():
             except: pass
     return None
 
-# 🔥 [Oh No 크래시 원천 해결] 170만 행을 대시보드 필수 차원으로 1차 경량 집계 로드
-@st.cache_data(ttl=3600, show_spinner="🌐 6수송 데이터를 최적화 로딩 중...")
+# 🔥 [6수송 로드 최적화]
+@st.cache_data(ttl=3600, show_spinner="🌐 6수송 데이터를 읽어오는 중...")
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    target_path = os.path.join(base_dir, 'cache_6th_data.parquet')
-    
-    if os.path.exists(target_path):
-        try:
-            df = pd.read_parquet(target_path, engine='pyarrow')
-            if df is not None and not df.empty:
-                group_cols = [
-                    'Ticket Purchase month', 'Trip Month', '4.OD RGN', 'DIRECTION', 
-                    '직항/경유', 'Trip Origin Country Code', 'Trip Destination Country Code', 
-                    '일본 APO', '해외 APO', 'Trip O&D', 'Trip O&D Market', 
-                    'Dominant Marketing Airline', '금년/전년', '발매_연도구분', '출발_연도구분',
-                    'Pur_YM_Key', 'Trip_YM_Key'
-                ]
-                existing_cols = [c for c in group_cols if c in df.columns]
-                val_col = 'Value' if 'Value' in df.columns else None
-                
-                if val_col and existing_cols:
-                    df_agg = df.groupby(existing_cols, observed=False, as_index=False)[val_col].sum()
-                    return df_agg
-                return df
-        except Exception as e:
-            st.error(f"⚠️ Parquet 데이터 로드 실패: {e}")
-            return None
+    for sp in [os.path.join(base_dir, 'cache_6th_data.parquet'), 'cache_6th_data.parquet']:
+        if os.path.exists(sp):
+            try:
+                df = pd.read_parquet(sp, engine='pyarrow')
+                if df is not None and not df.empty:
+                    return df
+            except Exception: pass
     return None
 
 def get_34_last_updated_date():
@@ -261,7 +250,7 @@ def get_dynamic_date_ranges_34(df_iss):
 
 
 # ==========================================
-# GROUP 1: ✈️ 3/4수송 대시보드
+# GROUP 1: ✈️️ 3/4수송 대시보드
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
@@ -278,10 +267,13 @@ if "3/4수송" in selected_group:
     )
     st.markdown("---")
     
-    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
 
     with tab_34_1:
-        if df_iss_merged is None: st.warning("❌ 3/4수송 데이터를 찾을 수 없습니다."); st.stop()
+        if df_iss_merged is None: 
+            st.warning("❌ 3/4수송 데이터(`cache_34_data.parquet`)를 찾을 수 없습니다.")
+            st.stop()
+            
         merged_df = df_iss_merged.copy()
         merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
         merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
@@ -969,7 +961,6 @@ elif "6수송" in selected_group:
     col_val_6 = get_actual_col("Value") or "Value"
     col_year_type = get_actual_col("금년/전년") or "금년/전년"
 
-    # 구분 필드 자동 보완
     if col_year_type not in df_6.columns:
         if 'source_file' in df_6.columns:
             df_6[col_year_type] = np.where(df_6['source_file'].astype(str).str.contains('금년|CY', na=False), '금년', '전년')
@@ -1010,7 +1001,6 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
         
-        # 금년 필터용 안전 서브셋
         df_cy_pur_only = temp_df[temp_df['발매_연도구분'] == '금년 발매']
         if df_cy_pur_only.empty:
             df_cy_pur_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)]
