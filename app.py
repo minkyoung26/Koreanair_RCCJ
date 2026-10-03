@@ -149,7 +149,6 @@ def load_6th_data_aggregated():
             except: pass
     return None
 
-# 🌟 3/4수송 및 6수송 캐시 파일의 최신 업데이트 시간 자동 추출 함수
 def get_34_last_updated_date():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_34_data.parquet')
@@ -166,7 +165,7 @@ def get_6th_last_updated_date():
         return datetime.datetime.fromtimestamp(mtime).strftime('%Y.%m.%d %H:%M')
     return "날짜 정보 없음"
 
-# 🌟 6수송 금년(CY) 파일 기준 동적 월 범위 라벨 생성 함수
+# 🌟 6수송 금년 파일 출처 전용 동적 월 범위 산출 함수
 def get_dynamic_range_label_6th(opts):
     if not opts: return ""
     clean_yms = []
@@ -958,6 +957,16 @@ elif "6수송" in selected_group:
     col_val_6 = get_actual_col("Value") or "Value"
     col_year_type = get_actual_col("금년/전년") or "금년/전년"
 
+    # 🔥 [핵심] 파일 출처 명시적 판정 및 전용 구분 필드 신설
+    if col_year_type not in df_6.columns:
+        if 'source_file' in df_6.columns:
+            df_6[col_year_type] = np.where(df_6['source_file'].astype(str).str.contains('금년|CY', na=False), '금년', '전년')
+        else:
+            df_6[col_year_type] = '금년'
+
+    df_6['발매_연도구분'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), '금년 발매', '전년 발매')
+    df_6['출발_연도구분'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), '금년 출발', '전년 출발')
+
     df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if col_val_6 in df_6.columns else 0.0
 
     if col_year_type in df_6.columns:
@@ -986,11 +995,11 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
         
-        # 🔥 [금년 데이터 기준 동적 라벨 산출용 데이터셋]
-        df_cy_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)] if col_year_type in temp_df.columns else temp_df
+        # 🔥 [명시적 '금년 발매' 데이터셋에서 동적 기간 추출]
+        df_cy_pur_only = temp_df[temp_df['발매_연도구분'] == '금년 발매']
 
-        # 1. 발매월 동적 필터 라벨 (금년 파일 범위 반영)
-        opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=True) if col_pur_m_disp in df_cy_only.columns else []
+        # 1. 발매월 동적 필터 라벨 (금년 파일 출처 전용)
+        opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_pur_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=True) if col_pur_m_disp in df_cy_pur_only.columns else []
         pur_range_label = get_dynamic_range_label_6th(opts_pur_m_cy)
         pur_label = f"발매월{pur_range_label}"
         
@@ -1005,8 +1014,11 @@ elif "6수송" in selected_group:
                         target_pur_m.append(f"{int(parts[0])-1}-{parts[1]}")
             temp_df = temp_df[temp_df[col_pur_m_disp].astype(str).isin(target_pur_m)]
 
-        # 2. 출발월 동적 필터 라벨 (금년 파일 범위 반영)
-        opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in df_cy_only.columns else []
+        # 🔥 [명시적 '금년 출발' 데이터셋에서 동적 기간 추출]
+        df_cy_trip_only = temp_df[temp_df['출발_연도구분'] == '금년 출발']
+
+        # 2. 출발월 동적 필터 라벨 (금년 파일 출처 전용)
+        opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_trip_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in df_cy_trip_only.columns else []
         trip_range_label = get_dynamic_range_label_6th(opts_trip_m_cy)
         trip_label = f"출발월{trip_range_label}"
         
@@ -1065,12 +1077,8 @@ elif "6수송" in selected_group:
         filtered_6th = temp_df
 
     with col_right_data:
-        is_admin = st.query_params.get("admin") == "master"
-
-        if is_admin:
-            tabs = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "📋 6수송 Raw Data View"])
-        else:
-            tabs = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교"])
+        # 🔥 [요청 반영] Raw Data 뷰 탭을 비밀 URL 없이 기본 표출 설정
+        tabs = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "📋 6수송 Raw Data View"])
 
         with tabs[0]:
             if not filtered_6th.empty and col_al_6 in filtered_6th.columns:
@@ -1373,13 +1381,12 @@ elif "6수송" in selected_group:
                 else:
                     st.info("💡 실적이 존재하는 O&D Market이 없습니다.")
 
-        if is_admin:
-            with tabs[1]:
-                st.markdown('<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및 다운로드</div>', unsafe_allow_html=True)
-                if not filtered_6th.empty:
-                    csv_6th_bytes = filtered_6th.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button("📥 필터링된 6수송 Data (CSV) 다운로드", data=csv_6th_bytes, file_name=f"6th_Freedom_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
-                    st.dataframe(filtered_6th.head(100), width="stretch")
+        with tabs[1]:
+            st.markdown('<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및 다운로드</div>', unsafe_allow_html=True)
+            if not filtered_6th.empty:
+                csv_6th_bytes = filtered_6th.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 필터링된 6수송 Data (CSV) 다운로드", data=csv_6th_bytes, file_name=f"6th_Freedom_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
+                st.dataframe(filtered_6th.head(100), width="stretch")
 
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
