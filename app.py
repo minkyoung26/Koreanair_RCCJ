@@ -134,13 +134,39 @@ def load_aux_files():
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_6th_data.parquet')
+    
     if os.path.exists(target_path):
         try:
+            # 1. 파케 파일 로드
             df = pd.read_parquet(target_path, engine='pyarrow')
             if df is not None and not df.empty:
+                # 2. 🔥 [핵심] PyArrow C-Extension 메모리 락 및 충돌 원천 차단
+                # 메모리 포인터 연결을 끊고 순수 파이썬 DataFrame 메모리로 완전히 복사
+                df = df.copy()
+                for c in df.columns:
+                    if str(df[c].dtype) == 'category' or df[c].dtype == 'object':
+                        df[c] = df[c].astype(str)
                 return df
         except Exception as e:
-            st.error(f"⚠ Parquet 로드 예외: {e}")
+            st.error(f"⚠️ 파케 로딩 중 예외 발생: {e}")
+            
+    # 3. 만약 파케 로드 실패 시 원천 CSV 직접 로드 (Emergency Fallback)
+    all_files = glob.glob(os.path.join(base_dir, "*.csv"))
+    df_list = []
+    for f in all_files:
+        if "6수송" in f and "cache" not in f:
+            try:
+                tmp = pd.read_csv(f, low_memory=False)
+                tmp.columns = [str(col).strip() for col in tmp.columns]
+                is_cy = "금년" in f or "CY" in f.upper()
+                tmp['금년/전년'] = '금년' if is_cy else '전년'
+                tmp['발매_연도구분'] = '금년 발매' if is_cy else '전년 발매'
+                tmp['출발_연도구분'] = '금년 출발' if is_cy else '전년 출발'
+                df_list.append(tmp)
+            except: pass
+    if df_list:
+        return pd.concat(df_list, ignore_index=True)
+        
     return None
 
 def get_34_last_updated_date():
