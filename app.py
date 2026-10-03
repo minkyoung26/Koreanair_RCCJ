@@ -11,7 +11,7 @@ import glob
 # 1. Page Config
 st.set_page_config(
     page_title="일본노선 발매/공급 Market Share",
-    page_icon="✈️️",
+    page_icon="✈️",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -104,7 +104,6 @@ def clean_transport_column(df):
     if b_col: df['수송'] = df[b_col].astype(str).str.strip()
     return df
 
-# 🔥 [경로 탐색 보완] cache_34_data.parquet 파일 완벽 탐색
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
@@ -139,7 +138,6 @@ def load_aux_files():
             except: pass
     return None
 
-# 🔥 [6수송 로드 완벽 최적화]
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
@@ -269,7 +267,7 @@ if "3/4수송" in selected_group:
         f'<div class="source-header-box">'
         f'<b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; '
         f'<b>🗓️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
-        f'<b>✈️️ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
+        f'<b>✈ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
         f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str_34}'
         f'</div>', 
         unsafe_allow_html=True
@@ -284,7 +282,14 @@ if "3/4수송" in selected_group:
             st.stop()
             
         merged_df = df_iss_merged.copy()
-        merged_df['노선_clean'] = merged_df['노선'].astype(str).str.strip()
+        
+        # 🔥 [KeyError: '노선' 예방 핵심 방어 로직]
+        route_col_target = next((c for c in ['노선', '노선_clean', 'Route', 'ROUTE', 'Route_Clean'] if c in merged_df.columns), None)
+        if route_col_target:
+            merged_df['노선_clean'] = merged_df[route_col_target].astype(str).str.strip()
+        else:
+            merged_df['노선_clean'] = ""
+
         merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
         al_col_target = next((c for c in ['Dominant Marketing Airline', 'AL', '항공사', 'Marketing Airline'] if c in merged_df.columns), None)
@@ -574,7 +579,14 @@ if "3/4수송" in selected_group:
             df_sup.columns = [str(c).strip() for c in df_sup.columns]
             al_col = next((c for c in ['Op Airline Code', 'Mkt Al', 'Airline', 'Op Airline', 'CARRIER', '항공사'] if c in df_sup.columns), None)
             df_sup['Airline'] = df_sup[al_col] if al_col else 'Unknown'
-            if '노선' in df_sup.columns: df_sup['노선_clean'] = df_sup['노선'].astype(str).str.strip()
+            
+            # 공급 데이터 노선 처리
+            sup_route_col = next((c for c in ['노선', 'Route', 'ROUTE'] if c in df_sup.columns), None)
+            if sup_route_col: 
+                df_sup['노선_clean'] = df_sup[sup_route_col].astype(str).str.strip()
+            else:
+                df_sup['노선_clean'] = ""
+
             df_sup['KE_취항여부'] = np.where(df_sup['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER), '취항', '미취항')
             df_sup['출발공항'] = df_sup['노선_clean'].apply(lambda x: KOREA_APO_MAP.get(str(x).split('/')[0].strip().upper(), '기타') if '/' in str(x) else '기타')
             df_sup['도착공항'] = df_sup['노선_clean'].apply(lambda x: str(x).split('/')[1].strip().upper() if '/' in str(x) else str(x).strip().upper())
@@ -767,7 +779,13 @@ if "3/4수송" in selected_group:
         
         if df_iss_merged is not None:
             df_agency = df_iss_merged.copy()
-            df_agency['노선_clean'] = df_agency['노선'].astype(str).str.strip()
+            
+            agency_route_col = next((c for c in ['노선', '노선_clean', 'Route', 'ROUTE'] if c in df_agency.columns), None)
+            if agency_route_col:
+                df_agency['노선_clean'] = df_agency[agency_route_col].astype(str).str.strip()
+            else:
+                df_agency['노선_clean'] = ""
+
             df_agency = df_agency[df_agency['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
             week_col_a = '발매주차_일자' if '발매주차_일자' in df_agency.columns else ('발매 주차' if '발매 주차' in df_agency.columns else '발매주차')
@@ -881,7 +899,13 @@ if "3/4수송" in selected_group:
         st.subheader("👥 발매 - 항공사별/대리점별 단체 발매 현황")
         if df_iss_merged is not None:
             df_grp_raw = df_iss_merged.copy()
-            df_grp_raw['노선_clean'] = df_grp_raw['노선'].astype(str).str.strip()
+            
+            grp_route_col = next((c for c in ['노선', '노선_clean', 'Route', 'ROUTE'] if c in df_grp_raw.columns), None)
+            if grp_route_col:
+                df_grp_raw['노선_clean'] = df_grp_raw[grp_route_col].astype(str).str.strip()
+            else:
+                df_grp_raw['노선_clean'] = ""
+
             df_grp_raw = df_grp_raw[df_grp_raw['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
             g_m_col = next((c for c in ['출발월', '출발 월'] if c in df_grp_raw.columns), None)
@@ -1332,7 +1356,7 @@ elif "6수송" in selected_group:
                     tot_ke_py = df_top20_all[df_top20_all[col_al_6] == 'KE']['Val_PY_num'].sum()
                     tot_ke_yoy = ((tot_ke_cy - tot_ke_py) / tot_ke_py * 100) if tot_ke_py > 0 else 0
                     tot_ke_ms_cy = (tot_ke_cy / tot_mkt_cy * 100) if tot_mkt_cy > 0 else 0
-                    tot_ke_ms_py = (tot_ke_py / tot_mkt_py * 100) if tot_mkt_py > 0 else 0
+                    tot_ke_ms_py = (tot_ke_py / tot_mkt_py * 100) if tot_ke_py > 0 else 0
                     tot_ke_ms_yoy = tot_ke_ms_cy - tot_ke_ms_py
 
                     od_matrix_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead>'
