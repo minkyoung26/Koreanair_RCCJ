@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 import os
+import glob
 
 # 1. Page Config
 st.set_page_config(
@@ -97,50 +98,39 @@ uploaded_iss = st.sidebar.file_uploader("1. 3/4수송 Parquet/CSV 캐시", type=
 uploaded_sup = st.sidebar.file_uploader("2. 공급 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_sup")
 uploaded_6th = st.sidebar.file_uploader("3. 6수송 데이터", type=['csv', 'xlsx', 'zip', 'parquet'], key="sb_uploader_6th")
 
-def optimize_df(df_in):
-    if df_in is None: return None
-    for col in df_in.columns:
-        if df_in[col].dtype == 'object':
-            if df_in[col].nunique() < len(df_in) * 0.5: df_in[col] = df_in[col].astype('category')
-        elif df_in[col].dtype == 'int64': df_in[col] = df_in[col].astype('int32')
-        elif df_in[col].dtype == 'float64': df_in[col] = df_in[col].astype('float32')
-    return df_in
-
 def clean_transport_column(df):
     if df is None: return df
     b_col = '수송' if '수송' in df.columns else ('Bound' if 'Bound' in df.columns else None)
     if b_col: df['수송'] = df[b_col].astype(str).str.strip()
     return df
 
-@st.cache_data(ttl=3600, show_spinner="3/4수송 데이터를 읽어오는 중...")
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_34_data.parquet')
-    if os.path.exists(target_path): return optimize_df(clean_transport_column(pd.read_parquet(target_path)))
+    if os.path.exists(target_path):
+        try: return clean_transport_column(pd.read_parquet(target_path))
+        except: pass
     return None
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def process_any_uploaded_file(file_obj):
     file_obj.seek(0)
     if file_obj.name.endswith('.parquet'): df = pd.read_parquet(file_obj)
     elif file_obj.name.endswith('.xlsx'): df = pd.read_excel(file_obj)
     else: df = pd.read_csv(file_obj, low_memory=False)
     df.columns = [str(c).strip() for c in df.columns]
-    return optimize_df(clean_transport_column(df))
+    return clean_transport_column(df)
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def load_aux_files():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     for sp in [os.path.join(base_dir, '공급.csv'), '공급.csv']:
         if os.path.exists(sp):
             try:
                 df = pd.read_csv(sp, low_memory=False)
-                if df is not None and not df.empty: return optimize_df(df)
+                if df is not None and not df.empty: return df
             except: pass
     return None
 
-# 🔥 [핵심] 안전성 강화된 6수송 데이터 로드 함수
-@st.cache_data(ttl=3600, show_spinner="🌐 6수송 집계 데이터를 로드하는 중...")
+# 🔥 [크래시 방지 핵심] 캐시 장치 제거 및 안전 직접 로드
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_path = os.path.join(base_dir, 'cache_6th_data.parquet')
@@ -150,8 +140,7 @@ def load_6th_data_aggregated():
             if df is not None and not df.empty:
                 return df
         except Exception as e:
-            st.error(f"⚠ Parquet 로드 중 예외 발생: {e}")
-            return None
+            st.error(f"⚠ Parquet 로드 예외: {e}")
     return None
 
 def get_34_last_updated_date():
@@ -558,7 +547,7 @@ if "3/4수송" in selected_group:
                 csv_data = filtered_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button("📥 필터링된 발매 Raw Data (CSV) 전체 다운로드", data=csv_data, file_name=f"Ticketing_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
                 st.dataframe(filtered_df.head(100), width='stretch')
-            else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
+            else: st.info("ℹ️️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
     # 2. ✈️ 공급 M/S 탭
@@ -938,8 +927,8 @@ elif "6수송" in selected_group:
     df_6th_raw = load_6th_data_aggregated()
 
     if df_6th_raw is None or df_6th_raw.empty:
-        st.error("❌ 6수송 캐시 파켓 파일(`cache_6th_data.parquet`)이 없거나 비어 있습니다.")
-        st.info("👉 터미널에서 `python batch_processor_6th.py`를 실행하여 파케 파일을 먼저 생성해주세요!")
+        st.error("❌ 6수송 캐시 파켓 파일(`cache_6th_data.parquet`)이 없거나 읽을 수 없습니다.")
+        st.info("👉 터미널에서 `python batch_processor_6th.py`를 한 번 실행해 주세요!")
         st.stop()
 
     df_6 = df_6th_raw.copy()
@@ -965,7 +954,7 @@ elif "6수송" in selected_group:
     col_val_6 = get_actual_col("Value") or "Value"
     col_year_type = get_actual_col("금년/전년") or "금년/전년"
 
-    # 🔥 [방어형 태깅] 구분 필드 자동 보완
+    # 🔥 안전한 구분 필드 태깅
     if col_year_type not in df_6.columns:
         if 'source_file' in df_6.columns:
             df_6[col_year_type] = np.where(df_6['source_file'].astype(str).str.contains('금년|CY', na=False), '금년', '전년')
@@ -1006,7 +995,7 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
         
-        # 🔥 [안전한 금년 전용 서브셋 추출 - 빈 프레임 절대 방지]
+        # 금년 필터용 안전 서브셋
         df_cy_pur_only = temp_df[temp_df['발매_연도구분'] == '금년 발매']
         if df_cy_pur_only.empty:
             df_cy_pur_only = temp_df[temp_df[col_year_type].astype(str).str.contains('금년|CY', na=False)]
