@@ -41,29 +41,26 @@ def make_unique_col_names(cols):
 
 def load_file_and_clean_columns(file_path):
     skip_rows, encoding = find_header_row_index(file_path)
-    print(f"\n📂 '{os.path.basename(file_path)}' 파일 분석 시작 (헤더 시작점: {skip_rows}행)...")
+    print(f"\n📂 '{os.path.basename(file_path)}' 분석 시작 (헤더 라인: {skip_rows})...")
 
     pdf = pd.read_csv(file_path, skiprows=skip_rows, encoding=encoding, low_memory=False, on_bad_lines='skip')
     pdf.columns = make_unique_col_names(pdf.columns)
 
     col_map = {str(c).lower().replace(" ", "").replace("_", "").replace(".", ""): c for c in pdf.columns}
 
-    # 🔥 비슷한 이름에 낚이지 않도록 '엄격한 일치' 방식 유지
     def get_col_strict(*targets):
         for t in targets:
             t_clean = t.lower().replace(" ", "").replace("_", "").replace(".", "")
             if t_clean in col_map: return col_map[t_clean]
         return None
 
-    # 1. 국가 코드 (JP, US 등)
+    # 국가 코드 및 국가 이름 매핑
     c_orig_cntry_code = get_col_strict("Trip Origin Country Code", "Origin Country Code", "Orig Country Code", "출발국가코드")
     c_dest_cntry_code = get_col_strict("Trip Destination Country Code", "Destination Country Code", "Dest Country Code", "도착국가코드")
-    
-    # 2. 국가 이름 (JAPAN, UNITED STATES 등) - 요청하신 Name 필드 완벽 추출
     c_orig_name = get_col_strict("Trip Origin Country Name", "Origin Country Name", "Trip Origin Country", "Origin Country", "출발국가")
     c_dest_name = get_col_strict("Trip Destination Country Name", "Destination Country Name", "Trip Destination Country", "Destination Country", "도착국가")
 
-    # 3. 공항 코드 (NRT, LAX 등)
+    # 공항 코드 매핑
     c_orig_city = get_col_strict("Trip Origin Code", "Origin Code", "Trip Origin", "Origin", "출발공항", "출발")
     c_dest_city = get_col_strict("Trip Destination Code", "Destination Code", "Trip Destination", "Destination", "Dest", "도착공항", "도착")
     
@@ -73,12 +70,6 @@ def load_file_and_clean_columns(file_path):
     c_airline = get_col_strict("Dominant Marketing Airline", "Marketing Airline", "Airline", "Carrier", "항공사")
     c_value = get_col_strict("Value", "Pax", "Passengers", "Passenger", "Bookings", "Tickets", "Total", "수송", "실적")
     c_stop1 = get_col_strict("STOP1", "Stops", "Stop", "경유")
-
-    print(f"  ✔️ 매핑 결과 확인:")
-    print(f"    - 출발 국가 [코드] : {c_orig_cntry_code}  |  [이름] : {c_orig_name}")
-    print(f"    - 도착 국가 [코드] : {c_dest_cntry_code}  |  [이름] : {c_dest_name}")
-    print(f"    - 출발 공항코드 컬럼 : {c_orig_city}")
-    print(f"    - 도착 공항코드 컬럼 : {c_dest_city}")
 
     clean_pdf = pd.DataFrame()
     clean_pdf["Ticket Purchase month"] = pdf[c_pur_m] if c_pur_m else ""
@@ -133,23 +124,26 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
             return f"{mkt_clean[:3]}-{mkt_clean[-3:]}"
         return f"{str(o_code).strip()}-{str(d_code).strip()}"
 
-    def make_vv_market(o_code, d_code, o_cntry_code, d_cntry_code):
+    def make_vv_market(o_code, d_code, o_cntry_code, d_cntry_code, o_name, d_name):
         o_c = str(o_cntry_code).upper().strip()
         d_c = str(d_cntry_code).upper().strip()
+        o_n = str(o_name).upper().strip()
+        d_n = str(d_name).upper().strip()
         o_str = str(o_code).strip()
         d_str = str(d_code).strip()
-        is_o_jp = o_c in ["JP", "JPN", "JAPAN"]
-        is_d_jp = d_c in ["JP", "JPN", "JAPAN"]
+        
+        is_o_jp = (o_c in ["JP", "JPN", "JAPAN"]) or (o_n in ["JP", "JPN", "JAPAN"])
+        is_d_jp = (d_c in ["JP", "JPN", "JAPAN"]) or (d_n in ["JP", "JPN", "JAPAN"])
 
         if is_o_jp: return f"{o_str}-{d_str} v.v."
         elif is_d_jp: return f"{d_str}-{o_str} v.v."
         else: return f"{o_str}-{d_str} v.v."
 
-    # 일본(JP) 여부를 국가코드 및 국가이름 양쪽에서 교차 검증
-    is_jp_expr = pl.col("Trip Origin Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN", "JAPAN"]) | \
-                 pl.col("Trip Origin Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN", "JAPAN"])
-    is_dest_jp_expr = pl.col("Trip Destination Country Code").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN", "JAPAN"]) | \
-                      pl.col("Trip Destination Country Name").cast(pl.Utf8).str.to_uppercase().str.strip_chars().is_in(["JP", "JPN", "JAPAN"])
+    # 일본(JP) 여부를 국가코드 및 국가이름 양쪽에서 교차 검증 (띄어쓰기 무시)
+    is_jp_expr = pl.col("Trip Origin Country Code").cast(pl.Utf8).str.to_uppercase().str.replace_all(" ", "").is_in(["JP", "JPN", "JAPAN"]) | \
+                 pl.col("Trip Origin Country Name").cast(pl.Utf8).str.to_uppercase().str.replace_all(" ", "").is_in(["JP", "JPN", "JAPAN"])
+    is_dest_jp_expr = pl.col("Trip Destination Country Code").cast(pl.Utf8).str.to_uppercase().str.replace_all(" ", "").is_in(["JP", "JPN", "JAPAN"]) | \
+                      pl.col("Trip Destination Country Name").cast(pl.Utf8).str.to_uppercase().str.replace_all(" ", "").is_in(["JP", "JPN", "JAPAN"])
 
     is_direct_expr = pl.col("STOP1").cast(pl.Utf8).str.strip_chars().str.to_lowercase().is_in(['', 'nan', 'none', 'null']) | pl.col("STOP1").is_null()
 
@@ -170,53 +164,51 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
             lambda x: parse_simple_od(x["Trip Market"], x["Trip Origin Code"], x["Trip Destination Code"]), return_dtype=pl.Utf8
         ).alias("Trip O&D"),
 
-        pl.struct(["Trip Origin Code", "Trip Destination Code", "Trip Origin Country Code", "Trip Destination Country Code"]).map_elements(
-            lambda x: make_vv_market(x["Trip Origin Code"], x["Trip Destination Code"], x["Trip Origin Country Code"], x["Trip Destination Country Code"]), return_dtype=pl.Utf8
+        pl.struct(["Trip Origin Code", "Trip Destination Code", "Trip Origin Country Code", "Trip Destination Country Code", "Trip Origin Country Name", "Trip Destination Country Name"]).map_elements(
+            lambda x: make_vv_market(x["Trip Origin Code"], x["Trip Destination Code"], x["Trip Origin Country Code"], x["Trip Destination Country Code"], x["Trip Origin Country Name"], x["Trip Destination Country Name"]), return_dtype=pl.Utf8
         ).alias("Trip O&D Market"),
         
         pl.when(is_jp_expr).then(pl.col("Trip Origin Code").cast(pl.Utf8)).otherwise(pl.col("Trip Destination Code").cast(pl.Utf8)).alias("일본 APO"),
         pl.when(is_jp_expr).then(pl.col("Trip Destination Code").cast(pl.Utf8)).otherwise(pl.col("Trip Origin Code").cast(pl.Utf8)).alias("해외 APO"),
         
-        # 🔥 투트랙(Dual) 매핑 준비: 일본 상대방의 국가코드(Code)와 국가이름(Name)을 모두 추출
+        # 🔥 투트랙 VLOOKUP 키 준비 (모든 띄어쓰기 강제 삭제)
         pl.when(is_jp_expr).then(pl.col("Trip Destination Country Code"))
           .when(is_dest_jp_expr).then(pl.col("Trip Origin Country Code"))
           .otherwise(pl.lit(""))
-          .cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("PARTNER_CNTRY_CODE"),
+          .cast(pl.Utf8).str.to_uppercase().str.replace_all(" ", "").alias("PARTNER_CNTRY_CODE"),
           
         pl.when(is_jp_expr).then(pl.col("Trip Destination Country Name"))
           .when(is_dest_jp_expr).then(pl.col("Trip Origin Country Name"))
           .otherwise(pl.lit(""))
-          .cast(pl.Utf8).str.to_uppercase().str.strip_chars().alias("PARTNER_CNTRY_NAME"),
+          .cast(pl.Utf8).str.to_uppercase().str.replace_all(" ", "").alias("PARTNER_CNTRY_NAME"),
           
         pl.col("Value").cast(pl.Utf8).str.replace_all(",", "").cast(pl.Float64, strict=False).fill_null(0.0).alias("Value_num")
     ])
 
     if os.path.exists(dim_file_path):
-        print("  ✔️ Dimension 파일 처리 중 (AA열: 국가코드/이름, AB열: 권역명 투트랙 매핑)...")
-        # 📌 지시하신 대로 Dimension.xlsx의 AA열과 AB열만 정확히 로드
+        print("  ✔️ Dimension 파일 처리 중 (띄어쓰기 무시 투트랙 VLOOKUP 진행 중)...")
         dim_df = pd.read_excel(dim_file_path, usecols="AA:AB")
         dim_df.columns = ["DIM_KEY", "RGN_NAME"]
         dim_df = dim_df.dropna(how='all')
         
+        # Dimension 키도 띄어쓰기 전부 삭제하여 완벽 일치 유도
         dim_pl = pl.from_pandas(dim_df).with_columns([
-            pl.col("DIM_KEY").cast(pl.Utf8).str.to_uppercase().str.strip_chars(),
+            pl.col("DIM_KEY").cast(pl.Utf8).str.to_uppercase().str.replace_all(" ", ""),
             pl.col("RGN_NAME").cast(pl.Utf8).str.strip_chars()
         ])
         
-        # 🔥 투트랙 매핑 실행
-        # 1. 원본의 '국가 코드'로 먼저 찔러보기
         df_processed = df_processed.join(dim_pl, left_on="PARTNER_CNTRY_CODE", right_on="DIM_KEY", how="left").rename({"RGN_NAME": "RGN_BY_CODE"})
-        # 2. 원본의 '국가 이름'으로 찔러보기
+        if "DIM_KEY" in df_processed.columns: df_processed = df_processed.drop("DIM_KEY")
+
         df_processed = df_processed.join(dim_pl, left_on="PARTNER_CNTRY_NAME", right_on="DIM_KEY", how="left").rename({"RGN_NAME": "RGN_BY_NAME"})
+        if "DIM_KEY" in df_processed.columns: df_processed = df_processed.drop("DIM_KEY")
         
-        # 3. 둘 중 하나라도 걸린 값(매칭 성공한 권역)을 최종 Region으로 확정!
         df_processed = df_processed.with_columns([
             pl.when(pl.col("RGN_BY_CODE").is_not_null() & (pl.col("RGN_BY_CODE") != "") & (pl.col("RGN_BY_CODE") != "nan")).then(pl.col("RGN_BY_CODE"))
               .when(pl.col("RGN_BY_NAME").is_not_null() & (pl.col("RGN_BY_NAME") != "") & (pl.col("RGN_BY_NAME") != "nan")).then(pl.col("RGN_BY_NAME"))
               .otherwise(pl.lit(None)).alias("FINAL_RGN")
         ])
 
-        # JPN- 머리말 붙이고, 매칭 실패 시 '기타' 처리
         df_processed = df_processed.with_columns([
             pl.when(pl.col("FINAL_RGN").is_not_null())
               .then(pl.lit("JPN-") + pl.col("FINAL_RGN"))
@@ -224,18 +216,19 @@ def process_and_aggregate_6th_data(cy_file_path, py_file_path, dim_file_path, ou
               .alias("4.OD RGN")
         ]).drop(["RGN_BY_CODE", "RGN_BY_NAME", "FINAL_RGN", "PARTNER_CNTRY_CODE", "PARTNER_CNTRY_NAME"])
     else:
-        print("  🚨 Dimension.xlsx 파일을 찾을 수 없어 권역이 '기타'로 세팅됩니다.")
         df_processed = df_processed.with_columns([pl.lit("기타").alias("4.OD RGN")]).drop(["PARTNER_CNTRY_CODE", "PARTNER_CNTRY_NAME"])
 
+    # 🔥 대시보드 화면에서 확인할 수 있도록 누락되었던 컬럼들 모두 부활
     final_group_cols = [
         "Ticket Purchase month", "Trip Month", "발매월_표시", "출발월_표시", "4.OD RGN", "DIRECTION", "직항/경유",
         "Trip Origin Country Code", "Trip Destination Country Code", 
+        "Trip Origin Country Name", "Trip Destination Country Name", 
         "일본 APO", "해외 APO", "Trip O&D", "Trip O&D Market", "Dominant Marketing Airline", "금년/전년"
     ]
 
     df_aggregated = df_processed.group_by(final_group_cols).agg([pl.col("Value_num").sum().alias("Value")])
     df_aggregated.write_parquet(output_parquet_path, compression="snappy")
-    print(f"\n🎉 성공! 캐시 파켓 파일('{output_parquet_path}')이 생성되었습니다! ({len(df_aggregated):,}행)")
+    print(f"\n🎉 대성공! 최신 캐시 파켓 파일('{output_parquet_path}')이 완벽하게 덮어써졌습니다! ({len(df_aggregated):,}행)")
 
 if __name__ == "__main__":
     process_and_aggregate_6th_data("6수송_금년.csv", "6수송_전년.csv", "Dimension.xlsx")
