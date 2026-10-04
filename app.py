@@ -296,7 +296,7 @@ if "3/4수송" in selected_group:
     )
     st.markdown("---")
     
-    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
 
     with tab_34_1:
         if df_iss_merged is None: 
@@ -320,7 +320,7 @@ if "3/4수송" in selected_group:
         bound_col = find_column_by_candidates(merged_df.columns, ['수송', 'bound'])
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
-            apply_weight_toggle = st.toggle("⚖️️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
+            apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
             
             temp_df_34 = merged_df.copy()
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
@@ -420,7 +420,7 @@ if "3/4수송" in selected_group:
                 with c2:
                     st.markdown("##### 📌 발매 실적 핵심 요약 (Summary)")
                     st.markdown(f'<div class="metric-card"><div class="metric-title">총 발매 실적{status_wt_label}</div><div class="metric-value">{total_pax:,.0f}</div></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#16a34a; font-weight:bold;">✈ <span class="ke-highlight">KE (대한항공) M/S</span></div><div class="metric-value" style="color:#16a34a;"><b>{ke_pax:,.0f} ({ke_ms:.1f}%)</b></div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#16a34a; font-weight:bold;">✈️ <span class="ke-highlight">KE (대한항공) M/S</span></div><div class="metric-value" style="color:#16a34a;"><b>{ke_pax:,.0f} ({ke_ms:.1f}%)</b></div></div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="metric-card"><div class="metric-title">1위 항공사 (M/S)</div><div class="metric-value" style="color:#1d4ed8;"><b>{top_al}</b> ({top_ms:.1f}%)</div></div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="metric-card"><div class="metric-title">최대 실적 노선</div><div class="metric-value" style="color:#047857;">{top_route}</div></div>', unsafe_allow_html=True)
 
@@ -726,7 +726,7 @@ if "3/4수송" in selected_group:
                 with tl_col2:
                     if sup_month_col and sup_month_col in df_schedule_route.columns and not df_schedule_route.empty:
                         avail_tl_months = sorted([str(x) for x in df_schedule_route[sup_month_col].dropna().unique() if '1900' not in str(x)])
-                        sel_tl_months = st.multiselect("🗓️️ 출발 월 필터 (미선택 시 전체):", options=avail_tl_months, default=[])
+                        sel_tl_months = st.multiselect("🗓️ 출발 월 필터 (미선택 시 전체):", options=avail_tl_months, default=[])
                         if sel_tl_months:
                             df_schedule = df_schedule_route[df_schedule_route[sup_month_col].astype(str).isin(sel_tl_months)].copy()
                         else:
@@ -1045,7 +1045,7 @@ elif "6수송" in selected_group:
     st.markdown('<div class="unified-sub-header">✈ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
     st.markdown(
         f'<div class="source-header-box">'
-        f'<b>📌 출처:</b> DDS, Bi-Directional, 일본-미주/구주/동남아/중국/대양주 &nbsp;|&nbsp; '
+        f'<b>📌 출처:</b> DDS, Bi-Directional, 일본-해외 노선 연동 &nbsp;|&nbsp; '
         f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str}'
         f'</div>', 
         unsafe_allow_html=True
@@ -1071,12 +1071,11 @@ elif "6수송" in selected_group:
             df_cy_trip_only = df_6[df_6[col_year_type].astype(str).str.contains('금년|CY', na=False)]
         if df_cy_trip_only.empty: df_cy_trip_only = df_6
 
-        # 필터 캐시 꼬임 방지를 위해 슬라이서 Key를 '_v3'로 일괄 변경
         raw_pur_m_cy = [str(x).strip() for x in df_cy_pur_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']] if col_pur_m_disp in df_cy_pur_only.columns else []
         opts_pur_m_cy = sort_month_options(raw_pur_m_cy, reverse=True)
         pur_range_label = get_dynamic_range_label_6th(opts_pur_m_cy)
         
-        sel_pur_m_disp = render_panel_multiselect(st, f"발매월{pur_range_label}", opts_pur_m_cy, "slc6_pur_v3")
+        sel_pur_m_disp = render_panel_multiselect(st, f"발매월{pur_range_label}", opts_pur_m_cy, "slicer6_pur_m_disp")
         if sel_pur_m_disp: 
             sel_norm_months = [extract_pure_month(x) for x in sel_pur_m_disp]
             temp_df = temp_df[temp_df['Pur_M_Norm'].isin(sel_norm_months)]
@@ -1085,21 +1084,21 @@ elif "6수송" in selected_group:
         opts_trip_m_cy = sort_month_options(raw_trip_m_cy, reverse=True)
         trip_range_label = get_dynamic_range_label_6th(opts_trip_m_cy)
         
-        sel_trip_m_disp = render_panel_multiselect(st, f"출발월{trip_range_label}", opts_trip_m_cy, "slc6_trp_v3")
+        sel_trip_m_disp = render_panel_multiselect(st, f"출발월{trip_range_label}", opts_trip_m_cy, "slicer6_trip_m_disp")
         if sel_trip_m_disp: 
             sel_norm_trip_months = [extract_pure_month(x) for x in sel_trip_m_disp]
             temp_df = temp_df[temp_df['Trip_M_Norm'].isin(sel_norm_trip_months)]
 
         opts_rgn = sorted([str(x).strip() for x in df_cy_pur_only[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in df_cy_pur_only.columns else []
-        sel_rgn = render_panel_multiselect(st, "OD Region", opts_rgn, "slc6_rgn_v3")
+        sel_rgn = render_panel_multiselect(st, "OD Region", opts_rgn, "slicer6_rgn")
         if sel_rgn: temp_df = temp_df[temp_df[col_rgn].astype(str).isin(sel_rgn)]
 
         opts_dir = sorted([str(x).strip() for x in df_cy_pur_only[col_dir].dropna().unique() if str(x).strip() != 'nan']) if col_dir in df_cy_pur_only.columns else []
-        sel_dir = render_panel_multiselect(st, "Direction (일본발/행)", opts_dir, "slc6_dir_v3")
+        sel_dir = render_panel_multiselect(st, "Direction (일본발/행)", opts_dir, "slicer6_dir")
         if sel_dir: temp_df = temp_df[temp_df[col_dir].astype(str).isin(sel_dir)]
 
         opts_direct = sorted([str(x).strip() for x in df_cy_pur_only[col_direct_transit].dropna().unique() if str(x).strip() != 'nan']) if col_direct_transit in df_cy_pur_only.columns else []
-        sel_direct = render_panel_multiselect(st, "직항/경유", opts_direct, "slc6_direct_v3")
+        sel_direct = render_panel_multiselect(st, "직항/경유", opts_direct, "slicer6_direct")
         if sel_direct: temp_df = temp_df[temp_df[col_direct_transit].astype(str).isin(sel_direct)]
 
         if col_al_6 in df_cy_pur_only.columns:
@@ -1108,27 +1107,27 @@ elif "6수송" in selected_group:
             opts_al = ['KE'] + [x for x in al_sorted if x != 'KE'] if 'KE' in al_sorted else al_sorted
         else:
             opts_al = []
-        sel_al_list = render_panel_multiselect(st, "항공사 (Carrier)", opts_al, "slc6_al_v3")
+        sel_al_list = render_panel_multiselect(st, "항공사 (Carrier)", opts_al, "slicer6_al_multi")
         if sel_al_list: temp_df = temp_df[temp_df[col_al_6].astype(str).isin(sel_al_list)]
 
         opts_od = sorted([str(x).strip() for x in df_cy_pur_only[col_od_simple].dropna().unique() if str(x).strip() != 'nan']) if col_od_simple in df_cy_pur_only.columns else []
-        sel_od_simple = render_panel_multiselect(st, "Trip O&D", opts_od, "slc6_od_v3")
+        sel_od_simple = render_panel_multiselect(st, "Trip O&D", opts_od, "slicer6_od_simple")
         if sel_od_simple: temp_df = temp_df[temp_df[col_od_simple].astype(str).isin(sel_od_simple)]
 
         opts_orig_c = sorted([str(x).strip() for x in df_cy_pur_only[col_orig_c].dropna().unique() if str(x).strip() != 'nan']) if col_orig_c in df_cy_pur_only.columns else []
-        sel_orig_c = render_panel_multiselect(st, "출발 국가 (Origin)", opts_orig_c, "slc6_orig_c_v3")
+        sel_orig_c = render_panel_multiselect(st, "출발 국가 (Origin)", opts_orig_c, "slicer6_orig_c")
         if sel_orig_c: temp_df = temp_df[temp_df[col_orig_c].astype(str).isin(sel_orig_c)]
 
         opts_dest_c = sorted([str(x).strip() for x in df_cy_pur_only[col_dest_c].dropna().unique() if str(x).strip() != 'nan']) if col_dest_c in df_cy_pur_only.columns else []
-        sel_dest_c = render_panel_multiselect(st, "도착 국가 (Destination)", opts_dest_c, "slc6_dest_c_v3")
+        sel_dest_c = render_panel_multiselect(st, "도착 국가 (Destination)", opts_dest_c, "slicer6_dest_c")
         if sel_dest_c: temp_df = temp_df[temp_df[col_dest_c].astype(str).isin(sel_dest_c)]
 
         opts_jp_apo = sorted([str(x).strip() for x in df_cy_pur_only[col_jp_apo].dropna().unique() if str(x).strip() != 'nan']) if col_jp_apo in df_cy_pur_only.columns else []
-        sel_jp_apo = render_panel_multiselect(st, "일본 APO", opts_jp_apo, "slc6_jp_apo_v3")
+        sel_jp_apo = render_panel_multiselect(st, "일본 APO", opts_jp_apo, "slicer6_jp_apo")
         if sel_jp_apo: temp_df = temp_df[temp_df[col_jp_apo].astype(str).isin(sel_jp_apo)]
 
         opts_ov_apo = sorted([str(x).strip() for x in df_cy_pur_only[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in df_cy_pur_only.columns else []
-        sel_ov_apo = render_panel_multiselect(st, "해외 APO", opts_ov_apo, "slc6_ov_apo_v3")
+        sel_ov_apo = render_panel_multiselect(st, "해외 APO", opts_ov_apo, "slicer6_ov_apo")
         if sel_ov_apo: temp_df = temp_df[temp_df[col_ov_apo].astype(str).isin(sel_ov_apo)]
 
         filtered_6th = temp_df
