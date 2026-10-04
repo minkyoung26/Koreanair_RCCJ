@@ -1043,7 +1043,7 @@ elif "6수송" in selected_group:
     st.markdown('<div class="unified-sub-header">✈ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
     st.markdown(
         f'<div class="source-header-box">'
-        f'<b>📌 출처:</b> DDS, Bi-Directional, 일본-해외 노선 연동 &nbsp;|&nbsp; '
+        f'<b>📌 출처:</b> DDS, Bi-Directional, 일본-중국/동남아/미주/구주/기타 &nbsp;|&nbsp; '
         f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str}'
         f'</div>', 
         unsafe_allow_html=True
