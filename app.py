@@ -1376,10 +1376,10 @@ elif "6수송" in selected_group:
                     tot_ke_ms_py = (tot_ke_py / tot_mkt_py * 100) if tot_mkt_py > 0 else 0
                     tot_ke_ms_yoy = tot_ke_ms_cy - tot_ke_ms_py
 
-                    # TOP 20 O&D 표 - 열 너비 완벽 정렬 스타일 적용
-                    od_matrix_html = '<div class="custom-piv-container" style="overflow-x:auto;"><table class="custom-piv-table" style="width:100%; table-layout:fixed; border-collapse:collapse;"><thead>'
+                  # TOP 20 O&D 표 - 줄바꿈 방지 및 최소 너비 확보 스타일 적용
+                    od_matrix_html = '<div class="custom-piv-container" style="overflow-x:auto;"><table class="custom-piv-table" style="width:100%; min-width:1150px; border-collapse:collapse;"><thead>'
                     
-                    # [헤더 1행] 순위(4%), Trip O&D(8%), 10개 지표열(각 8.8% 고정 = 88%) -> 합계 100%
+                    # [헤더 1행] 순위(4%), Trip O&D(8%), 10개 지표열(각 8.8% 고정)
                     od_matrix_html += '<tr>'
                     od_matrix_html += '<th rowspan="2" class="header-main" style="width:4%; padding:6px 2px; white-space:nowrap;">순위</th>'
                     od_matrix_html += '<th rowspan="2" class="header-main" style="width:8%; padding:6px 2px; white-space:nowrap;">Trip O&D</th>'
@@ -1389,7 +1389,7 @@ elif "6수송" in selected_group:
                     od_matrix_html += '<th colspan="4" class="header-main" style="width:35.2%; background-color:#9fc5e8 !important; color:#0f172a !important; white-space:nowrap;">KE 발매량 & M/S (대한항공)</th>'
                     od_matrix_html += '</tr>'
                     
-                    # [헤더 2행] 각 지표열 8.8% 균등 폭 고정
+                    # [헤더 2행] 각 지표열 8.8% 균등 폭 지정
                     th_col_style_dark = 'style="width:8.8%; background-color:#3172ac !important; color:#ffffff !important; padding:6px 2px; white-space:nowrap;"'
                     th_col_style_mid  = 'style="width:8.8%; background-color:#28629b !important; color:#ffffff !important; padding:6px 2px; white-space:nowrap;"'
                     th_col_style_navy = 'style="width:8.8%; background-color:#204f77 !important; color:#ffffff !important; padding:6px 2px; white-space:nowrap;"'
@@ -1408,7 +1408,7 @@ elif "6수송" in selected_group:
                     od_matrix_html += f'<th class="header-main" {th_col_style_ke}>YOY</th>'
                     od_matrix_html += '</tr></thead><tbody>'
 
-                    # [데이터 행] 동일 너비 및 텍스트 정렬 적용
+                    # [데이터 행] white-space: nowrap 적용
                     for r in matrix_rows:
                         od_matrix_html += '<tr>'
                         od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important; padding:6px 2px; white-space:nowrap;">{r["rank"]}</td>'
