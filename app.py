@@ -195,14 +195,16 @@ def extract_pure_month(val):
     elif len(s) <= 2 and s.isdigit(): return s.zfill(2)
     return s
 
-# 🔥 [신규 추가] 월 문자열(Dec-26 등)을 실제 날짜로 변환하여 정렬하는 헬퍼 함수
+# 🔥 [수정됨] 에러 방어 로직이 적용된 날짜 정렬 헬퍼 함수
 def sort_month_options(opts, reverse=True):
     def date_key(x):
         try:
-            return pd.to_datetime(x, format='%b-%y')
+            dt = pd.to_datetime(x, format='%b-%y')
+            return dt if pd.notna(dt) else pd.Timestamp('1900-01-01')
         except:
             try:
-                return pd.to_datetime(x)
+                dt = pd.to_datetime(x)
+                return dt if pd.notna(dt) else pd.Timestamp('1900-01-01')
             except:
                 return pd.Timestamp('1900-01-01')
     return sorted(opts, key=date_key, reverse=reverse)
@@ -211,7 +213,6 @@ def get_dynamic_range_label_6th(opts):
     if not opts: return ""
     clean_opts = [str(x).strip() for x in opts if str(x).strip() not in ['', 'nan']]
     if not clean_opts: return ""
-    # opts가 최신순(내림차순) 정렬되어 있다고 가정
     last_m = clean_opts[0]
     first_m = clean_opts[-1]
     return f" ({first_m}~{last_m})"
@@ -279,7 +280,7 @@ def get_dynamic_date_ranges_34(df_iss):
 
 
 # ==========================================
-# GROUP 1: ✈️️ 3/4수송 대시보드
+# GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
@@ -1071,9 +1072,9 @@ elif "6수송" in selected_group:
             df_cy_trip_only = df_6[df_6[col_year_type].astype(str).str.contains('금년|CY', na=False)]
         if df_cy_trip_only.empty: df_cy_trip_only = df_6
 
-        # 🔥 [정렬 보강] 발매월 최신순 정렬
-        raw_pur_m_cy = [str(x).strip() for x in df_cy_pur_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']]
-        opts_pur_m_cy = sort_month_options(raw_pur_m_cy, reverse=True) if col_pur_m_disp in df_cy_pur_only.columns else []
+        # 🔥 [정렬 보강 & 에러 방어 적용] 발매월 최신순 정렬
+        raw_pur_m_cy = [str(x).strip() for x in df_cy_pur_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']] if col_pur_m_disp in df_cy_pur_only.columns else []
+        opts_pur_m_cy = sort_month_options(raw_pur_m_cy, reverse=True)
         pur_range_label = get_dynamic_range_label_6th(opts_pur_m_cy)
         
         sel_pur_m_disp = render_panel_multiselect(st, f"발매월{pur_range_label}", opts_pur_m_cy, "slicer6_pur_m_disp")
@@ -1081,9 +1082,9 @@ elif "6수송" in selected_group:
             sel_norm_months = [extract_pure_month(x) for x in sel_pur_m_disp]
             temp_df = temp_df[temp_df['Pur_M_Norm'].isin(sel_norm_months)]
 
-        # 🔥 [정렬 보강] 출발월 최신순 정렬
-        raw_trip_m_cy = [str(x).strip() for x in df_cy_trip_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']]
-        opts_trip_m_cy = sort_month_options(raw_trip_m_cy, reverse=True) if col_trip_m_disp in df_cy_trip_only.columns else []
+        # 🔥 [정렬 보강 & 에러 방어 적용] 출발월 최신순 정렬
+        raw_trip_m_cy = [str(x).strip() for x in df_cy_trip_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']] if col_trip_m_disp in df_cy_trip_only.columns else []
+        opts_trip_m_cy = sort_month_options(raw_trip_m_cy, reverse=True)
         trip_range_label = get_dynamic_range_label_6th(opts_trip_m_cy)
         
         sel_trip_m_disp = render_panel_multiselect(st, f"출발월{trip_range_label}", opts_trip_m_cy, "slicer6_trip_m_disp")
