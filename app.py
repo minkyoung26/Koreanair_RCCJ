@@ -43,6 +43,11 @@ AIRLINE_WEIGHT_MULTIPLIERS = {
     'YP': 5.92588446, 'ZE': 3.783327953, 'WE': 1.0
 }
 
+MONTH_MAP = {
+    'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+    'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+}
+
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
@@ -179,14 +184,18 @@ def get_6th_last_updated_date():
     return "날짜 정보 없음"
 
 def extract_pure_month(val):
+    """
+    Dec-26, Jan-27, 2025-06, 06 등 영문/한글/숫자 포맷에서 순수 '월 번호(01~12)' 파싱
+    """
     if pd.isna(val): return ""
-    s = str(val).replace('-', '').replace('.', '').replace('/', '').replace('월', '').strip()
-    if len(s) >= 6 and s.isdigit():
-        return s[4:6].zfill(2)
-    elif len(s) == 4 and s.isdigit():
-        return s[2:4].zfill(2)
-    elif len(s) <= 2 and s.isdigit():
-        return s.zfill(2)
+    s_raw = str(val).strip().lower()
+    for m_abbr, m_num in MONTH_MAP.items():
+        if m_abbr in s_raw:
+            return m_num
+    s = s_raw.replace('-', '').replace('.', '').replace('/', '').replace('월', '').strip()
+    if len(s) >= 6 and s.isdigit(): return s[4:6].zfill(2)
+    elif len(s) == 4 and s.isdigit(): return s[2:4].zfill(2)
+    elif len(s) <= 2 and s.isdigit(): return s.zfill(2)
     return s
 
 def get_dynamic_range_label_6th(opts):
@@ -260,7 +269,7 @@ def get_dynamic_date_ranges_34(df_iss):
 
 
 # ==========================================
-# GROUP 1: ✈ 3/4수송 대시보드
+# GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
@@ -277,7 +286,7 @@ if "3/4수송" in selected_group:
     )
     st.markdown("---")
     
-    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
 
     with tab_34_1:
         if df_iss_merged is None: 
@@ -937,7 +946,7 @@ if "3/4수송" in selected_group:
 
                 al_g_col = find_column_by_candidates(temp_grp.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
                 opts_g_al = sorted([str(x) for x in temp_grp[al_g_col].dropna().unique()]) if al_g_col and al_g_col in temp_grp.columns else []
-                opts_g_al = ['KE'] + [x for x in opts_g_al if x != 'KE'] if 'KE' in opts_g_al else opts_al
+                opts_g_al = ['KE'] + [x for x in opts_g_al if x != 'KE'] if 'KE' in opts_g_al else opts_g_al
                 sel_g_al_list = render_multiselect_box(gc5, "5. 항공사", opts_g_al, "slicer_g_al_multi")
                 if sel_g_al_list and al_g_col: temp_grp = temp_grp[temp_grp[al_g_col].astype(str).isin(sel_g_al_list)]
 
@@ -1011,11 +1020,11 @@ elif "6수송" in selected_group:
 
     df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if col_val_6 in df_6.columns else 0.0
 
-    # 🔥 [핵심 1] 금년/전년 수치 분리
+    # 금년/전년 수치 분리
     df_6['Val_CY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), df_6['Val_num'], 0.0)
     df_6['Val_PY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('전년|PY', na=False), df_6['Val_num'], 0.0)
 
-    # 🔥 [핵심 2] 월 번호(01~12) 백그라운드 정규화 키
+    # 🔥 [월 번호 정규화 파생 컬럼 생성] Dec-26 -> '12'
     df_6['Pur_M_Norm'] = df_6[col_pur_m_disp].apply(extract_pure_month) if col_pur_m_disp in df_6.columns else ""
     df_6['Trip_M_Norm'] = df_6[col_trip_m_disp].apply(extract_pure_month) if col_trip_m_disp in df_6.columns else ""
 
@@ -1038,7 +1047,7 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
 
-        # 🔥 [핵심 3] 슬라이서 목록 추출 시 '6수송_금년.csv' (금년 발매/출발) 데이터 한정으로만 선택지 구성
+        # 슬라이서 옵션 추출용 (금년 레코드 한정)
         if col_pur_year_type in temp_df.columns:
             df_cy_pur_only = temp_df[temp_df[col_pur_year_type].astype(str).str.contains('금년', na=False)]
         else:
@@ -1058,7 +1067,7 @@ elif "6수송" in selected_group:
         
         sel_pur_m_disp = render_panel_multiselect(st, pur_label, opts_pur_m_cy, "slicer6_pur_m_disp")
         if sel_pur_m_disp: 
-            # 🔥 [핵심 4] 사용자가 선택한 금년 월의 '월 번호(01~12)'와 일치하는 '전년 파일 레코드'까지 백그라운드 연동 매칭
+            # 🔥 선택된 금년 월의 '순수 월 번호(MM)'로 금년/전년 레코드 동시 선택
             sel_norm_months = [extract_pure_month(x) for x in sel_pur_m_disp]
             temp_df = temp_df[temp_df['Pur_M_Norm'].isin(sel_norm_months)]
 
