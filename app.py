@@ -1313,6 +1313,13 @@ elif "6수송" in selected_group:
                 od_totals = filtered_6th.groupby(col_od_simple, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
                 top20_ods = [x for x in od_totals.index if od_totals[x] > 0][:20]
 
+                # 🔥 [nan, 결측치, 공백 값 제거 패치 적용]
+                od_totals = filtered_6th.groupby(col_od_simple, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
+                top20_ods = [
+                    x for x in od_totals.index 
+                    if str(x).strip().lower() not in ['nan', 'none', 'null', '', 'nat'] and od_totals[x] > 0
+                ][:20]
+
                 if top20_ods:
                     matrix_rows = []
                     for rank_i, od_simple_code in enumerate(top20_ods, 1):
