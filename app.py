@@ -197,24 +197,45 @@ def extract_pure_month(val):
 
 def sort_month_options(opts, reverse=True):
     def date_key(x):
-        try:
-            dt = pd.to_datetime(x, format='%b-%y')
-            return dt if pd.notna(dt) else pd.Timestamp('1900-01-01')
-        except:
+        s = str(x).strip()
+        if not s or s.lower() in ['nan', 'none']:
+            return pd.Timestamp('1900-01-01')
+        
+        # '26-Aug', 'Aug-26', '2026.08', '2026-08' 등 다양한 날짜 포맷 대응
+        formats_to_try = [
+            '%y-%b', '%b-%y', '%Y-%m', '%Y.%m', '%Y%m',
+            '%y-%B', '%B-%y', '%d-%b-%y', '%Y-%m-%d'
+        ]
+        for fmt in formats_to_try:
             try:
-                dt = pd.to_datetime(x)
-                return dt if pd.notna(dt) else pd.Timestamp('1900-01-01')
-            except:
-                return pd.Timestamp('1900-01-01')
+                dt = pd.to_datetime(s, format=fmt)
+                if pd.notna(dt):
+                    return dt
+            except Exception:
+                continue
+        try:
+            dt = pd.to_datetime(s, errors='coerce')
+            return dt if pd.notna(dt) else pd.Timestamp('1900-01-01')
+        except Exception:
+            return pd.Timestamp('1900-01-01')
+
+    # reverse=True -> 최신 달(예: Sep-26)이 맨 위, 과거 달(예: Oct-25)이 맨 아래
     return sorted(opts, key=date_key, reverse=reverse)
 
 def get_dynamic_range_label_6th(opts):
-    if not opts: return ""
-    clean_opts = [str(x).strip() for x in opts if str(x).strip() not in ['', 'nan']]
-    if not clean_opts: return ""
-    last_m = clean_opts[0]
-    first_m = clean_opts[-1]
-    return f" ({first_m}~{last_m})"
+    if not opts: 
+        return ""
+    # opts는 이미 sort_month_options(reverse=True)로 정렬된 상태
+    # opts[0] = 최신 달, opts[-1] = 가장 과거 달
+    clean_opts = [str(x).strip() for x in opts if str(x).strip() not in ['', 'nan', 'none']]
+    if not clean_opts: 
+        return ""
+    
+    latest_m = clean_opts[0]    # 가장 최근 (예: Sep-26)
+    earliest_m = clean_opts[-1] # 가장 과거 (예: Oct-25)
+    
+    # 과거 ~ 최근 순서로 범위 표기 (예: Oct-25 ~ Sep-26)
+    return f" ({earliest_m} ~ {latest_m})"
 
 disk_sup = load_aux_files()
 df_iss_merged = process_any_uploaded_file(uploaded_iss) if uploaded_iss else load_fast_parquet_data_file()
