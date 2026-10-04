@@ -179,9 +179,6 @@ def get_6th_last_updated_date():
     return "날짜 정보 없음"
 
 def extract_pure_month(val):
-    """
-    어떤 형식의 날짜 문자열(2025-06, 202506, 06, 6)이든 '06' 형태의 2자리 월로 정규화
-    """
     if pd.isna(val): return ""
     s = str(val).replace('-', '').replace('.', '').replace('/', '').replace('월', '').strip()
     if len(s) >= 6 and s.isdigit():
@@ -263,7 +260,7 @@ def get_dynamic_date_ranges_34(df_iss):
 
 
 # ==========================================
-# GROUP 1: ✈️️ 3/4수송 대시보드
+# GROUP 1: ✈ 3/4수송 대시보드
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
@@ -940,7 +937,7 @@ if "3/4수송" in selected_group:
 
                 al_g_col = find_column_by_candidates(temp_grp.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
                 opts_g_al = sorted([str(x) for x in temp_grp[al_g_col].dropna().unique()]) if al_g_col and al_g_col in temp_grp.columns else []
-                opts_g_al = ['KE'] + [x for x in opts_g_al if x != 'KE'] if 'KE' in opts_g_al else opts_g_al
+                opts_g_al = ['KE'] + [x for x in opts_g_al if x != 'KE'] if 'KE' in opts_g_al else opts_al
                 sel_g_al_list = render_multiselect_box(gc5, "5. 항공사", opts_g_al, "slicer_g_al_multi")
                 if sel_g_al_list and al_g_col: temp_grp = temp_grp[temp_grp[al_g_col].astype(str).isin(sel_g_al_list)]
 
@@ -1014,10 +1011,11 @@ elif "6수송" in selected_group:
 
     df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if col_val_6 in df_6.columns else 0.0
 
+    # 🔥 [핵심 1] 금년/전년 수치 분리
     df_6['Val_CY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), df_6['Val_num'], 0.0)
     df_6['Val_PY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('전년|PY', na=False), df_6['Val_num'], 0.0)
 
-    # 🔥 [월 정규화 파생 컬럼 준비]
+    # 🔥 [핵심 2] 월 번호(01~12) 백그라운드 정규화 키
     df_6['Pur_M_Norm'] = df_6[col_pur_m_disp].apply(extract_pure_month) if col_pur_m_disp in df_6.columns else ""
     df_6['Trip_M_Norm'] = df_6[col_trip_m_disp].apply(extract_pure_month) if col_trip_m_disp in df_6.columns else ""
 
@@ -1040,7 +1038,7 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
 
-        # 슬라이서 옵션 추출용 (금년 레코드 한정)
+        # 🔥 [핵심 3] 슬라이서 목록 추출 시 '6수송_금년.csv' (금년 발매/출발) 데이터 한정으로만 선택지 구성
         if col_pur_year_type in temp_df.columns:
             df_cy_pur_only = temp_df[temp_df[col_pur_year_type].astype(str).str.contains('금년', na=False)]
         else:
@@ -1060,14 +1058,9 @@ elif "6수송" in selected_group:
         
         sel_pur_m_disp = render_panel_multiselect(st, pur_label, opts_pur_m_cy, "slicer6_pur_m_disp")
         if sel_pur_m_disp: 
-            # 🔥 [원천 불일치 완전 방어 구문]
-            # 선택된 값들의 원본 문자열 목록 AND 2자리 월(MM) 정규화 목록을 모두 취함
-            sel_clean_strs = [str(x).strip() for x in sel_pur_m_disp]
+            # 🔥 [핵심 4] 사용자가 선택한 금년 월의 '월 번호(01~12)'와 일치하는 '전년 파일 레코드'까지 백그라운드 연동 매칭
             sel_norm_months = [extract_pure_month(x) for x in sel_pur_m_disp]
-            
-            cond1 = temp_df[col_pur_m_disp].astype(str).str.strip().isin(sel_clean_strs)
-            cond2 = temp_df['Pur_M_Norm'].isin(sel_norm_months)
-            temp_df = temp_df[cond1 | cond2]
+            temp_df = temp_df[temp_df['Pur_M_Norm'].isin(sel_norm_months)]
 
         # 2. 출발월 동적 필터
         opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_trip_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in df_cy_trip_only.columns else []
@@ -1076,12 +1069,8 @@ elif "6수송" in selected_group:
         
         sel_trip_m_disp = render_panel_multiselect(st, trip_label, opts_trip_m_cy, "slicer6_trip_m_disp")
         if sel_trip_m_disp: 
-            sel_clean_trip_strs = [str(x).strip() for x in sel_trip_m_disp]
             sel_norm_trip_months = [extract_pure_month(x) for x in sel_trip_m_disp]
-            
-            t_cond1 = temp_df[col_trip_m_disp].astype(str).str.strip().isin(sel_clean_trip_strs)
-            t_cond2 = temp_df['Trip_M_Norm'].isin(sel_norm_trip_months)
-            temp_df = temp_df[t_cond1 | t_cond2]
+            temp_df = temp_df[temp_df['Trip_M_Norm'].isin(sel_norm_trip_months)]
 
         opts_rgn = sorted([str(x).strip() for x in temp_df[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in temp_df.columns else []
         sel_rgn = render_panel_multiselect(st, "OD Region", opts_rgn, "slicer6_rgn")
