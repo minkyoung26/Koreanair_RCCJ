@@ -195,12 +195,25 @@ def extract_pure_month(val):
     elif len(s) <= 2 and s.isdigit(): return s.zfill(2)
     return s
 
+# 🔥 [신규 추가] 월 문자열(Dec-26 등)을 실제 날짜로 변환하여 정렬하는 헬퍼 함수
+def sort_month_options(opts, reverse=True):
+    def date_key(x):
+        try:
+            return pd.to_datetime(x, format='%b-%y')
+        except:
+            try:
+                return pd.to_datetime(x)
+            except:
+                return pd.Timestamp('1900-01-01')
+    return sorted(opts, key=date_key, reverse=reverse)
+
 def get_dynamic_range_label_6th(opts):
     if not opts: return ""
     clean_opts = [str(x).strip() for x in opts if str(x).strip() not in ['', 'nan']]
     if not clean_opts: return ""
-    first_m = clean_opts[-1]
+    # opts가 최신순(내림차순) 정렬되어 있다고 가정
     last_m = clean_opts[0]
+    first_m = clean_opts[-1]
     return f" ({first_m}~{last_m})"
 
 disk_sup = load_aux_files()
@@ -266,7 +279,7 @@ def get_dynamic_date_ranges_34(df_iss):
 
 
 # ==========================================
-# GROUP 1: ✈️ 3/4수송 대시보드
+# GROUP 1: ✈️️ 3/4수송 대시보드
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
@@ -324,7 +337,8 @@ if "3/4수송" in selected_group:
             sel_week_list = render_multiselect_box(f_col3, "3. 발매 주차", opts_week, "slicer_week_multi")
             if sel_week_list and week_col: temp_df_34 = temp_df_34[temp_df_34[week_col].astype(str).str.strip().isin(sel_week_list)]
 
-            opts_month = sorted([str(x).strip() for x in temp_df_34[month_col].dropna().unique() if str(x).strip() != 'nan']) if month_col and month_col in temp_df_34.columns else []
+            raw_month_34 = [str(x).strip() for x in temp_df_34[month_col].dropna().unique() if str(x).strip() != 'nan'] if month_col and month_col in temp_df_34.columns else []
+            opts_month = sort_month_options(raw_month_34, reverse=True)
             sel_month_list = render_multiselect_box(f_col4, "4. 출발 월", opts_month, "slicer_month_multi")
             if sel_month_list and month_col: temp_df_34 = temp_df_34[temp_df_34[month_col].astype(str).str.strip().isin(sel_month_list)]
 
@@ -406,7 +420,7 @@ if "3/4수송" in selected_group:
                 with c2:
                     st.markdown("##### 📌 발매 실적 핵심 요약 (Summary)")
                     st.markdown(f'<div class="metric-card"><div class="metric-title">총 발매 실적{status_wt_label}</div><div class="metric-value">{total_pax:,.0f}</div></div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#16a34a; font-weight:bold;">✈️️ <span class="ke-highlight">KE (대한항공) M/S</span></div><div class="metric-value" style="color:#16a34a;"><b>{ke_pax:,.0f} ({ke_ms:.1f}%)</b></div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#16a34a; font-weight:bold;">✈ <span class="ke-highlight">KE (대한항공) M/S</span></div><div class="metric-value" style="color:#16a34a;"><b>{ke_pax:,.0f} ({ke_ms:.1f}%)</b></div></div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="metric-card"><div class="metric-title">1위 항공사 (M/S)</div><div class="metric-value" style="color:#1d4ed8;"><b>{top_al}</b> ({top_ms:.1f}%)</div></div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="metric-card"><div class="metric-title">최대 실적 노선</div><div class="metric-value" style="color:#047857;">{top_route}</div></div>', unsafe_allow_html=True)
 
@@ -617,7 +631,8 @@ if "3/4수송" in selected_group:
             sel_sup_dest_list = render_multiselect_box(sf_col3, "3. 도착 공항", opts_dest, "slicer_sup_dest_multi")
             if sel_sup_dest_list: temp_sup = temp_sup[temp_sup['도착공항'].isin(sel_sup_dest_list)]
 
-            opts_sup_m = sorted([str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan']) if sup_month_col and sup_month_col in temp_sup.columns else []
+            raw_sup_m = [str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan'] if sup_month_col and sup_month_col in temp_sup.columns else []
+            opts_sup_m = sort_month_options(raw_sup_m, reverse=True)
             sel_sup_month_list = render_multiselect_box(sf_col4, "4. 출발 월", opts_sup_m, "slicer_month_sup_multi")
             if sel_sup_month_list and sup_month_col: temp_sup = temp_sup[temp_sup[sup_month_col].isin(sel_sup_month_list)]
 
@@ -802,7 +817,8 @@ if "3/4수송" in selected_group:
                 sel_route_ag_list = render_multiselect_box(ac1, "1. 노선", opts_r_ag, "slicer_route_ag_multi")
                 if sel_route_ag_list: temp_ag = temp_ag[temp_ag['노선_clean'].isin(sel_route_ag_list)]
 
-                opts_m_ag = sorted([str(x) for x in temp_ag[month_col_a].dropna().unique()]) if month_col_a and month_col_a in temp_ag.columns else []
+                raw_m_ag = [str(x) for x in temp_ag[month_col_a].dropna().unique()] if month_col_a and month_col_a in temp_ag.columns else []
+                opts_m_ag = sort_month_options(raw_m_ag, reverse=True)
                 sel_month_ag_list = render_multiselect_box(ac2, "2. 출발 월", opts_m_ag, "slicer_month_ag_multi")
                 if sel_month_ag_list and month_col_a: temp_ag = temp_ag[temp_ag[month_col_a].astype(str).isin(sel_month_ag_list)]
 
@@ -927,7 +943,8 @@ if "3/4수송" in selected_group:
                 sel_g_route_list = render_multiselect_box(gc1, "1. 노선", opts_g_route, "slicer_g_route_multi")
                 if sel_g_route_list: temp_grp = temp_grp[temp_grp['노선_clean'].isin(sel_g_route_list)]
 
-                opts_g_m = sorted([str(x) for x in temp_grp[g_m_col].dropna().unique()]) if g_m_col and g_m_col in temp_grp.columns else []
+                raw_g_m = [str(x) for x in temp_grp[g_m_col].dropna().unique()] if g_m_col and g_m_col in temp_grp.columns else []
+                opts_g_m = sort_month_options(raw_g_m, reverse=True)
                 sel_g_month_list = render_multiselect_box(gc2, "2. 출발 월", opts_g_m, "slicer_g_month_multi")
                 if sel_g_month_list and g_m_col: temp_grp = temp_grp[temp_grp[g_m_col].astype(str).isin(sel_g_month_list)]
 
@@ -1042,8 +1059,6 @@ elif "6수송" in selected_group:
         
         temp_df = df_6.copy()
 
-        # 🔥 [슬라이서 옵션 추출용 독립 베이스]
-        # 옵션 목록은 필터링으로 좁혀진 temp_df가 아닌, 원본 데이터 df_cy_pur_only 에서 직접 가져와서 고정시킵니다.
         if col_pur_year_type in df_6.columns:
             df_cy_pur_only = df_6[df_6[col_pur_year_type].astype(str).str.contains('금년', na=False)]
         else:
@@ -1056,8 +1071,9 @@ elif "6수송" in selected_group:
             df_cy_trip_only = df_6[df_6[col_year_type].astype(str).str.contains('금년|CY', na=False)]
         if df_cy_trip_only.empty: df_cy_trip_only = df_6
 
-        # 1. 발매월 동적 필터
-        opts_pur_m_cy = sorted([str(x).strip() for x in df_cy_pur_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=True) if col_pur_m_disp in df_cy_pur_only.columns else []
+        # 🔥 [정렬 보강] 발매월 최신순 정렬
+        raw_pur_m_cy = [str(x).strip() for x in df_cy_pur_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']]
+        opts_pur_m_cy = sort_month_options(raw_pur_m_cy, reverse=True) if col_pur_m_disp in df_cy_pur_only.columns else []
         pur_range_label = get_dynamic_range_label_6th(opts_pur_m_cy)
         
         sel_pur_m_disp = render_panel_multiselect(st, f"발매월{pur_range_label}", opts_pur_m_cy, "slicer6_pur_m_disp")
@@ -1065,8 +1081,9 @@ elif "6수송" in selected_group:
             sel_norm_months = [extract_pure_month(x) for x in sel_pur_m_disp]
             temp_df = temp_df[temp_df['Pur_M_Norm'].isin(sel_norm_months)]
 
-        # 2. 출발월 동적 필터
-        opts_trip_m_cy = sorted([str(x).strip() for x in df_cy_trip_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']], reverse=False) if col_trip_m_disp in df_cy_trip_only.columns else []
+        # 🔥 [정렬 보강] 출발월 최신순 정렬
+        raw_trip_m_cy = [str(x).strip() for x in df_cy_trip_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']]
+        opts_trip_m_cy = sort_month_options(raw_trip_m_cy, reverse=True) if col_trip_m_disp in df_cy_trip_only.columns else []
         trip_range_label = get_dynamic_range_label_6th(opts_trip_m_cy)
         
         sel_trip_m_disp = render_panel_multiselect(st, f"출발월{trip_range_label}", opts_trip_m_cy, "slicer6_trip_m_disp")
@@ -1074,8 +1091,6 @@ elif "6수송" in selected_group:
             sel_norm_trip_months = [extract_pure_month(x) for x in sel_trip_m_disp]
             temp_df = temp_df[temp_df['Trip_M_Norm'].isin(sel_norm_trip_months)]
 
-        # 🔥 [핵심 수정: 하위 필터 옵션 고정]
-        # temp_df 대신 항상 df_cy_pur_only에서 유니크 옵션을 가져와서 선택지가 지워지는 것을 방어
         opts_rgn = sorted([str(x).strip() for x in df_cy_pur_only[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in df_cy_pur_only.columns else []
         sel_rgn = render_panel_multiselect(st, "OD Region", opts_rgn, "slicer6_rgn")
         if sel_rgn: temp_df = temp_df[temp_df[col_rgn].astype(str).isin(sel_rgn)]
