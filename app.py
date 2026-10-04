@@ -1128,7 +1128,9 @@ elif "6수송" in selected_group:
         sel_ov_apo = render_panel_multiselect(st, "해외 APO", opts_ov_apo, "slicer6_ov_apo")
         if sel_ov_apo: temp_df = temp_df[temp_df[col_ov_apo].astype(str).isin(sel_ov_apo)]
 
-        filtered_6th = temp_df
+        # 🔥 filtered_6th = temp_df 대신 아래 2줄로 대체
+        invalid_mask = temp_df[col_od_simple].fillna('').astype(str).str.strip().str.lower().isin(['nan', 'none', 'null', '', 'nat'])
+        filtered_6th = temp_df[~invalid_mask].copy()
 
     with col_right_data:
         tabs = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "📋 6수송 Raw Data View"])
