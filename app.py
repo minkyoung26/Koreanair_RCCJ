@@ -258,11 +258,11 @@ def render_panel_multiselect(container, label, full_list, key_name, default_vals
 def get_yoy_td_html(val, is_percentage_point=False, bg_color="", bg_class=""):
     unit = "%p" if is_percentage_point else "%"
     class_str = f' class="{bg_class}"' if bg_class else ''
-    style_str = f' style="background-color:{bg_color} !important; text-align:center !important;"' if bg_color and not bg_class else ' style="text-align:center !important;"'
+    style_str = f' style="background-color:{bg_color} !important; text-align:center !important; white-space:nowrap !important; padding:6px 4px !important;"' if bg_color and not bg_class else ' style="text-align:center !important; white-space:nowrap !important; padding:6px 4px !important;"'
     base_td = f'<td{class_str}{style_str}>'
     if val > 0: return f'{base_td}<span class="yoy-up">▲ {val:.1f}{unit}</span></td>'
     elif val < 0: return f'{base_td}<span class="yoy-down">▼ {abs(val):.1f}{unit}</span></td>'
-    else: return f'{base_td}<span class="yoy-dash">-</span></td>'
+    else: return f'<td{class_str}{style_str}><span class="yoy-dash">-</span></td>'
 
 def get_dash_td(bg_color="", bg_class=""):
     class_str = f' class="{bg_class}"' if bg_class else ''
