@@ -110,13 +110,27 @@ def load_fast_parquet_data_file():
         'cache_34_data.parquet',
         os.path.join(os.getcwd(), 'cache_34_data.parquet')
     ]
+@st.cache_data(ttl=3600)  # 1시간 동안 메모리에 캐시 유지
+def load_fast_parquet_data_file():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(base_dir, "cache_34_data.parquet"),
+        "cache_34_data.parquet",
+        os.path.join(os.getcwd(), "cache_34_data.parquet"),
+    ]
+
     for target_path in candidates:
         if os.path.exists(target_path):
             try:
-                df = pd.read_parquet(target_path, engine='pyarrow')
+                df = pd.read_parquet(target_path, engine="pyarrow")
                 if df is not None and not df.empty:
+                    # 🟢 Category 타입을 일반 문자열로 변환하여 메모리 폭증 차단
+                    for col in df.select_dtypes(include=["category"]).columns:
+                        df[col] = df[col].astype(str)
+
                     return clean_transport_column(df)
-            except Exception: pass
+            except Exception:
+                pass
     return None
 
 def process_any_uploaded_file(file_obj):
