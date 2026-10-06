@@ -338,11 +338,21 @@ if "3/4수송" in selected_group:
                 break
         if al_col_target:
             break
-
     if not al_col_target:
-        al_col_target = find_column_by_candidates(merged_df.columns, ['dominantmarketingairline', 'marketingairline', 'mkt_al'])
+       # pos_al, country_al 등 국가 관련 컬럼을 제외하고 실제 항공사 컬럼만 지정
+target_al_col = None
+for col in merged_df.columns:
+    col_str = str(col).lower().replace('_', '').replace(' ', '')
+    if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
+        continue  # 국가 관련 컬럼 완전 무시
+    if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str:
+        target_al_col = col
+        break
 
-    merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target else ''
+if not target_al_col and 'dominantmarketingairline' in merged_df.columns:
+    target_al_col = 'dominantmarketingairline'
+
+merged_df['AL_clean'] = merged_df[target_al_col].astype(str).str.strip().str.upper() if target_al_col and target_al_col in merged_df.columns else 'OTHER'
          
         for cand in exact_al_candidates:
             for col in merged_df.columns:
