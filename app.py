@@ -975,19 +975,32 @@ elif "6수송" in selected_group:
                 return sorted([str(x).strip() for x in df_cy_only[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
             return []
 
-        # 🟢 3. 슬라이서 목록을 금년 기준으로 생성
-        opts_pur_m = sort_month_options(get_clean_opts_cy(col_pur_m_disp), reverse=True)
-        opts_trip_m = sort_month_options(get_clean_opts_cy(col_trip_m_disp), reverse=True)
-        opts_rgn = get_clean_opts_cy(col_rgn)
-        opts_dir = get_clean_opts_cy(col_dir)
-        opts_direct = get_clean_opts_cy(col_direct_transit)
-        opts_al = get_clean_opts_cy(col_al_6)
+     # 🟢 발매월/출발월 및 전체 슬라이서 옵션을 금년(CY) 데이터 기준으로만 추출
+        df_cy_pur = df_6[df_6[col_pur_year_type].astype(str).str.contains('금년|CY', na=False)] if col_pur_year_type in df_6.columns else df_6
+        if df_cy_pur.empty: df_cy_pur = df_6
+
+        df_cy_trip = df_6[df_6[col_trip_year_type].astype(str).str.contains('금년|CY', na=False)] if col_trip_year_type in df_6.columns else df_6
+        if df_cy_trip.empty: df_cy_trip = df_6
+
+        def get_clean_opts_from_df(target_df, col_name):
+            if col_name in target_df.columns:
+                return sorted([str(x).strip() for x in target_df[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
+            return []
+
+        opts_pur_m = sort_month_options(get_clean_opts_from_df(df_cy_pur, col_pur_m_disp), reverse=True)
+        opts_trip_m = sort_month_options(get_clean_opts_from_df(df_cy_trip, col_trip_m_disp), reverse=True)
+        
+        opts_rgn = get_clean_opts_from_df(df_cy_pur, col_rgn)
+        opts_dir = get_clean_opts_from_df(df_cy_pur, col_dir)
+        opts_direct = get_clean_opts_from_df(df_cy_pur, col_direct_transit)
+        opts_al = get_clean_opts_from_df(df_cy_pur, col_al_6)
         if 'KE' in opts_al: opts_al = ['KE'] + [x for x in opts_al if x != 'KE']
-        opts_od = get_clean_opts_cy(col_od_simple)
-        opts_orig_c = get_clean_opts_cy(col_orig_c)
-        opts_dest_c = get_clean_opts_cy(col_dest_c)
-        opts_jp_apo = get_clean_opts_cy(col_jp_apo)
-        opts_ov_apo = get_clean_opts_cy(col_ov_apo)
+        
+        opts_od = get_clean_opts_from_df(df_cy_pur, col_od_simple)
+        opts_orig_c = get_clean_opts_from_df(df_cy_pur, col_orig_c)
+        opts_dest_c = get_clean_opts_from_df(df_cy_pur, col_dest_c)
+        opts_jp_apo = get_clean_opts_from_df(df_cy_pur, col_jp_apo)
+        opts_ov_apo = get_clean_opts_from_df(df_cy_pur, col_ov_apo)
         sel_pur_m_disp = st.multiselect(f"발매월{get_dynamic_range_label_6th(opts_pur_m)}", options=opts_pur_m, key="m_pur_6th_v2")
         sel_trip_m_disp = st.multiselect(f"출발월{get_dynamic_range_label_6th(opts_trip_m)}", options=opts_trip_m, key="m_trip_6th_v2")
         sel_rgn = st.multiselect("OD Region", options=opts_rgn, key="m_rgn_6th_v2")
