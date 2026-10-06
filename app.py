@@ -397,9 +397,15 @@ if "3/4수송" in selected_group:
         filtered_df['Value'] = pd.to_numeric(filtered_df[val_col_raw].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if val_col_raw in filtered_df.columns else 0.0
 
         if apply_weight_toggle:
-            filtered_df['Mult_map'] = filtered_df['AL_clean'].map(AIRLINE_WEIGHT_MULTIPLIERS).fillna(1.0)
-            filtered_df['Calc_Weighted_Value'] = filtered_df['Value'] * filtered_df['Mult_map']
-            val_col = 'Calc_Weighted_Value'
+            # 파케 파일에 batch_processor가 이미 연산해둔 노선별 가중치 컬럼을 그대로 사용
+            if 'Calc_Weighted_Value' in filtered_df.columns:
+                val_col = 'Calc_Weighted_Value'
+            elif 'Weighted_Value' in filtered_df.columns:
+                val_col = 'Weighted_Value'
+            else:
+                val_col = 'Value'
+        else:
+            val_col = 'Value'
             al_wt_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
             total_pax = al_wt_sum.sum()
             ke_pax = al_wt_sum.get('KE', 0)
@@ -1460,7 +1466,7 @@ elif "6수송" in selected_group:
                         od_matrix_html += get_yoy_td_html(r["mkt_yoy"], bg_color="#ffffff")
                         od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important; padding:6px 2px; white-space:nowrap;">{r["sel_cy"]:,.0f}</td>'
                         od_matrix_html += get_yoy_td_html(r["sel_yoy"], bg_color="#ffffff")
-                        od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important; padding:6px 2px; white-space:nowrap;">{r["sel_ms_cy"]:.1f}%</td>'
+                        od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important; padding:grand_ke_ms_cyAIRLINE_WEIGHT_MULTIPLIERS =6px 2px; white-space:nowrap;">{r["sel_ms_cy"]:.1f}%</td>'
                         od_matrix_html += get_yoy_td_html(r["sel_ms_yoy"], True, bg_color="#ffffff")
                         
                         od_matrix_html += f'<td style="background-color:#ffffff !important; text-align:center !important; padding:6px 2px; white-space:nowrap;"><span class="txt-ke-bold">{r["ke_cy"]:,.0f}</span></td>'
