@@ -911,10 +911,11 @@ if "3/4수송" in selected_group:
                 st.markdown("---")
                 st.markdown(
                     '<div class="unified-sub-header">3. 주요 항공사 공급 타임라인'
-                    ' 추이</div>',
+                    " 산점도 추이</div>",
                     unsafe_allow_html=True,
                 )
 
+                # 🟢 3번 전용 별도 서브 필터 (노선, 출발월)
                 tf_col1, tf_col2 = st.columns(2)
 
                 opts_t_route = sorted([
@@ -945,6 +946,7 @@ if "3/4수송" in selected_group:
                         key="timeline_month_sub_filter",
                     )
 
+                    # 서브 필터링 적용
                     df_timeline_target = filtered_sup.copy()
                     if sel_t_route:
                         df_timeline_target = df_timeline_target[
@@ -956,6 +958,7 @@ if "3/4수송" in selected_group:
                         ]
 
                     if not df_timeline_target.empty:
+                        # 출발월/항공사별 그룹화
                         timeline_grp = (
                             df_timeline_target.groupby(
                                 [sup_month_col, "Airline"], observed=False
@@ -964,6 +967,31 @@ if "3/4수송" in selected_group:
                             .reset_index()
                         )
 
+                        # 월별 총공급량 대비 항공사별 M/S 점유율 계산
+                        mkt_monthly_tot = (
+                            df_timeline_target.groupby(
+                                sup_month_col, observed=False
+                            )[val_col_sup]
+                            .sum()
+                            .reset_index()
+                        )
+                        timeline_grp = pd.merge(
+                            timeline_grp,
+                            mkt_monthly_tot,
+                            on=sup_month_col,
+                            suffixes=("", "_Mkt"),
+                        )
+                        timeline_grp["MS_Percent"] = np.where(
+                            timeline_grp[f"{val_col_sup}_Mkt"] > 0,
+                            (
+                                timeline_grp[val_col_sup]
+                                / timeline_grp[f"{val_col_sup}_Mkt"]
+                            )
+                            * 100,
+                            0,
+                        )
+
+                        # 출발월 순서 정렬
                         timeline_grp[sup_month_col] = pd.Categorical(
                             timeline_grp[sup_month_col],
                             categories=opts_t_month,
@@ -971,22 +999,39 @@ if "3/4수송" in selected_group:
                         )
                         timeline_grp = timeline_grp.sort_values(sup_month_col)
 
-                        fig_sup_timeline = px.line(
+                        # 🟢 산점도(Scatter Bubble Chart) 생성
+                        fig_sup_scatter = px.scatter(
                             timeline_grp,
                             x=sup_month_col,
-                            y=val_col_sup,
+                            y="MS_Percent",
+                            size=val_col_sup,
                             color="Airline",
-                            markers=True,
-                            title=f"항공사별 {metric_mode} 타임라인 추이",
+                            hover_name="Airline",
+                            size_max=35,
+                            title=(
+                                f"출발월별 항공사 {metric_mode} 및 M/S 점유비"
+                                " 타임라인 산점도"
+                            ),
+                            hover_data={
+                                sup_month_col: True,
+                                "MS_Percent": ":.1f%",
+                                val_col_sup: ":,.0f",
+                            },
                         )
-                        fig_sup_timeline.update_layout(
+
+                        # 선(Line) 연결 추가 (산점도 + 추이선 조합)
+                        fig_sup_scatter.update_traces(
+                            mode="markers+lines",
+                            marker=dict(sizemin=6, opacity=0.8),
+                        )
+                        fig_sup_scatter.update_layout(
                             xaxis_title="출발월",
-                            yaxis_title=metric_mode,
-                            height=450,
+                            yaxis_title="공급 M/S (%)",
+                            height=480,
                         )
-                        apply_bottom_legend(fig_sup_timeline)
+                        apply_bottom_legend(fig_sup_scatter)
                         st.plotly_chart(
-                            fig_sup_timeline, use_container_width=True
+                            fig_sup_scatter, use_container_width=True
                         )
                     else:
                         st.info(
