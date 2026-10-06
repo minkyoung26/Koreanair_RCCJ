@@ -1029,7 +1029,7 @@ if "3/4수송" in selected_group:
                                 .reset_index()
                             )
 
-                            # 🟢 실제 운항 데이터가 존재해 오름차순 정렬된 시간대 목록만 추출
+                            # 실제 운항 데이터가 존재하는 시간대만 오름차순 정렬
                             time_grp = time_grp.sort_values("time_minutes")
                             present_time_labels = (
                                 time_grp.drop_duplicates("time_minutes")[
@@ -1088,12 +1088,50 @@ if "3/4수송" in selected_group:
                                                 width=1, color="#0f172a"
                                             ),
                                         ),
-                                            hovertemplate=(
-                                            f"<b>항공사: {al_code}</b><br>출발시간:"
-                                            f" %{{x}}<br>공급량:"
-                                            f" %{{customdata:,.0f}} ({metric_mode})<extra></extra>"
-                                        ),
-                   
+                                        hovertemplate=f"<b>항공사: {al_code}</b><br>출발시간: %{{x}}<br>공급량: %{{customdata:,.0f}} ({metric_mode})<extra></extra>",
+                                        customdata=al_df[val_col_sup],
+                                    )
+                                )
+
+                            fig_time_scatter.update_layout(
+                                title=(
+                                    f"선택 노선 ({', '.join(sel_t_route)})"
+                                    " 출발시간순 스케줄 타임라인"
+                                ),
+                                xaxis=dict(
+                                    title="출발시간 (실제 운항 시간대만 표시)",
+                                    type="category",
+                                    categoryorder="array",
+                                    categoryarray=present_time_labels,
+                                    showgrid=True,
+                                    gridcolor="#e2e8f0",
+                                    gridwidth=1,
+                                ),
+                                yaxis=dict(
+                                    title="항공사",
+                                    type="category",
+                                    categoryorder="array",
+                                    categoryarray=y_categories,
+                                    showgrid=True,
+                                    gridcolor="#f1f5f9",
+                                ),
+                                height=max(340, len(al_list) * 55 + 120),
+                                plot_bgcolor="#ffffff",
+                            )
+                            apply_bottom_legend(fig_time_scatter)
+                            st.plotly_chart(
+                                fig_time_scatter, use_container_width=True
+                            )
+                        else:
+                            st.info(
+                                "💡 선택하신 노선 및 필터 조건에 해당하는"
+                                " 출발시간대 데이터가 없습니다."
+                            )
+                else:
+                    st.info(
+                        "💡 데이터셋에 출발시간대 관련 컬럼(DepTime/출발시간 등)이"
+                        " 없습니다."
+                    )
     # 대리점/RBD 탭
     with tab_34_3:
         RBD_HIERARCHY_LOCAL = {
