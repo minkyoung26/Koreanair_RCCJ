@@ -119,7 +119,18 @@ def load_fast_parquet_data_file():
                     return clean_transport_column(df)
             except Exception: pass
     return None
-
+# 함수 위에 데코레이터를 추가하여 읽어온 데이터를 메모리에 캐싱합니다.
+@st.cache_data
+def process_any_uploaded_file(file_obj):
+    file_obj.seek(0)
+    if file_obj.name.endswith(".parquet"):
+        df = pd.read_parquet(file_obj)
+    elif file_obj.name.endswith(".xlsx"):
+        df = pd.read_excel(file_obj)
+    else:
+        df = pd.read_csv(file_obj, low_memory=False)
+    df.columns = [str(c).strip() for c in df.columns]
+    return clean_transport_column(df)
 def process_any_uploaded_file(file_obj):
     file_obj.seek(0)
     if file_obj.name.endswith('.parquet'): df = pd.read_parquet(file_obj)
