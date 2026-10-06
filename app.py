@@ -120,7 +120,6 @@ def load_fast_parquet_data_file():
             except Exception: pass
     return None
 # 함수 위에 데코레이터를 추가하여 읽어온 데이터를 메모리에 캐싱합니다.
-@st.cache_data
 def process_any_uploaded_file(file_obj):
     file_obj.seek(0)
     if file_obj.name.endswith(".parquet"):
@@ -1417,7 +1416,7 @@ elif "6수송" in selected_group:
                     show_df = filtered_6th if not filtered_6th.empty else df_6th_raw
                     csv_6th_bytes = show_df.to_csv(index=False).encode('utf-8-sig')
                     st.download_button("📥 필터링된 6수송 Data (CSV) 다운로드", data=csv_6th_bytes, file_name=f"6th_Freedom_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
-                    st.dataframe(show_df.head(100), use_container_width=True)
+                    st.dataframe(show_df.head(100))
                     
 # ==========================================
 # GROUP 3: 🔗 W26 연결 네트워크
