@@ -908,32 +908,37 @@ if "3/4수송" in selected_group:
                 sup_html += "</tbody></table></div>"
                 st.markdown(sup_html, unsafe_allow_html=True)
 
-                st.markdown("---")
+st.markdown("---")
                 st.markdown(
-                    '<div class="unified-sub-header">3. 주요 항공사 공급 타임라인'
-                    " 산점도 추이</div>",
+                    '<div class="unified-sub-header">3. KE 취항노선 한정 주요'
+                    " 항공사 공급 타임라인 산점도</div>",
                     unsafe_allow_html=True,
                 )
 
                 # 🟢 3번 전용 별도 서브 필터 (노선, 출발월)
                 tf_col1, tf_col2 = st.columns(2)
 
+                # KE 취항노선으로 대상 제한
+                df_ke_serv_only = filtered_sup[
+                    filtered_sup["KE_취항여부"] == "취항"
+                ].copy()
+
                 opts_t_route = sorted([
                     str(x)
-                    for x in filtered_sup["노선_clean"].dropna().unique()
+                    for x in df_ke_serv_only["노선_clean"].dropna().unique()
                     if str(x).strip() != ""
                 ])
                 sel_t_route = tf_col1.multiselect(
-                    "✈ 타임라인 분석 노선 선택 (미선택 시 전체):",
+                    "✈ 타임라인 분석 노선 선택 (미선택 시 전체 KE 취항노선):",
                     options=opts_t_route,
                     key="timeline_route_sub_filter",
                 )
 
-                if sup_month_col and sup_month_col in filtered_sup.columns:
+                if sup_month_col and sup_month_col in df_ke_serv_only.columns:
                     opts_t_month = sort_month_options(
                         [
                             str(x)
-                            for x in filtered_sup[sup_month_col]
+                            for x in df_ke_serv_only[sup_month_col]
                             .dropna()
                             .unique()
                             if str(x).strip() != ""
@@ -947,7 +952,7 @@ if "3/4수송" in selected_group:
                     )
 
                     # 서브 필터링 적용
-                    df_timeline_target = filtered_sup.copy()
+                    df_timeline_target = df_ke_serv_only.copy()
                     if sel_t_route:
                         df_timeline_target = df_timeline_target[
                             df_timeline_target["노선_clean"].isin(sel_t_route)
@@ -999,32 +1004,86 @@ if "3/4수송" in selected_group:
                         )
                         timeline_grp = timeline_grp.sort_values(sup_month_col)
 
-                        # 🟢 산점도(Scatter Bubble Chart) 생성
-                        fig_sup_scatter = px.scatter(
-                            timeline_grp,
-                            x=sup_month_col,
-                            y="MS_Percent",
-                            size=val_col_sup,
-                            color="Airline",
-                            hover_name="Airline",
-                            size_max=35,
-                            title=(
-                                f"출발월별 항공사 {metric_mode} 및 M/S 점유비"
-                                " 타임라인 산점도"
-                            ),
-                            hover_data={
-                                sup_month_col: True,
-                                "MS_Percent": ":.1f%",
-                                val_col_sup: ":,.0f",
-                            },
+                        # 🟢 산점도 생성 (KE는 다이아몬드, 경쟁사는 원형)
+                        fig_sup_scatter = go.Figure()
+                        color_map_al = build_airline_color_map(opts_sup_al)
+
+                        # 항공사 순서 정렬 (KE 우선 출력)
+                        all_al_in_grp = timeline_grp["Airline"].unique()
+                        al_order = (
+                            ["KE"] + [x for x in all_al_in_grp if x != "KE"]
+                            if "KE" in all_al_in_grp
+                            else all_al_in_grp
                         )
 
-                        # 선(Line) 연결 추가 (산점도 + 추이선 조합)
-                        fig_sup_scatter.update_traces(
-                            mode="markers+lines",
-                            marker=dict(sizemin=6, opacity=0.8),
-                        )
+                        for al_code in al_order:
+                            al_df = timeline_grp[
+                                timeline_grp["Airline"] == al_code
+                            ]
+                            if al_df.empty:
+                                continue
+
+                            is_ke = al_code == "KE"
+                            # KE는 다이아몬드(diamond), 타 경쟁사는 동그라미(circle)
+                            symbol_style = "diamond" if is_ke else "circle"
+                            line_style = (
+                                dict(color="#16a34a", width=3.5)
+                                if is_ke
+                                else dict(
+                                    color=color_map_al.get(al_code, "#94a3b8"),
+                                    dash="dot",
+                                    width=1.5,
+                                )
+                            )
+                            # 버블 크기 계산 (공급석/운항편수에 비례)
+                            max_val = timeline_grp[val_col_sup].max()
+                            size_vals = (
+                                (al_df[val_col_sup] / max_val * 28 + 10)
+                                if max_val > 0
+                                else 12
+                            )
+
+                            fig_sup_scatter.add_trace(
+                                go.Scatter(
+                                    x=al_df[sup_month_col],
+                                    y=al_df["MS_Percent"],
+                                    mode="lines+markers",
+                                    name=(
+                                        "★ KE (대한항공)"
+                                        if is_ke
+                                        else al_code
+                                    ),
+                                    line=line_style,
+                                    marker=dict(
+                                        symbol=symbol_style,
+                                        size=size_vals,
+                                        opacity=0.9 if is_ke else 0.75,
+                                        line=dict(
+                                            width=1.5 if is_ke else 0.5,
+                                            color="#0f172a",
+                                        ),
+                                    ),
+                                    text=[
+                                        f"<b>{ms:.1f}%</b> ({pax:,.0f})"
+                                        for ms, pax in zip(
+                                            al_df["MS_Percent"],
+                                            al_df[val_col_sup],
+                                        )
+                                    ],
+                                    hovertemplate=(
+                                        f"<b>항공사: {al_code}</b><br>출발월:"
+                                        " %{x}<br>공급 M/S: %{y:.1f}%<br>공급량:"
+                                        f" %{{customdata:,.0f}}<extra></extra>"
+                                    ),
+                                    customdata=al_df[val_col_sup],
+                                )
+                            )
+
                         fig_sup_scatter.update_layout(
+                            title=(
+                                f"KE 취항 노선 한정 - 출발월별 항공사 {metric_mode}"
+                                " 및 M/S 점유비 타임라인 산점도"
+                            ),
                             xaxis_title="출발월",
                             yaxis_title="공급 M/S (%)",
                             height=480,
