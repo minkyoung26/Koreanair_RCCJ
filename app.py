@@ -1200,7 +1200,7 @@ elif "6수송" in selected_group:
 
                 st.markdown("---")
 
-                # 3. Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계)
+# 3. Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계) - 연산 최적화 적용
                 try:
                     if col_od_simple in filtered_6th.columns and not filtered_6th.empty:
                         st.markdown('<div class="unified-sub-header">🏆 Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계)</div>', unsafe_allow_html=True)
@@ -1228,32 +1228,47 @@ elif "6수송" in selected_group:
                         grand_ke_ms_py = (grand_ke_py / grand_mkt_py * 100) if grand_mkt_py > 0 else 0
                         grand_ke_ms_yoy = grand_ke_ms_cy - grand_ke_ms_py
 
-                        od_totals = filtered_6th.groupby(col_od_simple, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
+                        # 💡 [핵심] 필터 변경 시 무거운 60번 반복 연산을 1번의 groupby 연산으로 경량화
+                        od_totals = filtered_6th.groupby(col_od_simple, observed=True)['Val_CY_num'].sum().sort_values(ascending=False)
                         top20_ods = [
                             x for x in od_totals.index 
                             if str(x).strip().lower() not in ['nan', 'none', 'null', '', 'nat'] and od_totals[x] > 0
                         ][:20]
 
                         if top20_ods:
+                            df_top20 = filtered_6th[filtered_6th[col_od_simple].isin(top20_ods)]
+                            
+                            od_mkt_piv = df_top20.groupby([col_od_simple], observed=True)[['Val_CY_num', 'Val_PY_num']].sum()
+                            od_al_piv = df_top20.groupby([col_od_simple, col_al_6], observed=True)[['Val_CY_num', 'Val_PY_num']].sum()
+
                             matrix_rows = []
                             for rank_i, od_simple_code in enumerate(top20_ods, 1):
-                                df_od = filtered_6th[filtered_6th[col_od_simple] == od_simple_code]
-
-                                mkt_cy = df_od['Val_CY_num'].sum()
-                                mkt_py = df_od['Val_PY_num'].sum()
+                                mkt_cy = od_mkt_piv.loc[od_simple_code, 'Val_CY_num'] if od_simple_code in od_mkt_piv.index else 0
+                                mkt_py = od_mkt_piv.loc[od_simple_code, 'Val_PY_num'] if od_simple_code in od_mkt_piv.index else 0
                                 mkt_yoy = ((mkt_cy - mkt_py) / mkt_py * 100) if mkt_py > 0 else 0
 
-                                df_sel = df_od[df_od[col_al_6].isin(sel_carriers)] if sel_carriers else df_od
-                                sel_cy = df_sel['Val_CY_num'].sum()
-                                sel_py = df_sel['Val_PY_num'].sum()
+                                if od_simple_code in od_al_piv.index:
+                                    sub_al = od_al_piv.loc[od_simple_code]
+                                    if sel_carriers:
+                                        sub_sel = sub_al[sub_al.index.isin(sel_carriers)]
+                                        sel_cy, sel_py = sub_sel['Val_CY_num'].sum(), sub_sel['Val_PY_num'].sum()
+                                    else:
+                                        sel_cy, sel_py = mkt_cy, mkt_py
+
+                                    if 'KE' in sub_al.index:
+                                        ke_cy = sub_al.loc['KE', 'Val_CY_num']
+                                        ke_py = sub_al.loc['KE', 'Val_PY_num']
+                                    else:
+                                        ke_cy, ke_py = 0, 0
+                                else:
+                                    sel_cy, sel_py = 0, 0
+                                    ke_cy, ke_py = 0, 0
+
                                 sel_yoy = ((sel_cy - sel_py) / sel_py * 100) if sel_py > 0 else 0
                                 sel_ms_cy = (sel_cy / mkt_cy * 100) if mkt_cy > 0 else 0
                                 sel_ms_py = (sel_py / mkt_py * 100) if mkt_py > 0 else 0
                                 sel_ms_yoy = sel_ms_cy - sel_ms_py
 
-                                df_ke = df_od[df_od[col_al_6] == 'KE']
-                                ke_cy = df_ke['Val_CY_num'].sum()
-                                ke_py = df_ke['Val_PY_num'].sum()
                                 ke_yoy = ((ke_cy - ke_py) / ke_py * 100) if ke_py > 0 else 0
                                 ke_ms_cy = (ke_cy / mkt_cy * 100) if mkt_cy > 0 else 0
                                 ke_ms_py = (ke_py / mkt_py * 100) if mkt_py > 0 else 0
@@ -1366,7 +1381,7 @@ elif "6수송" in selected_group:
                             st.markdown(od_matrix_html, unsafe_allow_html=True)
                 except Exception as e:
                     st.info("💡 TOP 20 O&D 분석 연산 중 방어 모드가 실행되었습니다.")
-
+                    
             with tabs[1]:
                 st.markdown('<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및 다운로드</div>', unsafe_allow_html=True)
                 if df_6th_raw is not None and not df_6th_raw.empty:
