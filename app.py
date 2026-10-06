@@ -1379,41 +1379,45 @@ elif "6수송" in selected_group:
                 except Exception as e:
                     st.info("💡 TOP 20 O&D 분석 연산 중 방어 모드가 실행되었습니다.")
 
-  with tabs[1]:
-        st.markdown(
-            '<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및'
-            " 다운로드</div>",
-            unsafe_allow_html=True,
-        )
-
-        if df_6th_raw is not None and not df_6th_raw.empty:
-            show_df = (
-                filtered_6th if not filtered_6th.empty else df_6th_raw
+ with tabs[1]:
+            st.markdown(
+                '<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및'
+                " 다운로드</div>",
+                unsafe_allow_html=True,
             )
 
-            df_export = show_df.copy()
-            for col in df_export.select_dtypes(include=["category"]).columns:
-                df_export[col] = df_export[col].astype(str)
+            if df_6th_raw is not None and not df_6th_raw.empty:
+                show_df = (
+                    filtered_6th if not filtered_6th.empty else df_6th_raw
+                )
 
-            csv_6th_bytes = df_export.to_csv(index=False).encode("utf-8-sig")
+                df_export = show_df.copy()
+                for col in df_export.select_dtypes(
+                    include=["category"]
+                ).columns:
+                    df_export[col] = df_export[col].astype(str)
 
-            st.download_button(
-                "📥 필터링된 6수송 Data (CSV) 다운로드",
-                data=csv_6th_bytes,
-                file_name=(
-                    "6th_Freedom_Data_"
-                    f"{datetime.date.today().strftime('%Y%m%d')}.csv"
-                ),
-                mime="text/csv",
-            )
+                csv_6th_bytes = df_export.to_csv(index=False).encode(
+                    "utf-8-sig"
+                )
 
-            st.dataframe(
-                df_export.head(100),
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.info("💡 조회 및 다운로드할 6수송 데이터가 없습니다.")
+                st.download_button(
+                    "📥 필터링된 6수송 Data (CSV) 다운로드",
+                    data=csv_6th_bytes,
+                    file_name=(
+                        "6th_Freedom_Data_"
+                        f"{datetime.date.today().strftime('%Y%m%d')}.csv"
+                    ),
+                    mime="text/csv",
+                )
+
+                st.dataframe(
+                    df_export.head(100),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.info("💡 조회 및 다운로드할 6수송 데이터가 없습니다.")
                     
 # ==========================================
 # GROUP 3: 🔗 W26 연결 네트워크
