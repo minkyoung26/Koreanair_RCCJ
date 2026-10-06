@@ -1,4 +1,6 @@
 streamlit
-pandas<3.0.0
+pandas
+numpy
 openpyxl
+pyarrow
 plotly
