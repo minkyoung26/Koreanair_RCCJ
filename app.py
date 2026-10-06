@@ -444,7 +444,7 @@ if "3/4수송" in selected_group:
 
                     fig1 = go.Figure(data=[go.Pie(labels=labels_list, values=values_for_pie, text=text_labels_pie, textinfo='label+text' if apply_weight_toggle else 'percent+label', hole=0.4, pull=pull_list, marker=dict(colors=colors_list), textposition='inside')])
                     apply_bottom_legend(fig1)
-                    st.plotly_chart(fig1, use_container_width=True)
+                    st.plotly_chart(fig1, width="stretch")
 
                 with c2:
                     st.markdown("##### 📌 발매 실적 핵심 요약 (Summary)")
@@ -493,7 +493,7 @@ if "3/4수송" in selected_group:
                         if not week_merged_top.empty:
                             fig_week_ms.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_week), yaxis=dict(range=[0, max(week_merged_top['MS_Percent'].max() * 1.25, 15)]), height=450)
                         apply_bottom_legend(fig_week_ms)
-                        st.plotly_chart(fig_week_ms, use_container_width=True)
+                        st.plotly_chart(fig_week_ms, width="stretch")
 
                 st.markdown("---")
 
@@ -535,7 +535,7 @@ if "3/4수송" in selected_group:
                         if not dep_merged_top.empty:
                             fig_ke_dep.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_month), yaxis=dict(range=[0, max(dep_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
                         apply_bottom_legend(fig_ke_dep)
-                        st.plotly_chart(fig_ke_dep, use_container_width=True)
+                        st.plotly_chart(fig_ke_dep, width="stretch")
 
                 st.markdown("---")
                 
@@ -548,7 +548,7 @@ if "3/4수송" in selected_group:
                         fig3 = px.pie(bound_pie_df, values=val_col, names=bound_col, hole=0.4)
                         fig3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>구분: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig3)
-                        st.plotly_chart(fig3, use_container_width=True)
+                        st.plotly_chart(fig3, width="stretch")
                 with c4:
                     tt_col = find_column_by_candidates(merged_df.columns, ['tickettype', 'triptype'])
                     if tt_col and tt_col in ke_only_df.columns:
@@ -557,7 +557,7 @@ if "3/4수송" in selected_group:
                         fig4 = px.pie(tt_pie_df, values=val_col, names=tt_col, hole=0.4)
                         fig4.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>Trip Type: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig4)
-                        st.plotly_chart(fig4, use_container_width=True)
+                        st.plotly_chart(fig4, width="stretch")
 
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
@@ -620,7 +620,7 @@ if "3/4수송" in selected_group:
             if admin_pw == "1234":
                 csv_data = filtered_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button("📥 필터링된 발매 Raw Data (CSV) 전체 다운로드", data=csv_data, file_name=f"Ticketing_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
-                st.dataframe(filtered_df.head(100), use_container_width=True)
+                st.dataframe(filtered_df.head(100), width="stretch")
             else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
@@ -712,7 +712,7 @@ if "3/4수송" in selected_group:
                 if not sup_merged_top.empty:
                     fig_sup_line.update_layout(yaxis_title="Supply Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_sup_m), yaxis=dict(range=[0, max(sup_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
                 apply_bottom_legend(fig_sup_line)
-                st.plotly_chart(fig_sup_line, use_container_width=True)
+                st.plotly_chart(fig_sup_line, width="stretch")
                 
                 st.markdown("---")
                 st.markdown('<div class="unified-sub-header">2. 출발기간별 주요 항공사 공급 M/S 피벗 테이블</div>', unsafe_allow_html=True)
@@ -812,7 +812,7 @@ if "3/4수송" in selected_group:
                     
                     fig_timeline.update_traces(hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{customdata[1]}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>")
                     fig_timeline.update_layout(height=350, showlegend=False)
-                    st.plotly_chart(fig_timeline, use_container_width=True)
+                    st.plotly_chart(fig_timeline, width="stretch")
                 else:
                     st.info("선택한 조건에 해당하는 스케줄 데이터가 없습니다.")
 
@@ -1488,8 +1488,8 @@ elif "6수송" in selected_group:
                 show_df = filtered_6th if not filtered_6th.empty else df_6th_raw
                 csv_6th_bytes = show_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button("📥 필터링된 6수송 Data (CSV) 다운로드", data=csv_6th_bytes, file_name=f"6th_Freedom_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
-                st.dataframe(show_df.head(100), use_container_width=True)
+                st.dataframe(show_df.head(100), width="stretch")
 
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
-    st.link_button("🔗 W26 연결 네트워크 바로가기 (새 탭에서 열기)", EXT_WEB_APP_URL, use_container_width=True)
+    st.link_button("🔗 W26 연결 네트워크 바로가기 (새 탭에서 열기)", EXT_WEB_APP_URL, width="stretch")
