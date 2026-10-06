@@ -122,16 +122,6 @@ def load_fast_parquet_data_file():
 # 함수 위에 데코레이터를 추가하여 읽어온 데이터를 메모리에 캐싱합니다.
 def process_any_uploaded_file(file_obj):
     file_obj.seek(0)
-    if file_obj.name.endswith(".parquet"):
-        df = pd.read_parquet(file_obj)
-    elif file_obj.name.endswith(".xlsx"):
-        df = pd.read_excel(file_obj)
-    else:
-        df = pd.read_csv(file_obj, low_memory=False)
-    df.columns = [str(c).strip() for c in df.columns]
-    return clean_transport_column(df)
-def process_any_uploaded_file(file_obj):
-    file_obj.seek(0)
     if file_obj.name.endswith('.parquet'): df = pd.read_parquet(file_obj)
     elif file_obj.name.endswith('.xlsx'): df = pd.read_excel(file_obj)
     else: df = pd.read_csv(file_obj, low_memory=False)
@@ -414,7 +404,7 @@ if "3/4수송" in selected_group:
 
                     fig1 = go.Figure(data=[go.Pie(labels=labels_list, values=values_for_pie, text=text_labels_pie, textinfo='label+text', hole=0.4, pull=pull_list, marker=dict(colors=colors_list), textposition='inside')])
                     apply_bottom_legend(fig1)
-                    st.plotly_chart(fig1, width="stretch")
+                    st.plotly_chart(fig1, use_container_width=True)
 
                 with c2:
                     st.markdown("##### 📌 발매 실적 핵심 요약 (Summary)")
@@ -463,7 +453,7 @@ if "3/4수송" in selected_group:
                         if not week_merged_top.empty:
                             fig_week_ms.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_week), yaxis=dict(range=[0, max(week_merged_top['MS_Percent'].max() * 1.25, 15)]), height=450)
                         apply_bottom_legend(fig_week_ms)
-                        st.plotly_chart(fig_week_ms, width="stretch")
+                        st.plotly_chart(fig_week_ms, use_container_width=True)
 
                 st.markdown("---")
 
@@ -505,7 +495,7 @@ if "3/4수송" in selected_group:
                         if not dep_merged_top.empty:
                             fig_ke_dep.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_month), yaxis=dict(range=[0, max(dep_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
                         apply_bottom_legend(fig_ke_dep)
-                        st.plotly_chart(fig_ke_dep, width="stretch")
+                        st.plotly_chart(fig_ke_dep, use_container_width=True)
 
                 st.markdown("---")
                 
@@ -518,7 +508,7 @@ if "3/4수송" in selected_group:
                         fig3 = px.pie(bound_pie_df, values=val_col, names=bound_col, hole=0.4)
                         fig3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>구분: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig3)
-                        st.plotly_chart(fig3, width="stretch")
+                        st.plotly_chart(fig3, use_container_width=True)
                 with c4:
                     tt_col = find_column_by_candidates(merged_df.columns, ['tickettype', 'triptype'])
                     if tt_col and tt_col in ke_only_df.columns:
@@ -527,7 +517,7 @@ if "3/4수송" in selected_group:
                         fig4 = px.pie(tt_pie_df, values=val_col, names=tt_col, hole=0.4)
                         fig4.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>Trip Type: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig4)
-                        st.plotly_chart(fig4, width="stretch")
+                        st.plotly_chart(fig4, use_container_width=True)
 
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
