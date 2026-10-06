@@ -908,7 +908,7 @@ if "3/4수송" in selected_group:
                 sup_html += "</tbody></table></div>"
                 st.markdown(sup_html, unsafe_allow_html=True)
 
-st.markdown("---")
+                st.markdown("---")
                 st.markdown(
                     '<div class="unified-sub-header">3. KE 취항노선 한정 주요'
                     " 항공사 공급 타임라인 산점도</div>",
