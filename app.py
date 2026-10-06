@@ -693,37 +693,95 @@ if "3/4수송" in selected_group:
                     sup_html += '</tr>'
                 sup_html += '</tbody></table></div>'
                 st.markdown(sup_html, unsafe_allow_html=True)
-    st.markdown("---")
+ st.markdown("---")
                 st.markdown(
-                    '<div class="unified-sub-header">3. 항공사별 공급 타임라인'
-                    " 추이 (Seats / Flights)</div>",
+                    '<div class="unified-sub-header">3. 주요 항공사 공급 타임라인'
+                    " 추이</div>",
                     unsafe_allow_html=True,
                 )
 
+                # 🟢 3번 전용 별도 슬라이서 필터 (노선, 출발월)
+                tf_col1, tf_col2 = st.columns(2)
+
+                opts_t_route = sorted([
+                    str(x)
+                    for x in filtered_sup["노선_clean"].dropna().unique()
+                    if str(x).strip() != ""
+                ])
+                sel_t_route = tf_col1.multiselect(
+                    "✈ 타임라인 분석 노선 선택 (미선택 시 전체):",
+                    options=opts_t_route,
+                    key="timeline_route_sub_filter",
+                )
+
                 if sup_month_col and sup_month_col in filtered_sup.columns:
-                    timeline_grp = (
-                        filtered_sup.groupby(
-                            [sup_month_col, "Airline"], observed=False
-                        )[val_col_sup]
-                        .sum()
-                        .reset_index()
+                    opts_t_month = sort_month_options(
+                        [
+                            str(x)
+                            for x in filtered_sup[sup_month_col]
+                            .dropna()
+                            .unique()
+                            if str(x).strip() != ""
+                        ],
+                        reverse=False,
+                    )
+                    sel_t_month = tf_col2.multiselect(
+                        "🗓 타임라인 분석 출발월 선택 (미선택 시 전체):",
+                        options=opts_t_month,
+                        key="timeline_month_sub_filter",
                     )
 
-                    fig_sup_timeline = px.line(
-                        timeline_grp,
-                        x=sup_month_col,
-                        y=val_col_sup,
-                        color="Airline",
-                        markers=True,
-                        title=f"월별 항공사 {metric_mode} 공급 추이",
-                    )
-                    fig_sup_timeline.update_layout(
-                        xaxis_title="출발월",
-                        yaxis_title=metric_mode,
-                        height=450,
-                    )
-                    apply_bottom_legend(fig_sup_timeline)
-                    st.plotly_chart(fig_sup_timeline, use_container_width=True)               
+                    # 타임라인 전용 필터링 적용
+                    df_timeline_target = filtered_sup.copy()
+                    if sel_t_route:
+                        df_timeline_target = df_timeline_target[
+                            df_timeline_target["노선_clean"].isin(sel_t_route)
+                        ]
+                    if sel_t_month:
+                        df_timeline_target = df_timeline_target[
+                            df_timeline_target[sup_month_col].isin(sel_t_month)
+                        ]
+
+                    if not df_timeline_target.empty:
+                        timeline_grp = (
+                            df_timeline_target.groupby(
+                                [sup_month_col, "Airline"], observed=False
+                            )[val_col_sup]
+                            .sum()
+                            .reset_index()
+                        )
+
+                        # 출발월 순서 정렬
+                        timeline_grp[sup_month_col] = pd.Categorical(
+                            timeline_grp[sup_month_col],
+                            categories=opts_t_month,
+                            ordered=True,
+                        )
+                        timeline_grp = timeline_grp.sort_values(sup_month_col)
+
+                        fig_sup_timeline = px.line(
+                            timeline_grp,
+                            x=sup_month_col,
+                            y=val_col_sup,
+                            color="Airline",
+                            markers=True,
+                            title=f"항공사별 {metric_mode} 타임라인 추이",
+                        )
+                        fig_sup_timeline.update_layout(
+                            xaxis_title="출발월",
+                            yaxis_title=metric_mode,
+                            height=450,
+                        )
+                        apply_bottom_legend(fig_sup_timeline)
+                        st.plotly_chart(
+                            fig_sup_timeline, use_container_width=True
+                        )
+                    else:
+                        st.info(
+                            "💡 선택하신 타임라인 필터 조건에 해당하는 데이터가"
+                            " 없습니다."
+                        )               
+                   
     # 대리점/RBD 탭
     with tab_34_3:
         RBD_HIERARCHY_LOCAL = {
