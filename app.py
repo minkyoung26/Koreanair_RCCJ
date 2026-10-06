@@ -1379,7 +1379,7 @@ elif "6수송" in selected_group:
                 except Exception as e:
                     st.info("💡 TOP 20 O&D 분석 연산 중 방어 모드가 실행되었습니다.")
 
- with tabs[1]:
+        with tabs[1]:
             st.markdown(
                 '<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및'
                 " 다운로드</div>",
