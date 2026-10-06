@@ -896,7 +896,7 @@ if "3/4수송" in selected_group:
                                     st.markdown(g_html, unsafe_allow_html=True)
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (위젯 세션 충돌 완벽 방지판)
+# GROUP 2: 🌐 6수송 대시보드 (데이터 타입/필터 완벽 동기화판)
 # ==========================================
 elif "6수송" in selected_group:
     df_6th_raw = load_6th_data_aggregated()
@@ -905,7 +905,7 @@ elif "6수송" in selected_group:
         st.error("❌ 6수송 캐시 파켓 파일(`cache_6th_data.parquet`)이 없거나 비어 있습니다.")
         st.stop()
 
-    df_6 = df_6th_raw
+    df_6 = df_6th_raw.copy()
     df_6.columns = [str(c).strip() for c in df_6.columns]
     lower_col_map = {c.lower().replace(" ", "").replace("_", "").replace(".", ""): c for c in df_6.columns}
 
@@ -930,6 +930,23 @@ elif "6수송" in selected_group:
     col_pur_year_type = get_actual_col("발매_연도구분") or "발매_연도구분"
     col_trip_year_type = get_actual_col("출발_연도구분") or "출발_연도구분"
 
+    # 값 정제
+    if col_val_6 in df_6.columns:
+        df_6['Val_num'] = pd.to_numeric(df_6[col_val_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+    else:
+        df_6['Val_num'] = 0.0
+
+    if col_year_type in df_6.columns:
+        df_6['Val_CY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('금년|CY', na=False), df_6['Val_num'], 0.0)
+        df_6['Val_PY_num'] = np.where(df_6[col_year_type].astype(str).str.contains('전년|PY', na=False), df_6['Val_num'], 0.0)
+    else:
+        df_6['Val_CY_num'] = df_6['Val_num']
+        df_6['Val_PY_num'] = 0.0
+
+    # 월 추출 (문자열 규격 통일)
+    df_6['Pur_M_Norm'] = df_6[col_pur_m_disp].astype(str).apply(extract_pure_month) if col_pur_m_disp in df_6.columns else ""
+    df_6['Trip_M_Norm'] = df_6[col_trip_m_disp].astype(str).apply(extract_pure_month) if col_trip_m_disp in df_6.columns else ""
+
     last_updated_str = get_6th_last_updated_date()
 
     st.markdown('<div class="unified-sub-header">✈ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
@@ -947,39 +964,37 @@ elif "6수송" in selected_group:
     with col_left_filter:
         st.markdown('<div style="font-size:15px; font-weight:800; color:#0f172a; border-bottom:2px solid #cbd5e1; padding-bottom:8px; margin-bottom:15px;">🔍 대시보드 슬라이서</div>', unsafe_allow_html=True)
 
-        # 드롭다운 옵션 추출
-        def get_opts(col_name):
+        def get_clean_opts(col_name):
             if col_name in df_6.columns:
-                return sorted([str(x).strip() for x in df_6[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']])
+                return sorted([str(x).strip() for x in df_6[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
             return []
 
-        opts_pur_m = sort_month_options(get_opts(col_pur_m_disp), reverse=True)
-        opts_trip_m = sort_month_options(get_opts(col_trip_m_disp), reverse=True)
-        opts_rgn = get_opts(col_rgn)
-        opts_dir = get_opts(col_dir)
-        opts_direct = get_opts(col_direct_transit)
-        opts_al = get_opts(col_al_6)
+        opts_pur_m = sort_month_options(get_clean_opts(col_pur_m_disp), reverse=True)
+        opts_trip_m = sort_month_options(get_clean_opts(col_trip_m_disp), reverse=True)
+        opts_rgn = get_clean_opts(col_rgn)
+        opts_dir = get_clean_opts(col_dir)
+        opts_direct = get_clean_opts(col_direct_transit)
+        opts_al = get_clean_opts(col_al_6)
         if 'KE' in opts_al: opts_al = ['KE'] + [x for x in opts_al if x != 'KE']
-        opts_od = get_opts(col_od_simple)
-        opts_orig_c = get_opts(col_orig_c)
-        opts_dest_c = get_opts(col_dest_c)
-        opts_jp_apo = get_opts(col_jp_apo)
-        opts_ov_apo = get_opts(col_ov_apo)
+        opts_od = get_clean_opts(col_od_simple)
+        opts_orig_c = get_clean_opts(col_orig_c)
+        opts_dest_c = get_clean_opts(col_dest_c)
+        opts_jp_apo = get_clean_opts(col_jp_apo)
+        opts_ov_apo = get_clean_opts(col_ov_apo)
 
-        # 표준 멀티셀렉트 호출 (세션 충돌 방지)
-        sel_pur_m_disp = st.multiselect(f"발매월{get_dynamic_range_label_6th(opts_pur_m)}", options=opts_pur_m, key="m_pur_6th")
-        sel_trip_m_disp = st.multiselect(f"출발월{get_dynamic_range_label_6th(opts_trip_m)}", options=opts_trip_m, key="m_trip_6th")
-        sel_rgn = st.multiselect("OD Region", options=opts_rgn, key="m_rgn_6th")
-        sel_dir = st.multiselect("Direction (일본발/행)", options=opts_dir, key="m_dir_6th")
-        sel_direct = st.multiselect("직항/경유", options=opts_direct, key="m_direct_6th")
-        sel_al_list = st.multiselect("항공사 (Carrier)", options=opts_al, key="m_al_6th")
-        sel_od_simple = st.multiselect("Trip O&D", options=opts_od, key="m_od_6th")
-        sel_orig_c = st.multiselect("출발 국가 (Origin)", options=opts_orig_c, key="m_orig_6th")
-        sel_dest_c = st.multiselect("도착 국가 (Destination)", options=opts_dest_c, key="m_dest_6th")
-        sel_jp_apo = st.multiselect("일본 APO", options=opts_jp_apo, key="m_jp_6th")
-        sel_ov_apo = st.multiselect("해외 APO", options=opts_ov_apo, key="m_ov_6th")
+        sel_pur_m_disp = st.multiselect(f"발매월{get_dynamic_range_label_6th(opts_pur_m)}", options=opts_pur_m, key="m_pur_6th_v2")
+        sel_trip_m_disp = st.multiselect(f"출발월{get_dynamic_range_label_6th(opts_trip_m)}", options=opts_trip_m, key="m_trip_6th_v2")
+        sel_rgn = st.multiselect("OD Region", options=opts_rgn, key="m_rgn_6th_v2")
+        sel_dir = st.multiselect("Direction (일본발/행)", options=opts_dir, key="m_dir_6th_v2")
+        sel_direct = st.multiselect("직항/경유", options=opts_direct, key="m_direct_6th_v2")
+        sel_al_list = st.multiselect("항공사 (Carrier)", options=opts_al, key="m_al_6th_v2")
+        sel_od_simple = st.multiselect("Trip O&D", options=opts_od, key="m_od_6th_v2")
+        sel_orig_c = st.multiselect("출발 국가 (Origin)", options=opts_orig_c, key="m_orig_6th_v2")
+        sel_dest_c = st.multiselect("도착 국가 (Destination)", options=opts_dest_c, key="m_dest_6th_v2")
+        sel_jp_apo = st.multiselect("일본 APO", options=opts_jp_apo, key="m_jp_6th_v2")
+        sel_ov_apo = st.multiselect("해외 APO", options=opts_ov_apo, key="m_ov_6th_v2")
 
-        # 인덱스 마스크 기반 필터링
+        # 💡 [핵심] 문자열 변환 및 스페이스 정제 후 필터링
         mask = np.ones(len(df_6), dtype=bool)
 
         if sel_pur_m_disp:
@@ -990,21 +1005,38 @@ elif "6수송" in selected_group:
             sel_norm_trip_months = [extract_pure_month(x) for x in sel_trip_m_disp]
             mask &= df_6['Trip_M_Norm'].isin(sel_norm_trip_months)
 
-        if sel_rgn and col_rgn in df_6.columns: mask &= df_6[col_rgn].astype(str).isin(sel_rgn)
-        if sel_dir and col_dir in df_6.columns: mask &= df_6[col_dir].astype(str).isin(sel_dir)
-        if sel_direct and col_direct_transit in df_6.columns: mask &= df_6[col_direct_transit].astype(str).isin(sel_direct)
-        if sel_al_list and col_al_6 in df_6.columns: mask &= df_6[col_al_6].astype(str).isin(sel_al_list)
-        if sel_od_simple and col_od_simple in df_6.columns: mask &= df_6[col_od_simple].astype(str).isin(sel_od_simple)
-        if sel_orig_c and col_orig_c in df_6.columns: mask &= df_6[col_orig_c].astype(str).isin(sel_orig_c)
-        if sel_dest_c and col_dest_c in df_6.columns: mask &= df_6[col_dest_c].astype(str).isin(sel_dest_c)
-        if sel_jp_apo and col_jp_apo in df_6.columns: mask &= df_6[col_jp_apo].astype(str).isin(sel_jp_apo)
-        if sel_ov_apo and col_ov_apo in df_6.columns: mask &= df_6[col_ov_apo].astype(str).isin(sel_ov_apo)
+        if sel_rgn and col_rgn in df_6.columns:
+            mask &= df_6[col_rgn].astype(str).str.strip().isin(sel_rgn)
+
+        if sel_dir and col_dir in df_6.columns:
+            mask &= df_6[col_dir].astype(str).str.strip().isin(sel_dir)
+
+        if sel_direct and col_direct_transit in df_6.columns:
+            mask &= df_6[col_direct_transit].astype(str).str.strip().isin(sel_direct)
+
+        if sel_al_list and col_al_6 in df_6.columns:
+            mask &= df_6[col_al_6].astype(str).str.strip().isin(sel_al_list)
+
+        if sel_od_simple and col_od_simple in df_6.columns:
+            mask &= df_6[col_od_simple].astype(str).str.strip().isin(sel_od_simple)
+
+        if sel_orig_c and col_orig_c in df_6.columns:
+            mask &= df_6[col_orig_c].astype(str).str.strip().isin(sel_orig_c)
+
+        if sel_dest_c and col_dest_c in df_6.columns:
+            mask &= df_6[col_dest_c].astype(str).str.strip().isin(sel_dest_c)
+
+        if sel_jp_apo and col_jp_apo in df_6.columns:
+            mask &= df_6[col_jp_apo].astype(str).str.strip().isin(sel_jp_apo)
+
+        if sel_ov_apo and col_ov_apo in df_6.columns:
+            mask &= df_6[col_ov_apo].astype(str).str.strip().isin(sel_ov_apo)
 
         filtered_6th = df_6[mask]
 
     with col_right_data:
         if filtered_6th.empty:
-            st.warning("⚠️ 선택하신 필터 조합에 해당하는 6수송 실적 데이터가 없습니다. 필터 조건을 변경해 주세요.")
+            st.warning("⚠️️ 선택하신 필터 조합에 해당하는 6수송 실적 데이터가 없습니다. 필터 조건을 변경해 주세요.")
         else:
             tabs = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "📋 6수송 Raw Data View"])
 
