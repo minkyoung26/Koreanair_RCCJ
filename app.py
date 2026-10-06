@@ -136,7 +136,22 @@ def load_aux_files():
                 if df is not None and not df.empty: return df
             except: pass
     return None
-
+@st.cache_data(ttl=600)  # 👈 이 줄을 바로 위에 새로 추가해 주세요!
+def load_6th_data_aggregated():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(base_dir, 'cache_6th_data.parquet'),
+        'cache_6th_data.parquet',
+        os.path.join(os.getcwd(), 'cache_6th_data.parquet')
+    ]
+    for target_path in candidates:
+        if os.path.exists(target_path):
+            try:
+                df = pd.read_parquet(target_path, engine='pyarrow')
+                if df is not None and not df.empty:
+                    return df
+            except Exception: pass
+    return None
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
