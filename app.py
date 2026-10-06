@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 import os
-import gc
 import glob
 
 # 1. Page Config
@@ -119,7 +118,7 @@ def load_fast_parquet_data_file():
                     return clean_transport_column(df)
             except Exception: pass
     return None
-# 함수 위에 데코레이터를 추가하여 읽어온 데이터를 메모리에 캐싱합니다.
+
 def process_any_uploaded_file(file_obj):
     file_obj.seek(0)
     if file_obj.name.endswith('.parquet'): df = pd.read_parquet(file_obj)
@@ -137,19 +136,20 @@ def load_aux_files():
                 if df is not None and not df.empty: return df
             except: pass
     return None
-# 🟢 @st.cache_data 대신 @st.cache_resource 사용 (메모리 복사본 생성 완전 차단)
-@st.cache_resource
+@st.cache_data(ttl=600)  # 👈 이 줄을 바로 위에 새로 추가해 주세요!
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
         os.path.join(base_dir, 'cache_6th_data.parquet'),
-        'cache_6th_data.parquet'
+        'cache_6th_data.parquet',
+        os.path.join(os.getcwd(), 'cache_6th_data.parquet')
     ]
     for target_path in candidates:
         if os.path.exists(target_path):
             try:
-                # pyarrow 메모리 맵(memory_map=True)으로 자원 최소 점유
-                return pd.read_parquet(target_path, engine='pyarrow', memory_map=True)
+                df = pd.read_parquet(target_path, engine='pyarrow')
+                if df is not None and not df.empty:
+                    return df
             except Exception: pass
     return None
 def load_6th_data_aggregated():
@@ -404,7 +404,7 @@ if "3/4수송" in selected_group:
 
                     fig1 = go.Figure(data=[go.Pie(labels=labels_list, values=values_for_pie, text=text_labels_pie, textinfo='label+text', hole=0.4, pull=pull_list, marker=dict(colors=colors_list), textposition='inside')])
                     apply_bottom_legend(fig1)
-                    st.plotly_chart(fig1, use_container_width=True)
+                    st.plotly_chart(fig1, width="stretch")
 
                 with c2:
                     st.markdown("##### 📌 발매 실적 핵심 요약 (Summary)")
@@ -453,7 +453,7 @@ if "3/4수송" in selected_group:
                         if not week_merged_top.empty:
                             fig_week_ms.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_week), yaxis=dict(range=[0, max(week_merged_top['MS_Percent'].max() * 1.25, 15)]), height=450)
                         apply_bottom_legend(fig_week_ms)
-                        st.plotly_chart(fig_week_ms, use_container_width=True)
+                        st.plotly_chart(fig_week_ms, width="stretch")
 
                 st.markdown("---")
 
@@ -495,7 +495,7 @@ if "3/4수송" in selected_group:
                         if not dep_merged_top.empty:
                             fig_ke_dep.update_layout(yaxis_title="Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_month), yaxis=dict(range=[0, max(dep_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
                         apply_bottom_legend(fig_ke_dep)
-                        st.plotly_chart(fig_ke_dep, use_container_width=True)
+                        st.plotly_chart(fig_ke_dep, width="stretch")
 
                 st.markdown("---")
                 
@@ -508,7 +508,7 @@ if "3/4수송" in selected_group:
                         fig3 = px.pie(bound_pie_df, values=val_col, names=bound_col, hole=0.4)
                         fig3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>구분: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig3)
-                        st.plotly_chart(fig3, use_container_width=True)
+                        st.plotly_chart(fig3, width="stretch")
                 with c4:
                     tt_col = find_column_by_candidates(merged_df.columns, ['tickettype', 'triptype'])
                     if tt_col and tt_col in ke_only_df.columns:
@@ -517,7 +517,7 @@ if "3/4수송" in selected_group:
                         fig4 = px.pie(tt_pie_df, values=val_col, names=tt_col, hole=0.4)
                         fig4.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>Trip Type: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                         apply_bottom_legend(fig4)
-                        st.plotly_chart(fig4, use_container_width=True)
+                        st.plotly_chart(fig4, width="stretch")
 
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
@@ -581,553 +581,119 @@ if "3/4수송" in selected_group:
                 st.download_button("📥 필터링된 발매 Raw Data (CSV) 전체 다운로드", data=csv_data, file_name=f"Ticketing_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
                 st.dataframe(filtered_df.head(100), width="stretch")
             else: st.info("ℹ️️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
-# 공급 M/S 탭
+
+    # 공급 M/S 탭
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
         if df_sup is not None:
             df_sup.columns = [str(c).strip() for c in df_sup.columns]
-            al_col = find_column_by_candidates(
-                df_sup.columns,
-                ["opairline", "mktal", "airline", "carrier", "항공사"],
-            )
-            df_sup["Airline"] = df_sup[al_col] if al_col else "Unknown"
+            al_col = find_column_by_candidates(df_sup.columns, ['opairline', 'mktal', 'airline', 'carrier', '항공사'])
+            df_sup['Airline'] = df_sup[al_col] if al_col else 'Unknown'
+            
+            sup_route_col = find_column_by_candidates(df_sup.columns, ['노선', 'route'])
+            df_sup['노선_clean'] = df_sup[sup_route_col].astype(str).str.strip() if sup_route_col else ""
 
-            sup_route_col = find_column_by_candidates(
-                df_sup.columns, ["노선", "route"]
-            )
-            df_sup["노선_clean"] = (
-                df_sup[sup_route_col].astype(str).str.strip()
-                if sup_route_col
-                else ""
-            )
-
-            df_sup["KE_취항여부"] = np.where(
-                df_sup["노선_clean"].isin(EXCEL_KE_ROUTES_MASTER),
-                "취항",
-                "미취항",
-            )
-            df_sup["출발공항"] = df_sup["노선_clean"].apply(
-                lambda x: (
-                    KOREA_APO_MAP.get(
-                        str(x).split("/")[0].strip().upper(), "기타"
-                    )
-                    if "/" in str(x)
-                    else "기타"
-                )
-            )
-            df_sup["도착공항"] = df_sup["노선_clean"].apply(
-                lambda x: (
-                    str(x).split("/")[1].strip().upper()
-                    if "/" in str(x)
-                    else str(x).strip().upper()
-                )
-            )
-            df_sup["Seats_num"] = (
-                pd.to_numeric(
-                    df_sup["Seats"]
-                    .astype(str)
-                    .str.replace(",", "")
-                    .str.strip(),
-                    errors="coerce",
-                ).fillna(0)
-                if "Seats" in df_sup.columns
-                else 0
-            )
-            df_sup["Flights_num"] = (
-                pd.to_numeric(
-                    df_sup["Flights"]
-                    .astype(str)
-                    .str.replace(",", "")
-                    .str.strip(),
-                    errors="coerce",
-                ).fillna(0)
-                if "Flights" in df_sup.columns
-                else 1
-            )
-            sup_month_col = find_column_by_candidates(
-                df_sup.columns, ["출발월", "travelmonth", "depmonth"]
-            )
+            df_sup['KE_취항여부'] = np.where(df_sup['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER), '취항', '미취항')
+            df_sup['출발공항'] = df_sup['노선_clean'].apply(lambda x: KOREA_APO_MAP.get(str(x).split('/')[0].strip().upper(), '기타') if '/' in str(x) else '기타')
+            df_sup['도착공항'] = df_sup['노선_clean'].apply(lambda x: str(x).split('/')[1].strip().upper() if '/' in str(x) else str(x).strip().upper())
+            df_sup['Seats_num'] = pd.to_numeric(df_sup['Seats'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if 'Seats' in df_sup.columns else 0
+            df_sup['Flights_num'] = pd.to_numeric(df_sup['Flights'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if 'Flights' in df_sup.columns else 1
+            sup_month_col = find_column_by_candidates(df_sup.columns, ['출발월', 'travelmonth', 'depmonth'])
 
             temp_sup = df_sup.copy()
-            st.markdown(
-                '<div class="unified-sub-header">🔍 공급 대시보드 필터'
-                ' 설정</div>',
-                unsafe_allow_html=True,
-            )
-            metric_mode = st.radio(
-                "📊 분석 공급 지표 선택:",
-                options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"],
-                horizontal=True,
-            )
+            st.markdown('<div class="unified-sub-header">🔍 공급 대시보드 필터 설정</div>', unsafe_allow_html=True)
+            metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
             sf_col1, sf_col2, sf_col3, sf_col4, sf_col5 = st.columns(5)
+            
+            opts_ke_serv = sorted([str(x) for x in temp_sup['KE_취항여부'].dropna().unique()])
+            sel_sup_ke_serv_list = render_multiselect_box(sf_col1, "1. KE 취항여부", opts_ke_serv, "slicer_sup_ke_serv_multi")
+            if sel_sup_ke_serv_list: temp_sup = temp_sup[temp_sup['KE_취항여부'].isin(sel_sup_ke_serv_list)]
 
-            opts_ke_serv = sorted([
-                str(x) for x in temp_sup["KE_취항여부"].dropna().unique()
-            ])
-            sel_sup_ke_serv_list = render_multiselect_box(
-                sf_col1,
-                "1. KE 취항여부",
-                opts_ke_serv,
-                "slicer_sup_ke_serv_multi",
-            )
-            if sel_sup_ke_serv_list:
-                temp_sup = temp_sup[
-                    temp_sup["KE_취항여부"].isin(sel_sup_ke_serv_list)
-                ]
+            opts_ori = sorted([str(x) for x in temp_sup['출발공항'].dropna().unique()])
+            sel_sup_origin_list = render_multiselect_box(sf_col2, "2. 출발 공항", opts_ori, "slicer_sup_origin_multi")
+            if sel_sup_origin_list: temp_sup = temp_sup[temp_sup['출발공항'].isin(sel_sup_origin_list)]
 
-            opts_ori = sorted([
-                str(x) for x in temp_sup["출발공항"].dropna().unique()
-            ])
-            sel_sup_origin_list = render_multiselect_box(
-                sf_col2, "2. 출발 공항", opts_ori, "slicer_sup_origin_multi"
-            )
-            if sel_sup_origin_list:
-                temp_sup = temp_sup[
-                    temp_sup["출발공항"].isin(sel_sup_origin_list)
-                ]
+            opts_dest = sorted([str(x) for x in temp_sup['도착공항'].dropna().unique()])
+            sel_sup_dest_list = render_multiselect_box(sf_col3, "3. 도착 공항", opts_dest, "slicer_sup_dest_multi")
+            if sel_sup_dest_list: temp_sup = temp_sup[temp_sup['도착공항'].isin(sel_sup_dest_list)]
 
-            opts_dest = sorted([
-                str(x) for x in temp_sup["도착공항"].dropna().unique()
-            ])
-            sel_sup_dest_list = render_multiselect_box(
-                sf_col3, "3. 도착 공항", opts_dest, "slicer_sup_dest_multi"
-            )
-            if sel_sup_dest_list:
-                temp_sup = temp_sup[
-                    temp_sup["도착공항"].isin(sel_sup_dest_list)
-                ]
-
-            raw_sup_m = (
-                [
-                    str(x)
-                    for x in temp_sup[sup_month_col].dropna().unique()
-                    if "1900" not in str(x) and str(x).strip() != "nan"
-                ]
-                if sup_month_col and sup_month_col in temp_sup.columns
-                else []
-            )
+            raw_sup_m = [str(x) for x in temp_sup[sup_month_col].dropna().unique() if '1900' not in str(x) and str(x).strip() != 'nan'] if sup_month_col and sup_month_col in temp_sup.columns else []
             opts_sup_m = sort_month_options(raw_sup_m, reverse=True)
-            sel_sup_month_list = render_multiselect_box(
-                sf_col4, "4. 출발 월", opts_sup_m, "slicer_month_sup_multi"
-            )
-            if sel_sup_month_list and sup_month_col:
-                temp_sup = temp_sup[
-                    temp_sup[sup_month_col].isin(sel_sup_month_list)
-                ]
+            sel_sup_month_list = render_multiselect_box(sf_col4, "4. 출발 월", opts_sup_m, "slicer_month_sup_multi")
+            if sel_sup_month_list and sup_month_col: temp_sup = temp_sup[temp_sup[sup_month_col].isin(sel_sup_month_list)]
 
-            opts_sup_al = sorted([
-                str(x) for x in temp_sup["Airline"].dropna().unique()
-            ])
-            opts_sup_al = (
-                ["KE"] + [x for x in opts_sup_al if x != "KE"]
-                if "KE" in opts_sup_al
-                else opts_sup_al
-            )
-            sel_sup_al_list = render_multiselect_box(
-                sf_col5, "5. 항공사", opts_sup_al, "slicer_al_sup_multi"
-            )
-            if sel_sup_al_list:
-                temp_sup = temp_sup[temp_sup["Airline"].isin(sel_sup_al_list)]
+            opts_sup_al = sorted([str(x) for x in temp_sup['Airline'].dropna().unique()])
+            opts_sup_al = ['KE'] + [x for x in opts_sup_al if x != 'KE'] if 'KE' in opts_sup_al else opts_sup_al
+            sel_sup_al_list = render_multiselect_box(sf_col5, "5. 항공사", opts_sup_al, "slicer_al_sup_multi")
+            if sel_sup_al_list: temp_sup = temp_sup[temp_sup['Airline'].isin(sel_sup_al_list)]
 
             filtered_sup = temp_sup
             st.markdown("---")
-            val_col_sup = (
-                "Seats_num" if "Seats" in metric_mode else "Flights_num"
-            )
-
-            if (
-                not filtered_sup.empty
-                and sup_month_col
-                and sup_month_col in filtered_sup.columns
-            ):
-                st.markdown(
-                    '<div class="unified-sub-header">1. 출발기간별 주요 항공사'
-                    ' 공급 M/S 점유비 추이</div>',
-                    unsafe_allow_html=True,
-                )
-                sup_al_grp = (
-                    filtered_sup.groupby(
-                        [sup_month_col, "Airline"], observed=False
-                    )[val_col_sup]
-                    .sum()
-                    .reset_index()
-                )
-                sup_mkt_tot = (
-                    filtered_sup.groupby(sup_month_col, observed=False)[
-                        val_col_sup
-                    ]
-                    .sum()
-                    .reset_index()
-                )
-
-                sup_merged = pd.merge(
-                    sup_al_grp,
-                    sup_mkt_tot,
-                    on=sup_month_col,
-                    suffixes=("", "_Mkt"),
-                )
-                sup_merged["MS_Percent"] = np.where(
-                    sup_merged[f"{val_col_sup}_Mkt"] > 0,
-                    (
-                        sup_merged[val_col_sup]
-                        / sup_merged[f"{val_col_sup}_Mkt"]
-                    )
-                    * 100,
-                    0,
-                )
-
-                al_sup_totals = filtered_sup.groupby(
-                    "Airline", observed=False
-                )[val_col_sup].sum()
+            val_col_sup = 'Seats_num' if 'Seats' in metric_mode else 'Flights_num'
+            
+            if not filtered_sup.empty and sup_month_col and sup_month_col in filtered_sup.columns:
+                st.markdown('<div class="unified-sub-header">1. 출발기간별 주요 항공사 공급 M/S 점유비 추이</div>', unsafe_allow_html=True)
+                sup_al_grp = filtered_sup.groupby([sup_month_col, 'Airline'], observed=False)[val_col_sup].sum().reset_index()
+                sup_mkt_tot = filtered_sup.groupby(sup_month_col, observed=False)[val_col_sup].sum().reset_index()
+                
+                sup_merged = pd.merge(sup_al_grp, sup_mkt_tot, on=sup_month_col, suffixes=('', '_Mkt'))
+                sup_merged['MS_Percent'] = np.where(sup_merged[f'{val_col_sup}_Mkt'] > 0, (sup_merged[val_col_sup] / sup_merged[f'{val_col_sup}_Mkt']) * 100, 0)
+                
+                al_sup_totals = filtered_sup.groupby('Airline', observed=False)[val_col_sup].sum()
                 valid_al_sup = al_sup_totals[al_sup_totals > 0].sort_values(ascending=False).index.tolist()
-
+                
                 top_sup_display = []
-                if "KE" in valid_al_sup:
-                    top_sup_display.append("KE")
-                top_sup_display += [al for al in valid_al_sup if al != "KE"][:5]
-
-                sup_merged_top = sup_merged[
-                    sup_merged["Airline"].isin(top_sup_display)
-                ].copy()
+                if 'KE' in valid_al_sup: top_sup_display.append('KE')
+                top_sup_display += [al for al in valid_al_sup if al != 'KE'][:5]
+                
+                sup_merged_top = sup_merged[sup_merged['Airline'].isin(top_sup_display)].copy()
 
                 fig_sup_line = go.Figure()
                 color_map_sup = build_airline_color_map(opts_sup_al)
 
                 for al_code in top_sup_display:
-                    al_data = sup_merged_top[
-                        sup_merged_top["Airline"] == al_code
-                    ]
-                    if al_data.empty:
-                        continue
-                    is_ke = al_code == "KE"
-                    line_style = (
-                        dict(color="#16a34a", width=3.5)
-                        if is_ke
-                        else dict(
-                            color=color_map_sup.get(al_code, "#94a3b8"),
-                            dash="dot",
-                            width=1.5,
-                        )
-                    )
-                    marker_style = (
-                        dict(size=8, symbol="circle") if is_ke else dict(size=4)
-                    )
-                    mode_setting = (
-                        "lines+markers+text" if is_ke else "lines+markers"
-                    )
-                    text_labels = (
-                        [f"<b>{v:.1f}%</b>" for v in al_data["MS_Percent"]]
-                        if is_ke
-                        else None
-                    )
-
-                    fig_sup_line.add_trace(
-                        go.Scatter(
-                            x=al_data[sup_month_col],
-                            y=al_data["MS_Percent"],
-                            mode=mode_setting,
-                            name="★ KE (대한항공)" if is_ke else al_code,
-                            line=line_style,
-                            marker=marker_style,
-                            text=text_labels,
-                            textposition="top center",
-                            hovertemplate=(
-                                f"<b>항공사: {al_code}</b><br>출발월:"
-                                " %{x}<br>공급 M/S: %{y:.1f}%<extra></extra>"
-                            ),
-                        )
-                    )
+                    al_data = sup_merged_top[sup_merged_top['Airline'] == al_code]
+                    if al_data.empty: continue
+                    is_ke = (al_code == 'KE')
+                    line_style = dict(color='#16a34a', width=3.5) if is_ke else dict(color=color_map_sup.get(al_code, '#94a3b8'), dash='dot', width=1.5)
+                    marker_style = dict(size=8, symbol='circle') if is_ke else dict(size=4)
+                    mode_setting = 'lines+markers+text' if is_ke else 'lines+markers'
+                    text_labels = [f"<b>{v:.1f}%</b>" for v in al_data['MS_Percent']] if is_ke else None
+                    
+                    fig_sup_line.add_trace(go.Scatter(
+                        x=al_data[sup_month_col], y=al_data['MS_Percent'], mode=mode_setting,
+                        name=f"★ KE (대한항공)" if is_ke else al_code, line=line_style, marker=marker_style, text=text_labels,
+                        textposition="top center", hovertemplate=f"<b>항공사: {al_code}</b><br>출발월: %{{x}}<br>공급 M/S: %{{y:.1f}}%<extra></extra>"
+                    ))
                 if not sup_merged_top.empty:
-                    fig_sup_line.update_layout(
-                        yaxis_title="Supply Market Share (%)",
-                        xaxis=dict(
-                            categoryorder="array", categoryarray=opts_sup_m
-                        ),
-                        yaxis=dict(
-                            range=[
-                                0,
-                                max(
-                                    sup_merged_top["MS_Percent"].max() * 1.25,
-                                    15,
-                                ),
-                            ]
-                        ),
-                        height=420,
-                    )
+                    fig_sup_line.update_layout(yaxis_title="Supply Market Share (%)", xaxis=dict(categoryorder='array', categoryarray=opts_sup_m), yaxis=dict(range=[0, max(sup_merged_top['MS_Percent'].max() * 1.25, 15)]), height=420)
                 apply_bottom_legend(fig_sup_line)
-                st.plotly_chart(fig_sup_line, use_container_width=True)
-
+                st.plotly_chart(fig_sup_line, width="stretch")
+                
                 st.markdown("---")
-                st.markdown(
-                    '<div class="unified-sub-header">2. 출발기간별 주요 항공사'
-                    ' 공급 M/S 피벗 테이블</div>',
-                    unsafe_allow_html=True,
-                )
-
-                piv_sup = filtered_sup.pivot_table(
-                    index="Airline",
-                    columns=sup_month_col,
-                    values=val_col_sup,
-                    aggfunc="sum",
-                    fill_value=0,
-                    observed=False,
-                )
-                piv_sup["총합계"] = piv_sup.sum(axis=1)
-                piv_sup = piv_sup[piv_sup["총합계"] > 0]
-
-                piv_sup_ms = (
-                    piv_sup.divide(piv_sup.sum(axis=0).replace(0, 1), axis=1)
-                    * 100
-                )
-                al_sup_sorted = (
-                    ["KE"] + [x for x in piv_sup_ms.index if x != "KE"]
-                    if "KE" in piv_sup_ms.index
-                    else piv_sup_ms.index
-                )
+                st.markdown('<div class="unified-sub-header">2. 출발기간별 주요 항공사 공급 M/S 피벗 테이블</div>', unsafe_allow_html=True)
+                
+                piv_sup = filtered_sup.pivot_table(index='Airline', columns=sup_month_col, values=val_col_sup, aggfunc='sum', fill_value=0, observed=False)
+                piv_sup['총합계'] = piv_sup.sum(axis=1)
+                piv_sup = piv_sup[piv_sup['총합계'] > 0] 
+                
+                piv_sup_ms = piv_sup.divide(piv_sup.sum(axis=0).replace(0, 1), axis=1) * 100
+                al_sup_sorted = ['KE'] + [x for x in piv_sup_ms.index if x != 'KE'] if 'KE' in piv_sup_ms.index else piv_sup_ms.index
                 piv_sup_ms = piv_sup_ms.loc[al_sup_sorted].head(100)
-
-                sup_html = (
-                    '<div class="custom-piv-container"><table'
-                    ' class="custom-piv-table"><thead><tr><th'
-                    ' class="header-main"'
-                    ' style="width:100px;">항공사</th>'
-                )
-                for col_m in piv_sup_ms.columns:
-                    sup_html += f'<th class="header-main">{col_m}</th>'
-                sup_html += "</tr></thead><tbody>"
+                
+                sup_html = '<div class="custom-piv-container"><table class="custom-piv-table"><thead><tr><th class="header-main" style="width:100px;">항공사</th>'
+                for col_m in piv_sup_ms.columns: sup_html += f'<th class="header-main">{col_m}</th>'
+                sup_html += '</tr></thead><tbody>'
                 for al_idx, row_item in piv_sup_ms.iterrows():
-                    is_ke_r = str(al_idx).upper() == "KE"
+                    is_ke_r = (str(al_idx).upper() == 'KE')
                     td_style = ' style="background-color: #ffffff !important;"'
-                    k_span = (
-                        '<span class="txt-ke-bold">' if is_ke_r else "<span>"
-                    )
-                    sup_html += f"<tr><td{td_style}>{k_span}{al_idx}</span></td>"
-                    for val_ms in row_item:
-                        sup_html += f"<td{td_style}>{k_span}{val_ms:.1f}%</span></td>"
-                    sup_html += "</tr>"
-                sup_html += "</tbody></table></div>"
+                    k_span = '<span class="txt-ke-bold">' if is_ke_r else '<span>'
+                    sup_html += f'<tr><td{td_style}>{k_span}{al_idx}</span></td>'
+                    for val_ms in row_item: sup_html += f'<td{td_style}>{k_span}{val_ms:.1f}%</span></td>'
+                    sup_html += '</tr>'
+                sup_html += '</tbody></table></div>'
                 st.markdown(sup_html, unsafe_allow_html=True)
 
-                st.markdown("---")
-                st.markdown(
-                    '<div class="unified-sub-header">3. 항공사별 출발시간대'
-                    " 스케줄 타임라인 (KE 취항노선 한정)</div>",
-                    unsafe_allow_html=True,
-                )
-
-                # 출발시간대 컬럼 자동 탐색
-                time_col_target = find_column_by_candidates(
-                    filtered_sup.columns,
-                    [
-                        "deptime",
-                        "출발시간",
-                        "출발시간대",
-                        "time_slot",
-                        "timeslot",
-                        "dep_time",
-                        "시간대",
-                    ],
-                )
-
-                if time_col_target and time_col_target in filtered_sup.columns:
-                    # 🟢 KE 취항노선 한정 데이터
-                    df_ke_serv_only = filtered_sup[
-                        filtered_sup["KE_취항여부"] == "취항"
-                    ].copy()
-
-                    tf_col1, tf_col2 = st.columns(2)
-
-                    opts_t_route = sorted([
-                        str(x)
-                        for x in df_ke_serv_only["노선_clean"]
-                        .dropna()
-                        .unique()
-                        if str(x).strip() != ""
-                    ])
-                    sel_t_route = tf_col1.multiselect(
-                        "✈ 분석 노선 선택 (필수 선택):",
-                        options=opts_t_route,
-                        key="timeline_time_route_sub_filter",
-                    )
-
-                    opts_t_month = sort_month_options(
-                        [
-                            str(x)
-                            for x in df_ke_serv_only[sup_month_col]
-                            .dropna()
-                            .unique()
-                            if str(x).strip() != ""
-                        ],
-                        reverse=False,
-                    )
-                    sel_t_month = tf_col2.multiselect(
-                        "🗓 분석 출발월 선택 (미선택 시 전체):",
-                        options=opts_t_month,
-                        key="timeline_time_month_sub_filter",
-                    )
-
-                    # 노선 미선택 시 빈 화면 안내
-                    if not sel_t_route:
-                        st.info(
-                            "✈ 상단 서브 필터에서 **[분석 노선]**을 1개 이상"
-                            " 선택하시면 시간대별 출발 타임라인이"
-                            " 조회됩니다."
-                        )
-                    else:
-                        df_time_target = df_ke_serv_only[
-                            df_ke_serv_only["노선_clean"].isin(sel_t_route)
-                        ].copy()
-
-                        if sel_t_month:
-                            df_time_target = df_time_target[
-                                df_time_target[sup_month_col].isin(sel_t_month)
-                            ]
-
-                        if not df_time_target.empty:
-                            # 시간 파싱 함수: '1620:00' -> '16:20'
-                            def parse_time_info(raw_val):
-                                s = str(raw_val).strip().split(".")[0]
-                                s_clean = "".join(filter(str.isdigit, s))
-                                if not s_clean:
-                                    return 9999, "기타"
-
-                                if len(s_clean) <= 2:
-                                    hh, mm = int(s_clean), 0
-                                elif len(s_clean) == 3:
-                                    hh, mm = int(s_clean[0]), int(s_clean[1:3])
-                                else:
-                                    hh, mm = int(s_clean[:2]), int(s_clean[2:4])
-
-                                hh = min(max(hh, 0), 23)
-                                mm = min(max(mm, 0), 59)
-                                total_minutes = hh * 60 + mm
-                                time_str = f"{hh:02d}:{mm:02d}"
-                                return total_minutes, time_str
-
-                            parsed_res = df_time_target[time_col_target].apply(
-                                parse_time_info
-                            )
-                            df_time_target["time_minutes"] = [
-                                r[0] for r in parsed_res
-                            ]
-                            df_time_target["시간대_fmt"] = [
-                                r[1] for r in parsed_res
-                            ]
-
-                            df_time_target = df_time_target[
-                                df_time_target["time_minutes"] < 9999
-                            ]
-
-                            time_grp_df = (
-                                df_time_target.groupby(
-                                    ["time_minutes", "시간대_fmt", "Airline"],
-                                    observed=False,
-                                )[val_col_sup]
-                                .sum()
-                                .reset_index()
-                            )
-
-                            time_grp_df = time_grp_df.sort_values(
-                                "time_minutes"
-                            )
-                            present_time_labels = (
-                                time_grp_df.drop_duplicates("time_minutes")[
-                                    "시간대_fmt"
-                                ].tolist()
-                            )
-
-                            al_list = sorted(time_grp_df["Airline"].unique())
-                            if "KE" in al_list:
-                                al_list.remove("KE")
-                                al_list = ["KE"] + al_list
-                            y_categories = al_list[::-1]
-
-                            fig_dep_timeline = go.Figure()
-                            color_map_al = build_airline_color_map(opts_sup_al)
-
-                            for al_code in al_list:
-                                al_df = time_grp_df[
-                                    time_grp_df["Airline"] == al_code
-                                ]
-                                if al_df.empty:
-                                    continue
-
-                                is_ke = al_code == "KE"
-                                symbol_style = "diamond" if is_ke else "circle"
-                                marker_color = (
-                                    "#16a34a"
-                                    if is_ke
-                                    else color_map_al.get(al_code, "#2563eb")
-                                )
-
-                                # 🟢 점 크기 설정: KE만 살짝 강조(16), 타 항공사는 모두 동일 크기(12)
-                                size_vals = 16 if is_ke else 12
-
-                                fig_dep_timeline.add_trace(
-                                    go.Scatter(
-                                        x=al_df["시간대_fmt"],
-                                        y=al_df["Airline"],
-                                        mode="markers",
-                                        name=(
-                                            "★ KE (대한항공)"
-                                            if is_ke
-                                            else al_code
-                                        ),
-                                        marker=dict(
-                                            symbol=symbol_style,
-                                            size=size_vals,
-                                            color=marker_color,
-                                            opacity=0.9,
-                                            # 🟢 테두리 완전히 제거
-                                            line=dict(width=0),
-                                        ),
-                                        hovertemplate=f"<b>항공사: {al_code}</b><br>출발시간: %{{x}}<br>공급량: %{{customdata:,.0f}} ({metric_mode})<extra></extra>",
-                                        customdata=al_df[val_col_sup],
-                                    )
-                                )
-
-                            fig_dep_timeline.update_layout(
-                                title=(
-                                    f"선택 노선 ({', '.join(sel_t_route)})"
-                                    " 출발시간순 스케줄 타임라인"
-                                ),
-                                xaxis=dict(
-                                    # 🟢 X축 title 제거하여 범례와 글씨 겹침 방지
-                                    title=None,
-                                    type="category",
-                                    categoryorder="array",
-                                    categoryarray=present_time_labels,
-                                    showgrid=True,
-                                    gridcolor="#e2e8f0",
-                                    gridwidth=1,
-                                ),
-                                yaxis=dict(
-                                    title="항공사",
-                                    type="category",
-                                    categoryorder="array",
-                                    categoryarray=y_categories,
-                                    showgrid=True,
-                                    gridcolor="#f1f5f9",
-                                ),
-                                height=max(340, len(al_list) * 55 + 120),
-                                plot_bgcolor="#ffffff",
-                                # 🟢 하단 여백 확보하여 글자 겹침 현상 예방
-                                margin=dict(b=60),
-                            )
-                            apply_bottom_legend(fig_dep_timeline)
-                            st.plotly_chart(
-                                fig_dep_timeline, use_container_width=True
-                            )
-                        else:
-                            st.info(
-                                "💡 선택하신 노선 및 필터 조건에 해당하는"
-                                " 출발시간대 데이터가 없습니다."
-                            )
-                else:
-                    st.info(
-                        "💡 데이터셋에 출발시간대 관련 컬럼(DepTime/출발시간 등)이"
-                        " 없습니다."
-                    )
     # 대리점/RBD 탭
     with tab_34_3:
         RBD_HIERARCHY_LOCAL = {
@@ -1398,43 +964,24 @@ elif "6수송" in selected_group:
     with col_left_filter:
         st.markdown('<div style="font-size:15px; font-weight:800; color:#0f172a; border-bottom:2px solid #cbd5e1; padding-bottom:8px; margin-bottom:15px;">🔍 대시보드 슬라이서</div>', unsafe_allow_html=True)
 
-        # 🟢 1. 전년 데이터를 제외한 '금년(CY)' 데이터만 선별
-        df_cy_only = df_6[df_6[col_pur_year_type].astype(str).str.contains('금년|CY', na=False)] if col_pur_year_type in df_6.columns else df_6
-        if df_cy_only.empty: 
-            df_cy_only = df_6
-
-        # 🟢 2. 금년 데이터에서만 옵션을 추출하는 전용 함수
-        def get_clean_opts_cy(col_name):
-            if col_name in df_cy_only.columns:
-                return sorted([str(x).strip() for x in df_cy_only[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
+        def get_clean_opts(col_name):
+            if col_name in df_6.columns:
+                return sorted([str(x).strip() for x in df_6[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
             return []
 
-     # 🟢 발매월/출발월 및 전체 슬라이서 옵션을 금년(CY) 데이터 기준으로만 추출
-        df_cy_pur = df_6[df_6[col_pur_year_type].astype(str).str.contains('금년|CY', na=False)] if col_pur_year_type in df_6.columns else df_6
-        if df_cy_pur.empty: df_cy_pur = df_6
-
-        df_cy_trip = df_6[df_6[col_trip_year_type].astype(str).str.contains('금년|CY', na=False)] if col_trip_year_type in df_6.columns else df_6
-        if df_cy_trip.empty: df_cy_trip = df_6
-
-        def get_clean_opts_from_df(target_df, col_name):
-            if col_name in target_df.columns:
-                return sorted([str(x).strip() for x in target_df[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
-            return []
-
-        opts_pur_m = sort_month_options(get_clean_opts_from_df(df_cy_pur, col_pur_m_disp), reverse=True)
-        opts_trip_m = sort_month_options(get_clean_opts_from_df(df_cy_trip, col_trip_m_disp), reverse=True)
-        
-        opts_rgn = get_clean_opts_from_df(df_cy_pur, col_rgn)
-        opts_dir = get_clean_opts_from_df(df_cy_pur, col_dir)
-        opts_direct = get_clean_opts_from_df(df_cy_pur, col_direct_transit)
-        opts_al = get_clean_opts_from_df(df_cy_pur, col_al_6)
+        opts_pur_m = sort_month_options(get_clean_opts(col_pur_m_disp), reverse=True)
+        opts_trip_m = sort_month_options(get_clean_opts(col_trip_m_disp), reverse=True)
+        opts_rgn = get_clean_opts(col_rgn)
+        opts_dir = get_clean_opts(col_dir)
+        opts_direct = get_clean_opts(col_direct_transit)
+        opts_al = get_clean_opts(col_al_6)
         if 'KE' in opts_al: opts_al = ['KE'] + [x for x in opts_al if x != 'KE']
-        
-        opts_od = get_clean_opts_from_df(df_cy_pur, col_od_simple)
-        opts_orig_c = get_clean_opts_from_df(df_cy_pur, col_orig_c)
-        opts_dest_c = get_clean_opts_from_df(df_cy_pur, col_dest_c)
-        opts_jp_apo = get_clean_opts_from_df(df_cy_pur, col_jp_apo)
-        opts_ov_apo = get_clean_opts_from_df(df_cy_pur, col_ov_apo)
+        opts_od = get_clean_opts(col_od_simple)
+        opts_orig_c = get_clean_opts(col_orig_c)
+        opts_dest_c = get_clean_opts(col_dest_c)
+        opts_jp_apo = get_clean_opts(col_jp_apo)
+        opts_ov_apo = get_clean_opts(col_ov_apo)
+
         sel_pur_m_disp = st.multiselect(f"발매월{get_dynamic_range_label_6th(opts_pur_m)}", options=opts_pur_m, key="m_pur_6th_v2")
         sel_trip_m_disp = st.multiselect(f"출발월{get_dynamic_range_label_6th(opts_trip_m)}", options=opts_trip_m, key="m_trip_6th_v2")
         sel_rgn = st.multiselect("OD Region", options=opts_rgn, key="m_rgn_6th_v2")
@@ -1486,8 +1033,6 @@ elif "6수송" in selected_group:
             mask &= df_6[col_ov_apo].astype(str).str.strip().isin(sel_ov_apo)
 
         filtered_6th = df_6[mask]
-        # 🟢 [추가] 필터링 후 메모리에 남은 임시 변수들 즉시 강제 수거
-        gc.collect()
 
     with col_right_data:
         if filtered_6th.empty:
@@ -1835,16 +1380,48 @@ elif "6수송" in selected_group:
                     st.info("💡 TOP 20 O&D 분석 연산 중 방어 모드가 실행되었습니다.")
 
             with tabs[1]:
-                st.markdown('<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및 다운로드</div>', unsafe_allow_html=True)
-                if df_6th_raw is not None and not df_6th_raw.empty:
-                    show_df = filtered_6th if not filtered_6th.empty else df_6th_raw
-                    csv_6th_bytes = show_df.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button("📥 필터링된 6수송 Data (CSV) 다운로드", data=csv_6th_bytes, file_name=f"6th_Freedom_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
-                    st.dataframe(show_df.head(100))
+    st.markdown(
+        '<div class="unified-sub-header">📋 6수송 사전 집계 Data 조회 및'
+        " 다운로드</div>",
+        unsafe_allow_html=True,
+    )
+
+    if df_6th_raw is not None and not df_6th_raw.empty:
+        # 🟢 메모리 과부하 방지: 필요한 필터 데이터만 가볍게 복사
+        show_df = (
+            filtered_6th if not filtered_6th.empty else df_6th_raw
+        )
+
+        # 🟢 Category 타입을 일반 string/int/float으로 변환하여 메모리 폭증 방지
+        df_export = show_df.copy()
+        for col in df_export.select_dtypes(include=["category"]).columns:
+            df_export[col] = df_export[col].astype(str)
+
+        # 🟢 CSV 변환 시 청크 처리로 메모리 랙 방지
+        csv_6th_bytes = df_export.to_csv(index=False).encode("utf-8-sig")
+
+        st.download_button(
+            "📥 필터링된 6수송 Data (CSV) 다운로드",
+            data=csv_6th_bytes,
+            file_name=(
+                "6th_Freedom_Data_"
+                f"{datetime.date.today().strftime('%Y%m%d')}.csv"
+            ),
+            mime="text/csv",
+        )
+
+        # 🟢 표 출력 시 너비 자동맞춤 적용 및 상위 100개만 안전하게 출력
+        st.dataframe(
+            df_export.head(100),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("💡 조회 및 다운로드할 6수송 데이터가 없습니다.")
                     
 # ==========================================
 # GROUP 3: 🔗 W26 연결 네트워크
 # ==========================================
 else:
     st.markdown('<div class="unified-sub-header">🔗 대한항공 W26 연결 네트워크 외부 연동 시스템</div>', unsafe_allow_html=True)
-    st.link_button("🔗 W26 연결 네트워크 바로가기 (새 탭에서 열기)", EXT_WEB_APP_URL)
+    st.link_button("🔗 W26 연결 네트워크 바로가기 (새 탭에서 열기)", EXT_WEB_APP_URL, width="stretch")
