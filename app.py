@@ -916,7 +916,7 @@ if "3/4수송" in selected_group:
                 )
 
                 # 출발시간대 컬럼 자동 탐색
-                time_col = find_column_by_candidates(
+                time_col_target = find_column_by_candidates(
                     filtered_sup.columns,
                     [
                         "deptime",
@@ -929,7 +929,7 @@ if "3/4수송" in selected_group:
                     ],
                 )
 
-                if time_col and time_col in filtered_sup.columns:
+                if time_col_target and time_col_target in filtered_sup.columns:
                     # 🟢 KE 취항노선 한정 데이터
                     df_ke_serv_only = filtered_sup[
                         filtered_sup["KE_취항여부"] == "취항"
@@ -984,7 +984,7 @@ if "3/4수송" in selected_group:
                             ]
 
                         if not df_time_target.empty:
-                            # 🟢 시간 파싱 함수: '1620:00' -> 분 단위(980분) & '16:20' 포맷 변환
+                            # 시간 파싱 함수: '1620:00' -> '16:20'
                             def parse_time_info(raw_val):
                                 s = str(raw_val).strip().split(".")[0]
                                 s_clean = "".join(filter(str.isdigit, s))
@@ -1004,7 +1004,7 @@ if "3/4수송" in selected_group:
                                 time_str = f"{hh:02d}:{mm:02d}"
                                 return total_minutes, time_str
 
-                            parsed_res = df_time_target[time_col].apply(
+                            parsed_res = df_time_target[time_col_target].apply(
                                 parse_time_info
                             )
                             df_time_target["time_minutes"] = [
@@ -1014,13 +1014,11 @@ if "3/4수송" in selected_group:
                                 r[1] for r in parsed_res
                             ]
 
-                            # 무효한 시간값 제거
                             df_time_target = df_time_target[
                                 df_time_target["time_minutes"] < 9999
                             ]
 
-                            # 시간대 및 항공사별 그룹화
-                            time_grp = (
+                            time_grp_df = (
                                 df_time_target.groupby(
                                     ["time_minutes", "시간대_fmt", "Airline"],
                                     observed=False,
@@ -1029,27 +1027,27 @@ if "3/4수송" in selected_group:
                                 .reset_index()
                             )
 
-                            # 실제 운항 데이터가 존재하는 시간대만 오름차순 정렬
-                            time_grp = time_grp.sort_values("time_minutes")
+                            time_grp_df = time_grp_df.sort_values(
+                                "time_minutes"
+                            )
                             present_time_labels = (
-                                time_grp.drop_duplicates("time_minutes")[
+                                time_grp_df.drop_duplicates("time_minutes")[
                                     "시간대_fmt"
                                 ].tolist()
                             )
 
-                            # Y축 항공사 순서 정렬 (KE 상단 노출)
-                            al_list = sorted(time_grp["Airline"].unique())
+                            al_list = sorted(time_grp_df["Airline"].unique())
                             if "KE" in al_list:
                                 al_list.remove("KE")
                                 al_list = ["KE"] + al_list
                             y_categories = al_list[::-1]
 
-                            fig_time_scatter = go.Figure()
+                            fig_dep_timeline = go.Figure()
                             color_map_al = build_airline_color_map(opts_sup_al)
 
                             for al_code in al_list:
-                                al_df = time_grp[
-                                    time_grp["Airline"] == al_code
+                                al_df = time_grp_df[
+                                    time_grp_df["Airline"] == al_code
                                 ]
                                 if al_df.empty:
                                     continue
@@ -1062,14 +1060,10 @@ if "3/4수송" in selected_group:
                                     else color_map_al.get(al_code, "#2563eb")
                                 )
 
-                                max_val = time_grp[val_col_sup].max()
-                                size_vals = (
-                                    (al_df[val_col_sup] / max_val * 22 + 14)
-                                    if max_val > 0
-                                    else 16
-                                )
+                                # 🟢 점 크기 설정: KE만 살짝 강조(16), 타 항공사는 모두 동일 크기(12)
+                                size_vals = 16 if is_ke else 12
 
-                                fig_time_scatter.add_trace(
+                                fig_dep_timeline.add_trace(
                                     go.Scatter(
                                         x=al_df["시간대_fmt"],
                                         y=al_df["Airline"],
@@ -1084,22 +1078,22 @@ if "3/4수송" in selected_group:
                                             size=size_vals,
                                             color=marker_color,
                                             opacity=0.9,
-                                            line=dict(
-                                                width=1, color="#0f172a"
-                                            ),
+                                            # 🟢 테두리 완전히 제거
+                                            line=dict(width=0),
                                         ),
                                         hovertemplate=f"<b>항공사: {al_code}</b><br>출발시간: %{{x}}<br>공급량: %{{customdata:,.0f}} ({metric_mode})<extra></extra>",
                                         customdata=al_df[val_col_sup],
                                     )
                                 )
 
-                            fig_time_scatter.update_layout(
+                            fig_dep_timeline.update_layout(
                                 title=(
                                     f"선택 노선 ({', '.join(sel_t_route)})"
                                     " 출발시간순 스케줄 타임라인"
                                 ),
                                 xaxis=dict(
-                                    title="출발시간 (실제 운항 시간대만 표시)",
+                                    # 🟢 X축 title 제거하여 범례와 글씨 겹침 방지
+                                    title=None,
                                     type="category",
                                     categoryorder="array",
                                     categoryarray=present_time_labels,
@@ -1117,10 +1111,12 @@ if "3/4수송" in selected_group:
                                 ),
                                 height=max(340, len(al_list) * 55 + 120),
                                 plot_bgcolor="#ffffff",
+                                # 🟢 하단 여백 확보하여 글자 겹침 현상 예방
+                                margin=dict(b=60),
                             )
-                            apply_bottom_legend(fig_time_scatter)
+                            apply_bottom_legend(fig_dep_timeline)
                             st.plotly_chart(
-                                fig_time_scatter, use_container_width=True
+                                fig_dep_timeline, use_container_width=True
                             )
                         else:
                             st.info(
