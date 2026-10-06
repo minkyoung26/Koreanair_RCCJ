@@ -123,6 +123,11 @@ def load_fast_parquet_data_file():
         if os.path.exists(target_path):
             try:
                 df = pd.read_parquet(target_path, engine="pyarrow")
+                # 🟢 메모리 사용량을 절반 이하로 줄여 OOM(Health Check) 에러 방지
+                for col in df.select_dtypes(include=["float64"]).columns:
+                    df[col] = df[col].astype("float32")
+                for col in df.select_dtypes(include=["int64"]).columns:
+                    df[col] = df[col].astype("int32")
                 if df is not None and not df.empty:
                     # 🟢 Category 타입을 일반 문자열로 변환하여 메모리 폭증 차단
                     for col in df.select_dtypes(include=["category"]).columns:
