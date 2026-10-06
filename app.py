@@ -294,7 +294,7 @@ def get_dynamic_date_ranges_34(df_iss):
     return iss_str, dep_str
 
 # ==========================================
-# GROUP 1: ✈️ 3/4수송 대시보드
+# GROUP 1: ✈️️ 3/4수송 대시보드
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
@@ -861,30 +861,30 @@ if "3/4수송" in selected_group:
                 sel_tt_ag_list = render_multiselect_box(ac4, "4. TRIP TYPE", opts_tt_ag, "slicer_tt_ag_multi")
                 if sel_tt_ag_list and tt_col_ag: temp_ag = temp_ag[temp_ag[tt_col_ag].astype(str).isin(sel_tt_ag_list)]
 
-# pos_al, country_al 등 국가 관련 컬럼을 제외하고 실제 항공사 컬럼만 매핑
-al_col_ag = None
-for col in temp_ag.columns:
-    col_str = str(col).lower().replace('_', '').replace(' ', '')
-    if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
-        continue
-    if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
-        al_col_ag = col
-        break
+                # pos_al, country_al 등 국가 관련 컬럼 제외 및 실제 항공사 컬럼 우선 매핑
+                al_col_ag = None
+                for col in temp_ag.columns:
+                    col_str = str(col).lower().replace('_', '').replace(' ', '')
+                    if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
+                        continue
+                    if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
+                        al_col_ag = col
+                        break
 
-if not al_col_ag and 'dominantmarketingairline' in temp_ag.columns:
-    al_col_ag = 'dominantmarketingairline'
-opts_al_ag = sorted([str(x) for x in temp_ag[al_col_ag].dropna().unique()]) if al_col_ag and al_col_ag in temp_ag.columns else []
-opts_al_ag = ['KE'] + [x for x in opts_al_ag if x != 'KE'] if 'KE' in opts_al_ag else opts_al_ag
-sel_al_ag_list = render_multiselect_box(ac5, "5. 항공사", opts_al_ag, "slicer_al_ag_multi")
-if sel_al_ag_list and al_col_ag: temp_ag = temp_ag[temp_ag[al_col_ag].astype(str).isin(sel_al_ag_list)]
+                if not al_col_ag and 'dominantmarketingairline' in temp_ag.columns:
+                    al_col_ag = 'dominantmarketingairline'
 
-df_ag_filtered = temp_ag
+                opts_al_ag = sorted([str(x) for x in temp_ag[al_col_ag].dropna().unique()]) if al_col_ag and al_col_ag in temp_ag.columns else []
+                opts_al_ag = ['KE'] + [x for x in opts_al_ag if x != 'KE'] if 'KE' in opts_al_ag else opts_al_ag
+                sel_al_ag_list = render_multiselect_box(ac5, "5. 항공사", opts_al_ag, "slicer_al_ag_multi")
+                if sel_al_ag_list and al_col_ag: temp_ag = temp_ag[temp_ag[al_col_ag].astype(str).isin(sel_al_ag_list)]
+
+            df_ag_filtered = temp_ag
             open_attr = "open" if st.toggle("📂 전체 항목 펼쳐보기", value=True, key="expand_toggle_all_key_fixed") else ""
 
             sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매현황", "🏢 대리점별 판매현황 (상위 20개 대리점)"])
 
             with sub_tab_rbd:
-                al_col_ag = find_column_by_candidates(df_ag_filtered.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
                 rbd_col_ag = find_column_by_candidates(df_ag_filtered.columns, ['rbkd', 'rbd', 'bookingclass'])
                 val_col_ag = find_column_by_candidates(df_ag_filtered.columns, ['value', 'pax', '수송량', '발매량', '실적']) or 'Value'
                 df_ag_filtered['Value'] = pd.to_numeric(df_ag_filtered[val_col_ag].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if val_col_ag in df_ag_filtered.columns else 0.0
@@ -927,7 +927,6 @@ df_ag_filtered = temp_ag
 
             with sub_tab_agency:
                 agency_col_target = find_column_by_candidates(df_ag_filtered.columns, ['agency', '대리점', '여행사'])
-                al_col_ag = find_column_by_candidates(df_ag_filtered.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
                 if not df_ag_filtered.empty and agency_col_target and week_col_a and al_col_ag:
                     week_list_ag = sorted([str(x) for x in df_ag_filtered[week_col_a].dropna().unique()], reverse=True)
                     agency_totals = df_ag_filtered.groupby(agency_col_target, observed=False)['Value'].sum().sort_values(ascending=False)
@@ -998,25 +997,25 @@ df_ag_filtered = temp_ag
                 sel_g_tt_list = render_multiselect_box(gc4, "4. TRIP TYPE", opts_g_tt, "slicer_g_tt_multi")
                 if sel_g_tt_list and tt_g_col: temp_grp = temp_grp[temp_grp[tt_g_col].astype(str).isin(sel_g_tt_list)]
 
-# pos_al, country_al 등 국가 관련 컬럼을 제외하고 실제 항공사 컬럼만 매핑
-al_g_col = None
-for col in temp_grp.columns:
-    col_str = str(col).lower().replace('_', '').replace(' ', '')
-    if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
-        continue
-    if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
-        al_g_col = col
-        break
+                # pos_al, country_al 등 국가 관련 컬럼 제외 및 실제 항공사 컬럼 우선 매핑
+                al_g_col = None
+                for col in temp_grp.columns:
+                    col_str = str(col).lower().replace('_', '').replace(' ', '')
+                    if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
+                        continue
+                    if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
+                        al_g_col = col
+                        break
 
-if not al_g_col and 'dominantmarketingairline' in temp_grp.columns:
-    al_g_col = 'dominantmarketingairline'
+                if not al_g_col and 'dominantmarketingairline' in temp_grp.columns:
+                    al_g_col = 'dominantmarketingairline'
+
                 opts_g_al = sorted([str(x) for x in temp_grp[al_g_col].dropna().unique()]) if al_g_col and al_g_col in temp_grp.columns else []
                 opts_g_al = ['KE'] + [x for x in opts_g_al if x != 'KE'] if 'KE' in opts_g_al else opts_g_al
                 sel_g_al_list = render_multiselect_box(gc5, "5. 항공사", opts_g_al, "slicer_g_al_multi")
                 if sel_g_al_list and al_g_col: temp_grp = temp_grp[temp_grp[al_g_col].astype(str).isin(sel_g_al_list)]
 
             rbd_g_col = find_column_by_candidates(temp_grp.columns, ['rbkd', 'rbd', 'bookingclass'])
-            al_g_col = find_column_by_candidates(temp_grp.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
             ag_g_col = find_column_by_candidates(temp_grp.columns, ['agency', '대리점', '여행사'])
 
             if rbd_g_col and al_g_col and ag_g_col:
@@ -1499,7 +1498,7 @@ elif "6수송" in selected_group:
                     od_matrix_html += get_yoy_td_html(grand_ke_ms_yoy, True)
                     od_matrix_html += '</tr>'
 
-                    od_matrix_html += '</tbody></table> destruction</div>'
+                    od_matrix_html += '</tbody></table></div>'
                     st.markdown(od_matrix_html, unsafe_allow_html=True)
                 else:
                     st.info("💡 실적이 존재하는 O&D Market이 없습니다.")
