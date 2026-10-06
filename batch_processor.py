@@ -4,6 +4,14 @@ import numpy as np
 import os
 import datetime
 
+def find_column_by_candidates(columns, candidates):
+    for c in columns:
+        cleaned_col = str(c).lower().replace(" ", "").replace("_", "").replace(".", "")
+        for cand in candidates:
+            if cand in cleaned_col:
+                return c
+    return None
+
 def process_batch_parquet():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -18,9 +26,8 @@ def process_batch_parquet():
             break
             
     if not input_file:
-        # 폴더 내 xlsx 또는 csv 파일 자동 탐색
         files = [f for f in os.listdir(base_dir) if f.endswith('.xlsx') or f.endswith('.csv')]
-        files = [f for f in files if not f.startswith('cache_') and not f.startswith('~$')]
+        files = [f for f in files if not f.startswith('cache_') and not f.startswith('~$') and '가중치' not in f]
         if files:
             input_file = os.path.join(base_dir, files[0])
 
@@ -38,7 +45,6 @@ def process_batch_parquet():
     # 2. 컬럼명 공백 제거 및 표준화
     df.columns = [str(c).strip() for c in df.columns]
 
-    # 문자열 타입 정리
     for col in df.columns:
         if df[col].dtype == 'object':
             df[col] = df[col].astype(str).str.strip()
@@ -49,30 +55,70 @@ def process_batch_parquet():
     else:
         df['Value'] = 0
 
-    if 'Weighted_Value' in df.columns:
-        df['Weighted_Value'] = pd.to_numeric(df['Weighted_Value'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+    # 4. 🔑 가중치 파일(가중치 파일_7월.csv 등) 탐색 및 노선+항공사별 가중치 매핑
+    weight_file = None
+    possible_weights = ['가중치 파일_7월.csv', '가중치.csv', '가중치.xlsx', 'LCC_weight.csv']
+    for wf in possible_weights:
+        w_path = os.path.join(base_dir, wf)
+        if os.path.exists(w_path):
+            weight_file = w_path
+            break
+
+    if not weight_file:
+        wt_files = [f for f in os.listdir(base_dir) if ('가중치' in f or 'weight' in f.lower()) and not f.startswith('~$')]
+        if wt_files:
+            weight_file = os.path.join(base_dir, wt_files[0])
+
+    if weight_file:
+        print(f"⚖️ 가중치 파일 적용 중: {os.path.basename(weight_file)}")
+        if weight_file.endswith('.xlsx'):
+            w_df = pd.read_excel(weight_file)
+        else:
+            w_df = pd.read_csv(weight_file, low_memory=False)
+
+        w_df.columns = [str(c).strip() for c in w_df.columns]
+
+        # 가중치 파일 내 컬럼 찾기 (Pax, OBD, 노선, 항공사)
+        pax_c = find_column_by_candidates(w_df.columns, ['pax', '실적', '합계'])
+        obd_c = find_column_by_candidates(w_df.columns, ['obd', '보정'])
+        al_c  = find_column_by_candidates(w_df.columns, ['dominant', 'mkt', 'al', 'airline', '항공사'])
+        rt_c  = find_column_by_candidates(w_df.columns, ['subroute', 'route', '노선'])
+
+        if pax_c and obd_c and al_c and rt_c:
+            w_df['pax_num'] = pd.to_numeric(w_df[pax_c].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+            w_df['obd_num'] = pd.to_numeric(w_df[obd_c].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+            # Pax 대비 OBD 배수(가중치 비율) 산출
+            w_df['weight_ratio'] = np.where(w_df['pax_num'] > 0, w_df['obd_num'] / w_df['pax_num'], 1.0)
+
+            w_df['rt_clean'] = w_df[rt_c].astype(str).str.strip().str.upper()
+            w_df['al_clean'] = w_df[al_c].astype(str).str.strip().str.upper()
+
+            # (노선, 항공사) -> 가중치 배수 딕셔너리 생성
+            weight_map = dict(zip(zip(w_df['rt_clean'], w_df['al_clean']), w_df['weight_ratio']))
+
+            # 원본 데이터 컬럼 찾기
+            route_col_target = find_column_by_candidates(df.columns, ['subroute', '노선', 'route'])
+            al_col_target    = find_column_by_candidates(df.columns, ['dominant', 'mktal', 'marketing', 'al', 'carrier', '항공사'])
+
+            def get_weight_multiplier(row):
+                rt_val = str(row[route_col_target]).strip().upper() if route_col_target and route_col_target in row else ''
+                al_val = str(row[al_col_target]).strip().upper() if al_col_target and al_col_target in row else ''
+                return weight_map.get((rt_val, al_val), 1.0)
+
+            df['Mult_map'] = df.apply(get_weight_multiplier, axis=1)
+            df['Calc_Weighted_Value'] = df['Value'] * df['Mult_map']
+            df['Weighted_Value'] = df['Calc_Weighted_Value']
+            print("  └ 💡 노선+항공사별 가중치가 성공적으로 매핑되었습니다.")
+        else:
+            print("  └ ⚠️ 가중치 파일 컬럼을 인식하지 못하여 Raw 실적을 사용합니다.")
+            df['Calc_Weighted_Value'] = df['Value']
+            df['Weighted_Value'] = df['Value']
     else:
+        print("  └ ⚠️ 가중치 파일을 찾지 못하여 Raw 실적을 사용합니다.")
+        df['Calc_Weighted_Value'] = df['Value']
         df['Weighted_Value'] = df['Value']
 
-    # 4. 안전한 HTML 피벗 생성 테스트 (KeyError 방지 예외 처리)
-    week_col = '발매주차_일자' if '발매주차_일자' in df.columns else ('발매 주차' if '발매 주차' in df.columns else None)
-    if week_col and 'O&D RBKD' in df.columns:
-        week_list = sorted([str(x) for x in df[week_col].dropna().unique()], reverse=True)
-        
-        piv_rbd = df.pivot_table(index='O&D RBKD', columns=week_col, values='Value', aggfunc='sum', fill_value=0, observed=False)
-        piv_rbd['총합계'] = piv_rbd.sum(axis=1)
-
-        # KeyError 원인이었던 주차별 동적 참조 안전 처리 (.get 방식)
-        rbd_html = ""
-        for rbd_code, rbd_row in piv_rbd.iterrows():
-            rbd_html += f'<tr><td style="width:180px; text-align:center; font-weight:700;">{rbd_code}</td>'
-            for wk in week_list:
-                # 핵심 보정: 해당 주차가 피벗 테이블 컬럼에 없더라도 0으로 안나게 처리
-                wk_val = rbd_row.get(wk, 0)
-                rbd_html += f'<td style="text-align:center;">{wk_val:,.0f}</td>'
-            rbd_html += f'<td style="text-align:center; font-weight:700;">{rbd_row.get("총합계", 0):,.0f}</td></tr>'
-
-    # 5. 최신 Parquet 파일로 최종 저장
+    # 5. 최신 Parquet 파일로 저장
     output_parquet = os.path.join(base_dir, 'cache_34_data.parquet')
     df.to_parquet(output_parquet, engine='pyarrow', index=False)
     
