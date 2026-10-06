@@ -907,7 +907,7 @@ if "3/4수송" in selected_group:
                     sup_html += "</tr>"
                 sup_html += "</tbody></table></div>"
                 st.markdown(sup_html, unsafe_allow_html=True)
-
+                
                 st.markdown("---")
                 st.markdown(
                     '<div class="unified-sub-header">3. 항공사/편명별'
@@ -1036,7 +1036,71 @@ if "3/4수송" in selected_group:
                                 (al_df[val_col_sup] / max_val * 22 + 12)
                                 if max_val > 0
                                 else 14
-                            )                 
+                            )
+
+                            fig_time_scatter.add_trace(
+                                go.Scatter(
+                                    x=al_df["시간대_fmt"],
+                                    y=al_df["Airline"],
+                                    mode="markers",
+                                    name=(
+                                        "★ KE (대한항공)"
+                                        if is_ke
+                                        else al_code
+                                    ),
+                                    marker=dict(
+                                        symbol=symbol_style,
+                                        size=size_vals,
+                                        color=marker_color,
+                                        opacity=0.9,
+                                        line=dict(width=1, color="#0f172a"),
+                                    ),
+                                    hovertemplate=(
+                                        f"<b>항공사: {al_code}</b><br>출발시간대:"
+                                        " %{x}<br>공급량:"
+                                        f" %{{customdata:,.0f}} ({metric_mode})<extra></extra>"
+                                    ),
+                                    customdata=al_df[val_col_sup],
+                                )
+                            )
+
+                        # 레이아웃: 구글 플라이트 스케줄 그리드 스타일
+                        fig_time_scatter.update_layout(
+                            title="항공사별 출발시간대 스케줄 분포 (KE 취항 노선 한정)",
+                            xaxis=dict(
+                                title="출발시간 (Time Slot)",
+                                type="category",
+                                categoryorder="array",
+                                categoryarray=present_hours if present_hours else all_hours,
+                                showgrid=True,
+                                gridcolor="#e2e8f0",
+                                gridwidth=1,
+                            ),
+                            yaxis=dict(
+                                title="항공사",
+                                type="category",
+                                categoryorder="array",
+                                categoryarray=y_categories,
+                                showgrid=True,
+                                gridcolor="#f1f5f9",
+                            ),
+                            height=max(320, len(al_list) * 50 + 120),
+                            plot_bgcolor="#ffffff",
+                        )
+                        apply_bottom_legend(fig_time_scatter)
+                        st.plotly_chart(
+                            fig_time_scatter, use_container_width=True
+                        )
+                    else:
+                        st.info(
+                            "💡 선택하신 조건에 해당하는 출발시간대 데이터가"
+                            " 없습니다."
+                        )
+                else:
+                    st.info(
+                        "💡 데이터셋에 출발시간대 관련 컬럼(DepTime/출발시간 등)이"
+                        " 없습니다."
+                    )               
                    
     # 대리점/RBD 탭
     with tab_34_3:
