@@ -141,17 +141,17 @@ def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
         os.path.join(base_dir, 'cache_6th_data.parquet'),
-        'cache_6th_data.parquet',
-        os.path.join(os.getcwd(), 'cache_6th_data.parquet')
+        'cache_6th_data.parquet'
     ]
     for target_path in candidates:
         if os.path.exists(target_path):
             try:
-                # category 변환 없이 파케 데이터를 깔끔하게 직접 로드
+                # pyarrow 엔진으로 읽어온 뒤 불필요한 메모리 방출
                 df = pd.read_parquet(target_path, engine='pyarrow')
                 if df is not None and not df.empty:
                     return df
-            except Exception: pass
+            except Exception as e:
+                st.error(f"데이터 로드 중 오류 발생: {e}")
     return None
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
