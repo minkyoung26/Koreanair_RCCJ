@@ -908,14 +908,14 @@ if "3/4수송" in selected_group:
                 sup_html += "</tbody></table></div>"
                 st.markdown(sup_html, unsafe_allow_html=True)
 
-                st.markdown("---")
+ st.markdown("---")
                 st.markdown(
-                    '<div class="unified-sub-header">3. 출발시간대별 주요'
-                    " 항공사 공급 타임라인 산점도 (KE 취항노선 한정)</div>",
+                    '<div class="unified-sub-header">3. 출발시간대별 항공사'
+                    " 운항 타임라인 (KE 취항노선 한정)</div>",
                     unsafe_allow_html=True,
                 )
 
-                # 출발시간대 컬럼 자동 탐색 (deptime, 시간, 시간대, 출발시간 등)
+                # 출발시간대 컬럼 자동 탐색
                 time_col = find_column_by_candidates(
                     filtered_sup.columns,
                     [
@@ -978,7 +978,7 @@ if "3/4수송" in selected_group:
                         ]
 
                     if not df_time_target.empty:
-                        # 출발시간대 포맷 정리 (예: '08' -> '08시' 또는 숫자 정렬)
+                        # 출발시간대 포맷 정리 (예: '08' -> '08시')
                         df_time_target["시간대_fmt"] = df_time_target[
                             time_col
                         ].apply(
@@ -989,37 +989,13 @@ if "3/4수송" in selected_group:
                             )
                         )
 
-                        # 시간대별 / 항공사별 그룹화
+                        # 시간대별 / 항공사별 공급량 합계
                         time_grp = (
                             df_time_target.groupby(
                                 ["시간대_fmt", "Airline"], observed=False
                             )[val_col_sup]
                             .sum()
                             .reset_index()
-                        )
-
-                        # 시간대 전체 공급 대비 M/S 점유율
-                        time_mkt_tot = (
-                            df_time_target.groupby(
-                                "시간대_fmt", observed=False
-                            )[val_col_sup]
-                            .sum()
-                            .reset_index()
-                        )
-                        time_grp = pd.merge(
-                            time_grp,
-                            time_mkt_tot,
-                            on="시간대_fmt",
-                            suffixes=("", "_Mkt"),
-                        )
-                        time_grp["MS_Percent"] = np.where(
-                            time_grp[f"{val_col_sup}_Mkt"] > 0,
-                            (
-                                time_grp[val_col_sup]
-                                / time_grp[f"{val_col_sup}_Mkt"]
-                            )
-                            * 100,
-                            0,
                         )
 
                         # 시간대 순서 정렬
@@ -1038,7 +1014,7 @@ if "3/4수송" in selected_group:
                         )
                         time_grp = time_grp.sort_values("시간대_fmt")
 
-                        # 🟢 출발시간대 산점도 생성 (KE 다이아몬드 ◆ / 타사 동그라미 ●)
+                        # 🟢 Y축 없이 X축(시간대) 중심의 타임라인 산점도 생성
                         fig_time_scatter = go.Figure()
                         color_map_al = build_airline_color_map(opts_sup_al)
 
@@ -1049,6 +1025,11 @@ if "3/4수송" in selected_group:
                             else all_al
                         )
 
+                        # 항공사별 Y축 서브 트랙(높이) 매핑 (KE는 맨 위 또는 전용 레인)
+                        al_y_map = {
+                            al: idx + 1 for idx, al in enumerate(al_order)
+                        }
+
                         for al_code in al_order:
                             al_df = time_grp[time_grp["Airline"] == al_code]
                             if al_df.empty:
@@ -1056,19 +1037,21 @@ if "3/4수송" in selected_group:
 
                             is_ke = al_code == "KE"
                             symbol_style = "diamond" if is_ke else "circle"
+                            y_pos = [al_y_map[al_code]] * len(al_df)
+
                             line_style = (
-                                dict(color="#16a34a", width=3.5)
+                                dict(color="#16a34a", width=2.5)
                                 if is_ke
                                 else dict(
                                     color=color_map_al.get(al_code, "#94a3b8"),
                                     dash="dot",
-                                    width=1.5,
+                                    width=1,
                                 )
                             )
 
                             max_val = time_grp[val_col_sup].max()
                             size_vals = (
-                                (al_df[val_col_sup] / max_val * 28 + 10)
+                                (al_df[val_col_sup] / max_val * 24 + 10)
                                 if max_val > 0
                                 else 12
                             )
@@ -1076,8 +1059,8 @@ if "3/4수송" in selected_group:
                             fig_time_scatter.add_trace(
                                 go.Scatter(
                                     x=al_df["시간대_fmt"],
-                                    y=al_df["MS_Percent"],
-                                    mode="lines+markers",
+                                    y=y_pos,
+                                    mode="markers+lines",
                                     name=(
                                         "★ KE (대한항공)"
                                         if is_ke
@@ -1095,21 +1078,27 @@ if "3/4수송" in selected_group:
                                     ),
                                     hovertemplate=(
                                         f"<b>항공사: {al_code}</b><br>출발시간대:"
-                                        " %{x}<br>공급 M/S: %{y:.1f}%<br>공급량:"
+                                        " %{x}<br>공급실적:"
                                         f" %{{customdata:,.0f}}<extra></extra>"
                                     ),
                                     customdata=al_df[val_col_sup],
                                 )
                             )
 
+                        # 🟢 Y축 레이아웃 완전 제거 (Y축 숫자 및 축 선 비활성화)
                         fig_time_scatter.update_layout(
                             title=(
-                                f"출발시간대별 항공사 {metric_mode} 및 M/S"
-                                " 타임라인 산점도"
+                                "출발시간대별 항공사 운항 분포 (KE 취항 노선"
+                                " 한정)"
                             ),
-                            xaxis_title="출발시간대",
-                            yaxis_title="공급 M/S (%)",
-                            height=480,
+                            xaxis_title="출발시간대 (Time Slot)",
+                            yaxis=dict(
+                                visible=False,
+                                showticklabels=False,
+                                showgrid=False,
+                                zeroline=False,
+                            ),
+                            height=380,
                         )
                         apply_bottom_legend(fig_time_scatter)
                         st.plotly_chart(
