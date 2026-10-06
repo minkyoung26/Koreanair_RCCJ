@@ -982,17 +982,62 @@ elif "6수송" in selected_group:
         opts_jp_apo = get_clean_opts(col_jp_apo)
         opts_ov_apo = get_clean_opts(col_ov_apo)
 
-        sel_pur_m_disp = st.multiselect(f"발매월{get_dynamic_range_label_6th(opts_pur_m)}", options=opts_pur_m, key="m_pur_6th_v2")
-        sel_trip_m_disp = st.multiselect(f"출발월{get_dynamic_range_label_6th(opts_trip_m)}", options=opts_trip_m, key="m_trip_6th_v2")
-        sel_rgn = st.multiselect("OD Region", options=opts_rgn, key="m_rgn_6th_v2")
-        sel_dir = st.multiselect("Direction (일본발/행)", options=opts_dir, key="m_dir_6th_v2")
-        sel_direct = st.multiselect("직항/경유", options=opts_direct, key="m_direct_6th_v2")
-        sel_al_list = st.multiselect("항공사 (Carrier)", options=opts_al, key="m_al_6th_v2")
-        sel_od_simple = st.multiselect("Trip O&D", options=opts_od, key="m_od_6th_v2")
-        sel_orig_c = st.multiselect("출발 국가 (Origin)", options=opts_orig_c, key="m_orig_6th_v2")
-        sel_dest_c = st.multiselect("도착 국가 (Destination)", options=opts_dest_c, key="m_dest_6th_v2")
-        sel_jp_apo = st.multiselect("일본 APO", options=opts_jp_apo, key="m_jp_6th_v2")
-        sel_ov_apo = st.multiselect("해외 APO", options=opts_ov_apo, key="m_ov_6th_v2")
+# 🟢 [안전 교체] 6수송 멀티필터 (세션 Crash 및 메모리 폭발 원천 차단)
+        sel_pur_m_disp = st.multiselect(
+            "발매월",
+            options=opts_pur_m,
+            key="m_pur_6th_safe",
+        )
+        sel_trip_m_disp = st.multiselect(
+            "출발월",
+            options=opts_trip_m,
+            key="m_trip_6th_safe",
+        )
+        sel_rgn = st.multiselect(
+            "OD Region",
+            options=opts_rgn,
+            key="m_rgn_6th_safe",
+        )
+        sel_dir = st.multiselect(
+            "Direction (일본발/행)",
+            options=opts_dir,
+            key="m_dir_6th_safe",
+        )
+        sel_direct = st.multiselect(
+            "직항/경유",
+            options=opts_direct,
+            key="m_direct_6th_safe",
+        )
+        sel_al_list = st.multiselect(
+            "항공사 (Carrier)",
+            options=opts_al,
+            key="m_al_6th_safe",
+        )
+        sel_od_simple = st.multiselect(
+            "Trip O&D",
+            options=opts_od,
+            key="m_od_6th_safe",
+        )
+        sel_orig_c = st.multiselect(
+            "출발 국가 (Origin)",
+            options=opts_orig_c,
+            key="m_orig_6th_safe",
+        )
+        sel_dest_c = st.multiselect(
+            "도착 국가 (Destination)",
+            options=opts_dest_c,
+            key="m_dest_6th_safe",
+        )
+        sel_jp_apo = st.multiselect(
+            "일본 APO",
+            options=opts_jp_apo,
+            key="m_jp_6th_safe",
+        )
+        sel_ov_apo = st.multiselect(
+            "해외 APO",
+            options=opts_ov_apo,
+            key="m_ov_6th_safe",
+        )
 
         # 💡 [핵심] 문자열 변환 및 스페이스 정제 후 필터링
         mask = np.ones(len(df_6), dtype=bool)
