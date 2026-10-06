@@ -1417,7 +1417,7 @@ elif "6수송" in selected_group:
                     show_df = filtered_6th if not filtered_6th.empty else df_6th_raw
                     csv_6th_bytes = show_df.to_csv(index=False).encode('utf-8-sig')
                     st.download_button("📥 필터링된 6수송 Data (CSV) 다운로드", data=csv_6th_bytes, file_name=f"6th_Freedom_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
-                    st.dataframe(show_df.head(100), width="stretch")
+                    st.dataframe(show_df.head(100))
                     
 # ==========================================
 # GROUP 3: 🔗 W26 연결 네트워크
