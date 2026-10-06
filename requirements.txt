@@ -1,6 +1,7 @@
-streamlit==1.38.0
-pandas<3.0.0
+streamlit>=1.40.0
+pandas
 numpy
 openpyxl
-pyarrow<25
+pyarrow
 plotly
+pillow>=11.0.0
