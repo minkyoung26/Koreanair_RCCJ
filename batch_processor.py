@@ -51,7 +51,7 @@ def process_batch_parquet():
     val_col_name = find_column_by_candidates(df.columns, ['value', 'pax', '수송량', '발매량', '실적']) or 'Value'
     df['Value'] = pd.to_numeric(df[val_col_name].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
 
-    # 2. 가중치 파일 읽기 및 가중치 사전(Dictionary) 생성
+    # 2. 가중치 파일 읽기 및 매핑 사전 구축
     weight_file = None
     wt_files = [f for f in all_dir_files if ('가중치' in f or 'weight' in f.lower()) and not f.startswith('~$')]
     if wt_files:
@@ -66,7 +66,6 @@ def process_batch_parquet():
 
         w_df.columns = [str(c).strip() for c in w_df.columns]
 
-        # 정확한 컬럼 매핑: Route Code 사용
         pax_c = '합계 : Pax' if '합계 : Pax' in w_df.columns else find_column_by_candidates(w_df.columns, ['pax', '실적', '합계'])
         obd_c = 'OBD' if 'OBD' in w_df.columns else find_column_by_candidates(w_df.columns, ['obd', '보정'])
         al_c  = 'Dominant Marketing Airline' if 'Dominant Marketing Airline' in w_df.columns else find_column_by_candidates(w_df.columns, ['dominant', 'al', 'airline'])
@@ -79,7 +78,6 @@ def process_batch_parquet():
         w_df['rt_clean'] = w_df[rt_c].astype(str).str.strip().str.upper()
         w_df['al_clean'] = w_df[al_c].astype(str).str.strip().str.upper()
 
-        # (노선, 항공사) -> 가중치 매핑 딕셔너리
         weight_dict = dict(zip(zip(w_df['rt_clean'], w_df['al_clean']), w_df['weight_ratio']))
 
         main_rt_col = find_column_by_candidates(df.columns, ['노선', 'route', 'subroute'])
@@ -93,12 +91,12 @@ def process_batch_parquet():
         df['Mult_map'] = df.apply(apply_wt, axis=1)
         df['Calc_Weighted_Value'] = df['Value'] * df['Mult_map']
         df['Weighted_Value'] = df['Calc_Weighted_Value']
-        print("  └ 💡 노선(Route Code) + 항공사 가중치가 파케 데이터에 성공적으로 구워졌습니다!", flush=True)
+        print("  └ 💡 노선(Route Code) + 항공사 가중치가 정상 매핑되었습니다!", flush=True)
     else:
         df['Calc_Weighted_Value'] = df['Value']
         df['Weighted_Value'] = df['Value']
 
-    # 3. 초고속 Parquet 캐시 저장
+    # 3. Parquet 캐시 저장
     print("💾 3/3. cache_34_data.parquet 저장 중...", flush=True)
     output_parquet = os.path.join(base_dir, 'cache_34_data.parquet')
     df.to_parquet(output_parquet, engine='pyarrow', index=False)
