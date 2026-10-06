@@ -910,8 +910,8 @@ if "3/4수송" in selected_group:
 
                 st.markdown("---")
                 st.markdown(
-                    '<div class="unified-sub-header">3. 출발시간대별 항공사'
-                    " 운항 타임라인 (KE 취항노선 한정)</div>",
+                    '<div class="unified-sub-header">3. 항공사/편명별'
+                    " 출발시간대 타임라인 (KE 취항노선 한정)</div>",
                     unsafe_allow_html=True,
                 )
 
@@ -978,142 +978,67 @@ if "3/4수송" in selected_group:
                         ]
 
                     if not df_time_target.empty:
-                        # 출발시간대 포맷 정리 (예: '08' -> '08시')
+                        # 출발시간대 포맷 정리 (예: '08' -> '08시' 또는 '8a')
                         df_time_target["시간대_fmt"] = df_time_target[
                             time_col
                         ].apply(
                             lambda x: (
-                                f"{int(float(x)):02d}시"
+                                f"{int(float(x)):02d}:00"
                                 if str(x).replace(".", "", 1).isdigit()
                                 else str(x).strip()
                             )
                         )
 
-                        # 시간대별 / 항공사별 공급량 합계
+                        # 시간대별 / 항공사별 그룹화
                         time_grp = (
                             df_time_target.groupby(
-                                ["시간대_fmt", "Airline"], observed=False
+                                ["Airline", "시간대_fmt"], observed=False
                             )[val_col_sup]
                             .sum()
                             .reset_index()
                         )
 
-                        # 시간대 순서 정렬
-                        time_order = sorted(
-                            time_grp["시간대_fmt"].unique(),
-                            key=lambda x: (
-                                int("".join(filter(str.isdigit, x)))
-                                if any(c.isdigit() for c in x)
-                                else 99
-                            ),
-                        )
-                        time_grp["시간대_fmt"] = pd.Categorical(
-                            time_grp["시간대_fmt"],
-                            categories=time_order,
-                            ordered=True,
-                        )
-                        time_grp = time_grp.sort_values("시간대_fmt")
+                        # X축 시간대 전체 범위 생성 (00:00 ~ 23:00 정렬)
+                        all_hours = [f"{h:02d}:00" for h in range(24)]
+                        present_hours = [
+                            h for h in all_hours if h in time_grp["시간대_fmt"].values
+                        ]
 
-                        # 🟢 Y축 없이 X축(시간대) 중심의 타임라인 산점도 생성
+                        # Y축 범주: 항공사 목록 (KE가 맨 위에 오도록 정렬)
+                        al_list = sorted(time_grp["Airline"].unique())
+                        if "KE" in al_list:
+                            al_list.remove("KE")
+                            al_list = ["KE"] + al_list
+                        
+                        # Y축 표시 순서 역순 처리 (Plotly Y축 상단 노출용)
+                        y_categories = al_list[::-1]
+
+                        # 🟢 점 마커 전용 스케줄 타임라인 생성
                         fig_time_scatter = go.Figure()
                         color_map_al = build_airline_color_map(opts_sup_al)
 
-                        all_al = time_grp["Airline"].unique()
-                        al_order = (
-                            ["KE"] + [x for x in all_al if x != "KE"]
-                            if "KE" in all_al
-                            else all_al
-                        )
-
-                        # 항공사별 Y축 서브 트랙(높이) 매핑 (KE는 맨 위 또는 전용 레인)
-                        al_y_map = {
-                            al: idx + 1 for idx, al in enumerate(al_order)
-                        }
-
-                        for al_code in al_order:
+                        for al_code in al_list:
                             al_df = time_grp[time_grp["Airline"] == al_code]
                             if al_df.empty:
                                 continue
 
                             is_ke = al_code == "KE"
+                            # KE는 다이아몬드(◆), 경쟁사는 동그라미(●)
                             symbol_style = "diamond" if is_ke else "circle"
-                            y_pos = [al_y_map[al_code]] * len(al_df)
-
-                            line_style = (
-                                dict(color="#16a34a", width=2.5)
+                            marker_color = (
+                                "#16a34a"
                                 if is_ke
-                                else dict(
-                                    color=color_map_al.get(al_code, "#94a3b8"),
-                                    dash="dot",
-                                    width=1,
-                                )
+                                else color_map_al.get(al_code, "#2563eb")
                             )
 
                             max_val = time_grp[val_col_sup].max()
                             size_vals = (
-                                (al_df[val_col_sup] / max_val * 24 + 10)
+                                (al_df[val_col_sup] / max_val * 22 + 12)
                                 if max_val > 0
-                                else 12
+                                else 14
                             )
 
-                            fig_time_scatter.add_trace(
-                                go.Scatter(
-                                    x=al_df["시간대_fmt"],
-                                    y=y_pos,
-                                    mode="markers+lines",
-                                    name=(
-                                        "★ KE (대한항공)"
-                                        if is_ke
-                                        else al_code
-                                    ),
-                                    line=line_style,
-                                    marker=dict(
-                                        symbol=symbol_style,
-                                        size=size_vals,
-                                        opacity=0.9 if is_ke else 0.75,
-                                        line=dict(
-                                            width=1.5 if is_ke else 0.5,
-                                            color="#0f172a",
-                                        ),
-                                    ),
-                                    hovertemplate=(
-                                        f"<b>항공사: {al_code}</b><br>출발시간대:"
-                                        " %{x}<br>공급실적:"
-                                        f" %{{customdata:,.0f}}<extra></extra>"
-                                    ),
-                                    customdata=al_df[val_col_sup],
-                                )
-                            )
-
-                        # 🟢 Y축 레이아웃 완전 제거 (Y축 숫자 및 축 선 비활성화)
-                        fig_time_scatter.update_layout(
-                            title=(
-                                "출발시간대별 항공사 운항 분포 (KE 취항 노선"
-                                " 한정)"
-                            ),
-                            xaxis_title="출발시간대 (Time Slot)",
-                            yaxis=dict(
-                                visible=False,
-                                showticklabels=False,
-                                showgrid=False,
-                                zeroline=False,
-                            ),
-                            height=380,
-                        )
-                        apply_bottom_legend(fig_time_scatter)
-                        st.plotly_chart(
-                            fig_time_scatter, use_container_width=True
-                        )
-                    else:
-                        st.info(
-                            "💡 선택하신 조건에 해당하는 출발시간대 데이터가"
-                            " 없습니다."
-                        )
-                else:
-                    st.info(
-                        "💡 데이터셋에 출발시간대 관련 컬럼(DepTime/출발시간 등)이"
-                        " 없습니다."
-                    )
+                            fig_time
                  
                    
     # 대리점/RBD 탭
