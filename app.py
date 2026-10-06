@@ -944,7 +944,6 @@ if "3/4수송" in selected_group:
                         .unique()
                         if str(x).strip() != ""
                     ])
-                    # 🚨 필터 1: 노선 선택 (기본값 빈 선택)
                     sel_t_route = tf_col1.multiselect(
                         "✈ 분석 노선 선택 (필수 선택):",
                         options=opts_t_route,
@@ -967,7 +966,7 @@ if "3/4수송" in selected_group:
                         key="timeline_time_month_sub_filter",
                     )
 
-                    # 🟢 노선을 선택하지 않았을 경우 빈 화면(안내 메시지) 표시
+                    # 노선 미선택 시 빈 화면 안내
                     if not sel_t_route:
                         st.info(
                             "✈ 상단 서브 필터에서 **[분석 노선]**을 1개 이상"
@@ -975,7 +974,6 @@ if "3/4수송" in selected_group:
                             " 조회됩니다."
                         )
                     else:
-                        # 서브 필터링 적용 (선택한 노선만)
                         df_time_target = df_ke_serv_only[
                             df_ke_serv_only["노선_clean"].isin(sel_t_route)
                         ].copy()
@@ -986,37 +984,66 @@ if "3/4수송" in selected_group:
                             ]
 
                         if not df_time_target.empty:
-                            # 출발시간대 포맷 정리 ('08' -> '08:00')
-                            df_time_target["시간대_fmt"] = df_time_target[
-                                time_col
-                            ].apply(
-                                lambda x: (
-                                    f"{int(float(x)):02d}:00"
-                                    if str(x).replace(".", "", 1).isdigit()
-                                    else str(x).strip()
-                                )
-                            )
+                            # 🟢 시간 파싱 함수: '1620:00' -> 분 단위(980분) & '16:20' 포맷 변환
+                            def parse_time_info(raw_val):
+                                s = str(raw_val).strip().split(".")[0]
+                                s_clean = "".join(filter(str.isdigit, s))
+                                if not s_clean:
+                                    return 9999, "기타"
 
-                            # 시간대 및 항공사별 공급 데이터 정리
+                                if len(s_clean) <= 2:
+                                    hh, mm = int(s_clean), 0
+                                elif len(s_clean) == 3:
+                                    hh, mm = int(s_clean[0]), int(s_clean[1:3])
+                                else:
+                                    hh, mm = int(s_clean[:2]), int(s_clean[2:4])
+
+                                hh = min(max(hh, 0), 23)
+                                mm = min(max(mm, 0), 59)
+                                total_minutes = hh * 60 + mm
+                                time_str = f"{hh:02d}:{mm:02d}"
+                                return total_minutes, time_str
+
+                            parsed_res = df_time_target[time_col].apply(
+                                parse_time_info
+                            )
+                            df_time_target["time_minutes"] = [
+                                r[0] for r in parsed_res
+                            ]
+                            df_time_target["시간대_fmt"] = [
+                                r[1] for r in parsed_res
+                            ]
+
+                            # 무효한 시간값 제거
+                            df_time_target = df_time_target[
+                                df_time_target["time_minutes"] < 9999
+                            ]
+
+                            # 시간대 및 항공사별 그룹화
                             time_grp = (
                                 df_time_target.groupby(
-                                    ["시간대_fmt", "Airline"], observed=False
+                                    ["time_minutes", "시간대_fmt", "Airline"],
+                                    observed=False,
                                 )[val_col_sup]
                                 .sum()
                                 .reset_index()
                             )
 
-                            # 00:00부터 23:00까지 전체 X축 시간대 슬롯 정렬
-                            all_hours = [f"{h:02d}:00" for h in range(24)]
+                            # 🟢 실제 운항 데이터가 존재해 오름차순 정렬된 시간대 목록만 추출
+                            time_grp = time_grp.sort_values("time_minutes")
+                            present_time_labels = (
+                                time_grp.drop_duplicates("time_minutes")[
+                                    "시간대_fmt"
+                                ].tolist()
+                            )
 
-                            # Y축 카테고리: 항공사 정렬 (KE가 상단)
+                            # Y축 항공사 순서 정렬 (KE 상단 노출)
                             al_list = sorted(time_grp["Airline"].unique())
                             if "KE" in al_list:
                                 al_list.remove("KE")
                                 al_list = ["KE"] + al_list
                             y_categories = al_list[::-1]
 
-                            # 🟢 X축 시간대별 스케줄 타임라인 차트 생성
                             fig_time_scatter = go.Figure()
                             color_map_al = build_airline_color_map(opts_sup_al)
 
@@ -1037,9 +1064,9 @@ if "3/4수송" in selected_group:
 
                                 max_val = time_grp[val_col_sup].max()
                                 size_vals = (
-                                    (al_df[val_col_sup] / max_val * 22 + 12)
+                                    (al_df[val_col_sup] / max_val * 22 + 14)
                                     if max_val > 0
-                                    else 14
+                                    else 16
                                 )
 
                                 fig_time_scatter.add_trace(
@@ -1063,52 +1090,7 @@ if "3/4수송" in selected_group:
                                         ),
                                         hovertemplate=(
                                             f"<b>항공사: {al_code}</b><br>출발시간:"
-                                            " %{x}<br>공급량:"
-                                            f" %{{customdata:,.0f}} ({metric_mode})<extra></extra>"
-                                        ),
-                                        customdata=al_df[val_col_sup],
-                                    )
-                                )
-
-                            fig_time_scatter.update_layout(
-                                title=(
-                                    f"선택 노선 ({', '.join(sel_t_route)})"
-                                    " 시간대별 출발 스케줄 타임라인"
-                                ),
-                                xaxis=dict(
-                                    title="출발시간대 (X축: 00:00 ~ 23:00)",
-                                    type="category",
-                                    categoryorder="array",
-                                    categoryarray=all_hours,
-                                    showgrid=True,
-                                    gridcolor="#e2e8f0",
-                                    gridwidth=1,
-                                ),
-                                yaxis=dict(
-                                    title="항공사",
-                                    type="category",
-                                    categoryorder="array",
-                                    categoryarray=y_categories,
-                                    showgrid=True,
-                                    gridcolor="#f1f5f9",
-                                ),
-                                height=max(340, len(al_list) * 50 + 120),
-                                plot_bgcolor="#ffffff",
-                            )
-                            apply_bottom_legend(fig_time_scatter)
-                            st.plotly_chart(
-                                fig_time_scatter, use_container_width=True
-                            )
-                        else:
-                            st.info(
-                                "💡 선택하신 노선 및 필터 조건에 해당하는"
-                                " 출발시간대 데이터가 없습니다."
-                            )
-                else:
-                    st.info(
-                        "💡 데이터셋에 출발시간대 관련 컬럼(DepTime/출발시간 등)이"
-                        " 없습니다."
-                    )
+                                            " %{x}<br>공급량
                    
     # 대리점/RBD 탭
     with tab_34_3:
