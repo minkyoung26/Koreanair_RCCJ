@@ -878,7 +878,7 @@ opts_al_ag = ['KE'] + [x for x in opts_al_ag if x != 'KE'] if 'KE' in opts_al_ag
 sel_al_ag_list = render_multiselect_box(ac5, "5. 항공사", opts_al_ag, "slicer_al_ag_multi")
 if sel_al_ag_list and al_col_ag: temp_ag = temp_ag[temp_ag[al_col_ag].astype(str).isin(sel_al_ag_list)]
 
-            df_ag_filtered = temp_ag
+df_ag_filtered = temp_ag
             open_attr = "open" if st.toggle("📂 전체 항목 펼쳐보기", value=True, key="expand_toggle_all_key_fixed") else ""
 
             sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매현황", "🏢 대리점별 판매현황 (상위 20개 대리점)"])
