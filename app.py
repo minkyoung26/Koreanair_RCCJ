@@ -693,7 +693,37 @@ if "3/4수송" in selected_group:
                     sup_html += '</tr>'
                 sup_html += '</tbody></table></div>'
                 st.markdown(sup_html, unsafe_allow_html=True)
+    st.markdown("---")
+                st.markdown(
+                    '<div class="unified-sub-header">3. 항공사별 공급 타임라인'
+                    " 추이 (Seats / Flights)</div>",
+                    unsafe_allow_html=True,
+                )
 
+                if sup_month_col and sup_month_col in filtered_sup.columns:
+                    timeline_grp = (
+                        filtered_sup.groupby(
+                            [sup_month_col, "Airline"], observed=False
+                        )[val_col_sup]
+                        .sum()
+                        .reset_index()
+                    )
+
+                    fig_sup_timeline = px.line(
+                        timeline_grp,
+                        x=sup_month_col,
+                        y=val_col_sup,
+                        color="Airline",
+                        markers=True,
+                        title=f"월별 항공사 {metric_mode} 공급 추이",
+                    )
+                    fig_sup_timeline.update_layout(
+                        xaxis_title="출발월",
+                        yaxis_title=metric_mode,
+                        height=450,
+                    )
+                    apply_bottom_legend(fig_sup_timeline)
+                    st.plotly_chart(fig_sup_timeline, use_container_width=True)               
     # 대리점/RBD 탭
     with tab_34_3:
         RBD_HIERARCHY_LOCAL = {
