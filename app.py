@@ -317,7 +317,7 @@ if "3/4수송" in selected_group:
     
     tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
 
-    with tab_34_1:
+with tab_34_1:
         if df_iss_merged is None: 
             st.warning("❌ 3/4수송 데이터(cache_34_data.parquet)를 찾을 수 없습니다.")
             st.stop()
@@ -325,30 +325,34 @@ if "3/4수송" in selected_group:
         merged_df = df_iss_merged.copy()
         
         route_col_target = find_column_by_candidates(merged_df.columns, ['노선', 'route'])
-    merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
-    
-    # 국가 코드 컬럼(pos_al 등)을 제외하고 실제 항공사 컬럼만 지정
-    al_col_target = None
-    for col in merged_df.columns:
-        col_str = str(col).lower().replace('_', '').replace(' ', '')
-        if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
-           continue  # 국가 관련 컬럼 무시
-        if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
-            al_col_target = col
-            break
+        if route_col_target and '노선_clean' not in merged_df.columns:
+            merged_df['노선_clean'] = merged_df[route_col_target].astype(str).str.strip().str.upper()
 
-    if not al_col_target and 'dominantmarketingairline' in merged_df.columns:
-        al_col_target = 'dominantmarketingairline'
+        if '노선_clean' in merged_df.columns:
+            merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
+        
+        # 국가 코드 컬럼(pos_al 등)을 제외하고 실제 항공사 컬럼만 지정
+        al_col_target = None
+        for col in merged_df.columns:
+            col_str = str(col).lower().replace('_', '').replace(' ', '')
+            if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
+                continue  # 국가 관련 컬럼 무시
+            if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
+                al_col_target = col
+                break
 
-    merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target and al_col_target in merged_df.columns else 'OTHER'
+        if not al_col_target and 'dominantmarketingairline' in merged_df.columns:
+            al_col_target = 'dominantmarketingairline'
 
-    region_col = find_column_by_candidates(merged_df.columns, ['일본권역', '권역', 'japanregion', 'region'])
-    bound_raw_col = find_column_by_candidates(merged_df.columns, ['bound', '방향', '바운드'])
-    week_col = find_column_by_candidates(merged_df.columns, ['발매주차', 'issueweek', 'purchaseweek'])
-    month_col = find_column_by_candidates(merged_df.columns, ['출발월', 'tripmonth', 'travelmonth'])
-    bound_col = find_column_by_candidates(merged_df.columns, ['수송', 'bound'])
+        merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target and al_col_target in merged_df.columns else 'OTHER'
 
-    with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
+        region_col = find_column_by_candidates(merged_df.columns, ['일본권역', '권역', 'japanregion', 'region'])
+        bound_raw_col = find_column_by_candidates(merged_df.columns, ['bound', '방향', '바운드'])
+        week_col = find_column_by_candidates(merged_df.columns, ['발매주차', 'issueweek', 'purchaseweek'])
+        month_col = find_column_by_candidates(merged_df.columns, ['출발월', 'tripmonth', 'travelmonth'])
+        bound_col = find_column_by_candidates(merged_df.columns, ['수송', 'bound'])
+
+        with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
             
             temp_df_34 = merged_df.copy()
