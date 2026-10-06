@@ -983,8 +983,8 @@ elif "6수송" in selected_group:
                 return sorted([str(x).strip() for x in df_6[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
             return []
 
-        opts_pur_m = sort_month_options(get_clean_opts(col_pur_m_disp), reverse=True)
-        opts_trip_m = sort_month_options(get_clean_opts(col_trip_m_disp), reverse=True)
+        opts_pur_m = [x for x in sort_month_options(get_clean_opts(col_pur_m_disp), reverse=True) if "전년" not in str(x) and "LY" not in str(x)]
+        opts_trip_m = [x for x in sort_month_options(get_clean_opts(col_trip_m_disp), reverse=True) if "전년" not in str(x) and "LY" not in str(x)]
         opts_rgn = get_clean_opts(col_rgn)
         opts_dir = get_clean_opts(col_dir)
         opts_direct = get_clean_opts(col_direct_transit)
