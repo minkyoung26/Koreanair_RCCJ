@@ -910,31 +910,46 @@ if "3/4수송" in selected_group:
 
                 st.markdown("---")
                 st.markdown(
-                    '<div class="unified-sub-header">3. KE 취항노선 한정 주요'
-                    " 항공사 공급 타임라인 산점도</div>",
+                    '<div class="unified-sub-header">3. 출발시간대별 주요'
+                    " 항공사 공급 타임라인 산점도 (KE 취항노선 한정)</div>",
                     unsafe_allow_html=True,
                 )
 
-                # 🟢 3번 전용 별도 서브 필터 (노선, 출발월)
-                tf_col1, tf_col2 = st.columns(2)
-
-                # KE 취항노선으로 대상 제한
-                df_ke_serv_only = filtered_sup[
-                    filtered_sup["KE_취항여부"] == "취항"
-                ].copy()
-
-                opts_t_route = sorted([
-                    str(x)
-                    for x in df_ke_serv_only["노선_clean"].dropna().unique()
-                    if str(x).strip() != ""
-                ])
-                sel_t_route = tf_col1.multiselect(
-                    "✈ 타임라인 분석 노선 선택 (미선택 시 전체 KE 취항노선):",
-                    options=opts_t_route,
-                    key="timeline_route_sub_filter",
+                # 출발시간대 컬럼 자동 탐색 (deptime, 시간, 시간대, 출발시간 등)
+                time_col = find_column_by_candidates(
+                    filtered_sup.columns,
+                    [
+                        "deptime",
+                        "출발시간",
+                        "출발시간대",
+                        "time_slot",
+                        "timeslot",
+                        "dep_time",
+                        "시간대",
+                    ],
                 )
 
-                if sup_month_col and sup_month_col in df_ke_serv_only.columns:
+                if time_col and time_col in filtered_sup.columns:
+                    # 🟢 KE 취항노선 한정 데이터
+                    df_ke_serv_only = filtered_sup[
+                        filtered_sup["KE_취항여부"] == "취항"
+                    ].copy()
+
+                    tf_col1, tf_col2 = st.columns(2)
+
+                    opts_t_route = sorted([
+                        str(x)
+                        for x in df_ke_serv_only["노선_clean"]
+                        .dropna()
+                        .unique()
+                        if str(x).strip() != ""
+                    ])
+                    sel_t_route = tf_col1.multiselect(
+                        "✈ 분석 노선 선택 (미선택 시 전체 KE 취항노선):",
+                        options=opts_t_route,
+                        key="timeline_time_route_sub_filter",
+                    )
+
                     opts_t_month = sort_month_options(
                         [
                             str(x)
@@ -946,85 +961,100 @@ if "3/4수송" in selected_group:
                         reverse=False,
                     )
                     sel_t_month = tf_col2.multiselect(
-                        "🗓 타임라인 분석 출발월 선택 (미선택 시 전체):",
+                        "🗓 분석 출발월 선택 (미선택 시 전체):",
                         options=opts_t_month,
-                        key="timeline_month_sub_filter",
+                        key="timeline_time_month_sub_filter",
                     )
 
                     # 서브 필터링 적용
-                    df_timeline_target = df_ke_serv_only.copy()
+                    df_time_target = df_ke_serv_only.copy()
                     if sel_t_route:
-                        df_timeline_target = df_timeline_target[
-                            df_timeline_target["노선_clean"].isin(sel_t_route)
+                        df_time_target = df_time_target[
+                            df_time_target["노선_clean"].isin(sel_t_route)
                         ]
                     if sel_t_month:
-                        df_timeline_target = df_timeline_target[
-                            df_timeline_target[sup_month_col].isin(sel_t_month)
+                        df_time_target = df_time_target[
+                            df_time_target[sup_month_col].isin(sel_t_month)
                         ]
 
-                    if not df_timeline_target.empty:
-                        # 출발월/항공사별 그룹화
-                        timeline_grp = (
-                            df_timeline_target.groupby(
-                                [sup_month_col, "Airline"], observed=False
+                    if not df_time_target.empty:
+                        # 출발시간대 포맷 정리 (예: '08' -> '08시' 또는 숫자 정렬)
+                        df_time_target["시간대_fmt"] = df_time_target[
+                            time_col
+                        ].apply(
+                            lambda x: (
+                                f"{int(float(x)):02d}시"
+                                if str(x).replace(".", "", 1).isdigit()
+                                else str(x).strip()
+                            )
+                        )
+
+                        # 시간대별 / 항공사별 그룹화
+                        time_grp = (
+                            df_time_target.groupby(
+                                ["시간대_fmt", "Airline"], observed=False
                             )[val_col_sup]
                             .sum()
                             .reset_index()
                         )
 
-                        # 월별 총공급량 대비 항공사별 M/S 점유율 계산
-                        mkt_monthly_tot = (
-                            df_timeline_target.groupby(
-                                sup_month_col, observed=False
+                        # 시간대 전체 공급 대비 M/S 점유율
+                        time_mkt_tot = (
+                            df_time_target.groupby(
+                                "시간대_fmt", observed=False
                             )[val_col_sup]
                             .sum()
                             .reset_index()
                         )
-                        timeline_grp = pd.merge(
-                            timeline_grp,
-                            mkt_monthly_tot,
-                            on=sup_month_col,
+                        time_grp = pd.merge(
+                            time_grp,
+                            time_mkt_tot,
+                            on="시간대_fmt",
                             suffixes=("", "_Mkt"),
                         )
-                        timeline_grp["MS_Percent"] = np.where(
-                            timeline_grp[f"{val_col_sup}_Mkt"] > 0,
+                        time_grp["MS_Percent"] = np.where(
+                            time_grp[f"{val_col_sup}_Mkt"] > 0,
                             (
-                                timeline_grp[val_col_sup]
-                                / timeline_grp[f"{val_col_sup}_Mkt"]
+                                time_grp[val_col_sup]
+                                / time_grp[f"{val_col_sup}_Mkt"]
                             )
                             * 100,
                             0,
                         )
 
-                        # 출발월 순서 정렬
-                        timeline_grp[sup_month_col] = pd.Categorical(
-                            timeline_grp[sup_month_col],
-                            categories=opts_t_month,
+                        # 시간대 순서 정렬
+                        time_order = sorted(
+                            time_grp["시간대_fmt"].unique(),
+                            key=lambda x: (
+                                int("".join(filter(str.isdigit, x)))
+                                if any(c.isdigit() for c in x)
+                                else 99
+                            ),
+                        )
+                        time_grp["시간대_fmt"] = pd.Categorical(
+                            time_grp["시간대_fmt"],
+                            categories=time_order,
                             ordered=True,
                         )
-                        timeline_grp = timeline_grp.sort_values(sup_month_col)
+                        time_grp = time_grp.sort_values("시간대_fmt")
 
-                        # 🟢 산점도 생성 (KE는 다이아몬드, 경쟁사는 원형)
-                        fig_sup_scatter = go.Figure()
+                        # 🟢 출발시간대 산점도 생성 (KE 다이아몬드 ◆ / 타사 동그라미 ●)
+                        fig_time_scatter = go.Figure()
                         color_map_al = build_airline_color_map(opts_sup_al)
 
-                        # 항공사 순서 정렬 (KE 우선 출력)
-                        all_al_in_grp = timeline_grp["Airline"].unique()
+                        all_al = time_grp["Airline"].unique()
                         al_order = (
-                            ["KE"] + [x for x in all_al_in_grp if x != "KE"]
-                            if "KE" in all_al_in_grp
-                            else all_al_in_grp
+                            ["KE"] + [x for x in all_al if x != "KE"]
+                            if "KE" in all_al
+                            else all_al
                         )
 
                         for al_code in al_order:
-                            al_df = timeline_grp[
-                                timeline_grp["Airline"] == al_code
-                            ]
+                            al_df = time_grp[time_grp["Airline"] == al_code]
                             if al_df.empty:
                                 continue
 
                             is_ke = al_code == "KE"
-                            # KE는 다이아몬드(diamond), 타 경쟁사는 동그라미(circle)
                             symbol_style = "diamond" if is_ke else "circle"
                             line_style = (
                                 dict(color="#16a34a", width=3.5)
@@ -1035,17 +1065,17 @@ if "3/4수송" in selected_group:
                                     width=1.5,
                                 )
                             )
-                            # 버블 크기 계산 (공급석/운항편수에 비례)
-                            max_val = timeline_grp[val_col_sup].max()
+
+                            max_val = time_grp[val_col_sup].max()
                             size_vals = (
                                 (al_df[val_col_sup] / max_val * 28 + 10)
                                 if max_val > 0
                                 else 12
                             )
 
-                            fig_sup_scatter.add_trace(
+                            fig_time_scatter.add_trace(
                                 go.Scatter(
-                                    x=al_df[sup_month_col],
+                                    x=al_df["시간대_fmt"],
                                     y=al_df["MS_Percent"],
                                     mode="lines+markers",
                                     name=(
@@ -1063,15 +1093,8 @@ if "3/4수송" in selected_group:
                                             color="#0f172a",
                                         ),
                                     ),
-                                    text=[
-                                        f"<b>{ms:.1f}%</b> ({pax:,.0f})"
-                                        for ms, pax in zip(
-                                            al_df["MS_Percent"],
-                                            al_df[val_col_sup],
-                                        )
-                                    ],
                                     hovertemplate=(
-                                        f"<b>항공사: {al_code}</b><br>출발월:"
+                                        f"<b>항공사: {al_code}</b><br>출발시간대:"
                                         " %{x}<br>공급 M/S: %{y:.1f}%<br>공급량:"
                                         f" %{{customdata:,.0f}}<extra></extra>"
                                     ),
@@ -1079,24 +1102,29 @@ if "3/4수송" in selected_group:
                                 )
                             )
 
-                        fig_sup_scatter.update_layout(
+                        fig_time_scatter.update_layout(
                             title=(
-                                f"KE 취항 노선 한정 - 출발월별 항공사 {metric_mode}"
-                                " 및 M/S 점유비 타임라인 산점도"
+                                f"출발시간대별 항공사 {metric_mode} 및 M/S"
+                                " 타임라인 산점도"
                             ),
-                            xaxis_title="출발월",
+                            xaxis_title="출발시간대",
                             yaxis_title="공급 M/S (%)",
                             height=480,
                         )
-                        apply_bottom_legend(fig_sup_scatter)
+                        apply_bottom_legend(fig_time_scatter)
                         st.plotly_chart(
-                            fig_sup_scatter, use_container_width=True
+                            fig_time_scatter, use_container_width=True
                         )
                     else:
                         st.info(
-                            "💡 선택하신 타임라인 필터 조건에 해당하는 데이터가"
+                            "💡 선택하신 조건에 해당하는 출발시간대 데이터가"
                             " 없습니다."
                         )
+                else:
+                    st.info(
+                        "💡 데이터셋에 출발시간대 관련 컬럼(DepTime/출발시간 등)이"
+                        " 없습니다."
+                    )
                  
                    
     # 대리점/RBD 탭
