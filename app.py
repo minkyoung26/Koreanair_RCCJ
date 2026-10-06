@@ -1036,10 +1036,7 @@ if "3/4수송" in selected_group:
                                 (al_df[val_col_sup] / max_val * 22 + 12)
                                 if max_val > 0
                                 else 14
-                            )
-
-                            fig_time
-                 
+                            )                 
                    
     # 대리점/RBD 탭
     with tab_34_3:
