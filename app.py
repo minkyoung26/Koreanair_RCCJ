@@ -147,12 +147,9 @@ def load_6th_data_aggregated():
     for target_path in candidates:
         if os.path.exists(target_path):
             try:
-                # pyarrow 메모리 맵으로 읽어와 시동 시 RAM 사용량 80% 감소
+                # category 변환 없이 파케 데이터를 깔끔하게 직접 로드
                 df = pd.read_parquet(target_path, engine='pyarrow')
                 if df is not None and not df.empty:
-                    # 필터용 텍스트 컬럼들을 미리 category 타입으로 변환 (메모리 절약)
-                    for col in df.select_dtypes(include=['object']).columns:
-                        df[col] = df[col].astype('category')
                     return df
             except Exception: pass
     return None
