@@ -861,7 +861,18 @@ if "3/4수송" in selected_group:
                 sel_tt_ag_list = render_multiselect_box(ac4, "4. TRIP TYPE", opts_tt_ag, "slicer_tt_ag_multi")
                 if sel_tt_ag_list and tt_col_ag: temp_ag = temp_ag[temp_ag[tt_col_ag].astype(str).isin(sel_tt_ag_list)]
 
-                al_col_ag = find_column_by_candidates(temp_ag.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
+# pos_al, country_al 등 국가 관련 컬럼을 제외하고 실제 항공사 컬럼만 매핑
+al_col_ag = None
+for col in temp_ag.columns:
+    col_str = str(col).lower().replace('_', '').replace(' ', '')
+    if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
+        continue
+    if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
+        al_col_ag = col
+        break
+
+if not al_col_ag and 'dominantmarketingairline' in temp_ag.columns:
+    al_col_ag = 'dominantmarketingairline'
                 opts_al_ag = sorted([str(x) for x in temp_ag[al_col_ag].dropna().unique()]) if al_col_ag and al_col_ag in temp_ag.columns else []
                 opts_al_ag = ['KE'] + [x for x in opts_al_ag if x != 'KE'] if 'KE' in opts_al_ag else opts_al_ag
                 sel_al_ag_list = render_multiselect_box(ac5, "5. 항공사", opts_al_ag, "slicer_al_ag_multi")
@@ -987,7 +998,18 @@ if "3/4수송" in selected_group:
                 sel_g_tt_list = render_multiselect_box(gc4, "4. TRIP TYPE", opts_g_tt, "slicer_g_tt_multi")
                 if sel_g_tt_list and tt_g_col: temp_grp = temp_grp[temp_grp[tt_g_col].astype(str).isin(sel_g_tt_list)]
 
-                al_g_col = find_column_by_candidates(temp_grp.columns, ['dominantmarketingairline', 'al', '항공사', 'carrier'])
+# pos_al, country_al 등 국가 관련 컬럼을 제외하고 실제 항공사 컬럼만 매핑
+al_g_col = None
+for col in temp_grp.columns:
+    col_str = str(col).lower().replace('_', '').replace(' ', '')
+    if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
+        continue
+    if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
+        al_g_col = col
+        break
+
+if not al_g_col and 'dominantmarketingairline' in temp_grp.columns:
+    al_g_col = 'dominantmarketingairline'
                 opts_g_al = sorted([str(x) for x in temp_grp[al_g_col].dropna().unique()]) if al_g_col and al_g_col in temp_grp.columns else []
                 opts_g_al = ['KE'] + [x for x in opts_g_al if x != 'KE'] if 'KE' in opts_g_al else opts_g_al
                 sel_g_al_list = render_multiselect_box(gc5, "5. 항공사", opts_g_al, "slicer_g_al_multi")
