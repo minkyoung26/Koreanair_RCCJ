@@ -201,7 +201,6 @@ def sort_month_options(opts, reverse=True):
         if not s or s.lower() in ['nan', 'none']:
             return pd.Timestamp('1900-01-01')
         
-        # '26-Aug', 'Aug-26', '2026.08', '2026-08' 등 다양한 날짜 포맷 대응
         formats_to_try = [
             '%y-%b', '%b-%y', '%Y-%m', '%Y.%m', '%Y%m',
             '%y-%B', '%B-%y', '%d-%b-%y', '%Y-%m-%d'
@@ -219,22 +218,18 @@ def sort_month_options(opts, reverse=True):
         except Exception:
             return pd.Timestamp('1900-01-01')
 
-    # reverse=True -> 최신 달(예: Sep-26)이 맨 위, 과거 달(예: Oct-25)이 맨 아래
     return sorted(opts, key=date_key, reverse=reverse)
 
 def get_dynamic_range_label_6th(opts):
     if not opts: 
         return ""
-    # opts는 이미 sort_month_options(reverse=True)로 정렬된 상태
-    # opts[0] = 최신 달, opts[-1] = 가장 과거 달
     clean_opts = [str(x).strip() for x in opts if str(x).strip() not in ['', 'nan', 'none']]
     if not clean_opts: 
         return ""
     
-    latest_m = clean_opts[0]    # 가장 최근 (예: Sep-26)
-    earliest_m = clean_opts[-1] # 가장 과거 (예: Oct-25)
+    latest_m = clean_opts[0]
+    earliest_m = clean_opts[-1]
     
-    # 과거 ~ 최근 순서로 범위 표기 (예: Oct-25 ~ Sep-26)
     return f" ({earliest_m} ~ {latest_m})"
 
 disk_sup = load_aux_files()
@@ -297,6 +292,7 @@ def get_dynamic_date_ranges_34(df_iss):
     w_col = find_column_by_candidates(df_iss.columns, ['발매주차', 'issueweek', 'purchaseweek'])
     iss_str = f"{sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[0]} ~ {sorted([str(x).strip() for x in df_iss[w_col].dropna().unique() if str(x).strip() != 'nan'])[-1]}" if w_col else issue_range_str
     return iss_str, dep_str
+
 # ==========================================
 # GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
@@ -307,7 +303,7 @@ if "3/4수송" in selected_group:
     st.markdown(
         f'<div class="source-header-box">'
         f'<b>📌 출처: DDS & OAG 데이터 (3/4수송 대시보드)</b> &nbsp;|&nbsp; '
-        f'<b>🗓️️ 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
+        f'<b>🗓 발매기간:</b> {dynamic_iss_str_34} (과거 5주) &nbsp;|&nbsp; '
         f'<b>✈ 출발기간:</b> {dynamic_dep_str_34} (향후 6개월) &nbsp;|&nbsp; '
         f'<b>🕒 데이터 최근 업데이트:</b> {last_updated_str_34}'
         f'</div>', 
@@ -317,7 +313,7 @@ if "3/4수송" in selected_group:
     
     tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs(["🎟️ 발매 M/S", "✈ 공급 M/S", "🏷 대리점,RBD별 발매현황", "👥 단체실적"])
 
-with tab_34_1:
+    with tab_34_1:
         if df_iss_merged is None: 
             st.warning("❌ 3/4수송 데이터(cache_34_data.parquet)를 찾을 수 없습니다.")
             st.stop()
@@ -395,7 +391,7 @@ with tab_34_1:
             sel_al_list = render_multiselect_box(f_col8, "8. 항공사", opts_al, "slicer_al_multi")
             if sel_al_list: temp_df_34 = temp_df_34[temp_df_34['AL_clean'].isin(sel_al_list)]
 
-    filtered_df = temp_df_34.copy()
+        filtered_df = temp_df_34.copy()
 
         val_col_raw = find_column_by_candidates(filtered_df.columns, ['value', 'pax', '수송량', '발매량', '실적']) or 'Value'
         filtered_df['Value'] = pd.to_numeric(filtered_df[val_col_raw].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if val_col_raw in filtered_df.columns else 0.0
@@ -1163,7 +1159,6 @@ elif "6수송" in selected_group:
         sel_ov_apo = render_panel_multiselect(st, "해외 APO", opts_ov_apo, "slicer6_ov_apo")
         if sel_ov_apo: temp_df = temp_df[temp_df[col_ov_apo].astype(str).isin(sel_ov_apo)]
 
-        # 🔥 filtered_6th = temp_df 대신 아래 2줄로 대체
         invalid_mask = temp_df[col_od_simple].fillna('').astype(str).str.strip().str.lower().isin(['nan', 'none', 'null', '', 'nat'])
         filtered_6th = temp_df[~invalid_mask].copy()
 
@@ -1348,10 +1343,6 @@ elif "6수송" in selected_group:
                 grand_ke_ms_yoy = grand_ke_ms_cy - grand_ke_ms_py
 
                 od_totals = filtered_6th.groupby(col_od_simple, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
-                top20_ods = [x for x in od_totals.index if od_totals[x] > 0][:20]
-
-                # 🔥 [nan, 결측치, 공백 값 제거 패치 적용]
-                od_totals = filtered_6th.groupby(col_od_simple, observed=False)['Val_CY_num'].sum().sort_values(ascending=False)
                 top20_ods = [
                     x for x in od_totals.index 
                     if str(x).strip().lower() not in ['nan', 'none', 'null', '', 'nat'] and od_totals[x] > 0
@@ -1411,10 +1402,8 @@ elif "6수송" in selected_group:
                     tot_ke_ms_py = (tot_ke_py / tot_mkt_py * 100) if tot_mkt_py > 0 else 0
                     tot_ke_ms_yoy = tot_ke_ms_cy - tot_ke_ms_py
 
-                  # TOP 20 O&D 표 - 줄바꿈 방지 및 최소 너비 확보 스타일 적용
                     od_matrix_html = '<div class="custom-piv-container" style="overflow-x:auto;"><table class="custom-piv-table" style="width:100%; min-width:1150px; border-collapse:collapse;"><thead>'
                     
-                    # [헤더 1행] 순위(4%), Trip O&D(8%), 10개 지표열(각 8.8% 고정)
                     od_matrix_html += '<tr>'
                     od_matrix_html += '<th rowspan="2" class="header-main" style="width:4%; padding:6px 2px; white-space:nowrap;">순위</th>'
                     od_matrix_html += '<th rowspan="2" class="header-main" style="width:8%; padding:6px 2px; white-space:nowrap;">Trip O&D</th>'
@@ -1424,7 +1413,6 @@ elif "6수송" in selected_group:
                     od_matrix_html += '<th colspan="4" class="header-main" style="width:35.2%; background-color:#9fc5e8 !important; color:#0f172a !important; white-space:nowrap;">KE 발매량 & M/S (대한항공)</th>'
                     od_matrix_html += '</tr>'
                     
-                    # [헤더 2행] 각 지표열 8.8% 균등 폭 지정
                     th_col_style_dark = 'style="width:8.8%; background-color:#3172ac !important; color:#ffffff !important; padding:6px 2px; white-space:nowrap;"'
                     th_col_style_mid  = 'style="width:8.8%; background-color:#28629b !important; color:#ffffff !important; padding:6px 2px; white-space:nowrap;"'
                     th_col_style_navy = 'style="width:8.8%; background-color:#204f77 !important; color:#ffffff !important; padding:6px 2px; white-space:nowrap;"'
@@ -1443,7 +1431,6 @@ elif "6수송" in selected_group:
                     od_matrix_html += f'<th class="header-main" {th_col_style_ke}>YOY</th>'
                     od_matrix_html += '</tr></thead><tbody>'
 
-                    # [데이터 행] white-space: nowrap 적용
                     for r in matrix_rows:
                         od_matrix_html += '<tr>'
                         od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important; padding:6px 2px; white-space:nowrap;">{r["rank"]}</td>'
@@ -1490,7 +1477,7 @@ elif "6수송" in selected_group:
                     od_matrix_html += get_yoy_td_html(grand_ke_ms_yoy, True)
                     od_matrix_html += '</tr>'
 
-                    od_matrix_html += '</tbody></table></div>'
+                    od_matrix_html += '</tbody></table> destruction</div>'
                     st.markdown(od_matrix_html, unsafe_allow_html=True)
                 else:
                     st.info("💡 실적이 존재하는 O&D Market이 없습니다.")
