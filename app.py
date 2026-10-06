@@ -325,24 +325,22 @@ if "3/4수송" in selected_group:
         merged_df = df_iss_merged.copy()
         
         route_col_target = find_column_by_candidates(merged_df.columns, ['노선', 'route'])
-        merged_df['노선_clean'] = merged_df[route_col_target].astype(str).str.strip() if route_col_target else ""
+    merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
 
-        merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
+    # 국가 코드 컬럼(pos_al 등)을 제외하고 실제 항공사 컬럼만 정확히 매핑
+    exact_al_candidates = ['dominantmarketingairline', 'marketingairline', 'mkt_al', 'operatingairline', 'carrier_code']
+    al_col_target = None
 
-       # 국가 코드 컬럼(pos_al 등)을 제외하고 실제 항공사 컬럼만 정확히 매핑
-       exact_al_candidates = ['dominantmarketingairline', 'marketingairline', 'mkt_al', 'operatingairline', 'carrier_code']
-       al_col_target = None
+    for cand in exact_al_candidates:
+        for col in merged_df.columns:
+            if cand == str(col).lower().replace('_', '').replace(' ', ''):
+                al_col_target = col
+                break
+        if al_col_target:
+            break
 
-       for cand in exact_al_candidates:
-            for col in merged_df.columns:
-               if cand == str(col).lower().replace('_', '').replace(' ', ''):
-                   al_col_target = col
-                   break
-            if al_col_target:
-               break
-
-       if not al_col_target:
-          al_col_target = find_column_by_candidates(merged_df.columns, ['dominantmarketingairline', 'marketingairline', 'mkt_al'])
+    if not al_col_target:
+        al_col_target = find_column_by_candidates(merged_df.columns, ['dominantmarketingairline', 'marketingairline', 'mkt_al'])
 
     merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target else ''
          
