@@ -326,19 +326,21 @@ if "3/4수송" in selected_group:
         
         route_col_target = find_column_by_candidates(merged_df.columns, ['노선', 'route'])
     merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
-# 국가 코드 컬럼(pos_al 등)을 제외하고 실제 항공사 컬럼만 지정
-al_col_target = None
-        for col in merged_df.columns:
-            col_str = str(col).lower().replace('_', '').replace(' ', '')
-            if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
-                continue  # 국가 관련 컬럼 무시
-            if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
-                al_col_target = col
-                break
+    
+    # 국가 코드 컬럼(pos_al 등)을 제외하고 실제 항공사 컬럼만 지정
+    al_col_target = None
+    for col in merged_df.columns:
+        col_str = str(col).lower().replace('_', '').replace(' ', '')
+        if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
+           continue  # 국가 관련 컬럼 무시
+        if 'dominant' in col_str or 'mktal' in col_str or 'marketing' in col_str or col_str == 'al' or col_str == 'carrier':
+            al_col_target = col
+            break
 
-        if not al_col_target and 'dominantmarketingairline' in merged_df.columns:
+    if not al_col_target and 'dominantmarketingairline' in merged_df.columns:
         al_col_target = 'dominantmarketingairline'
 
+    merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target and al_col_target in merged_df.columns else 'OTHER'
         merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target and al_col_target in merged_df.columns else 'OTHER'
 
         region_col = find_column_by_candidates(merged_df.columns, ['일본권역', '권역', 'japanregion', 'region'])
