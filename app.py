@@ -326,9 +326,8 @@ if "3/4수송" in selected_group:
         
         route_col_target = find_column_by_candidates(merged_df.columns, ['노선', 'route'])
     merged_df = merged_df[merged_df['노선_clean'].isin(EXCEL_KE_ROUTES_MASTER)]
-
-        # 국가 코드 컬럼(pos_al 등)을 제외하고 실제 항공사 컬럼만 지정
-        al_col_target = None
+# 국가 코드 컬럼(pos_al 등)을 제외하고 실제 항공사 컬럼만 지정
+# al_col_target = None
         for col in merged_df.columns:
             col_str = str(col).lower().replace('_', '').replace(' ', '')
             if 'pos' in col_str or 'country' in col_str or 'cntry' in col_str:
