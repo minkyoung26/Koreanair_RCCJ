@@ -344,9 +344,9 @@ if "3/4수송" in selected_group:
 
     region_col = find_column_by_candidates(merged_df.columns, ['일본권역', '권역', 'japanregion', 'region'])
     bound_raw_col = find_column_by_candidates(merged_df.columns, ['bound', '방향', '바운드'])
-        week_col = find_column_by_candidates(merged_df.columns, ['발매주차', 'issueweek', 'purchaseweek'])
-        month_col = find_column_by_candidates(merged_df.columns, ['출발월', 'tripmonth', 'travelmonth'])
-        bound_col = find_column_by_candidates(merged_df.columns, ['수송', 'bound'])
+    week_col = find_column_by_candidates(merged_df.columns, ['발매주차', 'issueweek', 'purchaseweek'])
+    month_col = find_column_by_candidates(merged_df.columns, ['출발월', 'tripmonth', 'travelmonth'])
+    bound_col = find_column_by_candidates(merged_df.columns, ['수송', 'bound'])
 
         with st.expander("🔍 **발매 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True, key="main_wt_toggle_fixed")
