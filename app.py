@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 import os
+import gc
 import glob
 
 # 1. Page Config
@@ -136,7 +137,8 @@ def load_aux_files():
                 if df is not None and not df.empty: return df
             except: pass
     return None
-@st.cache_data(ttl=3600, show_spinner=False)
+# 🟢 @st.cache_data 대신 @st.cache_resource 사용 (메모리 복사본 생성 완전 차단)
+@st.cache_resource
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
@@ -146,12 +148,9 @@ def load_6th_data_aggregated():
     for target_path in candidates:
         if os.path.exists(target_path):
             try:
-                # pyarrow 엔진으로 읽어온 뒤 불필요한 메모리 방출
-                df = pd.read_parquet(target_path, engine='pyarrow')
-                if df is not None and not df.empty:
-                    return df
-            except Exception as e:
-                st.error(f"데이터 로드 중 오류 발생: {e}")
+                # pyarrow 메모리 맵(memory_map=True)으로 자원 최소 점유
+                return pd.read_parquet(target_path, engine='pyarrow', memory_map=True)
+            except Exception: pass
     return None
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1034,6 +1033,8 @@ elif "6수송" in selected_group:
             mask &= df_6[col_ov_apo].astype(str).str.strip().isin(sel_ov_apo)
 
         filtered_6th = df_6[mask]
+        # 🟢 [추가] 필터링 후 메모리에 남은 임시 변수들 즉시 강제 수거
+        gc.collect()
 
     with col_right_data:
         if filtered_6th.empty:
