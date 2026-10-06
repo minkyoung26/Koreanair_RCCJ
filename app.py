@@ -1088,9 +1088,11 @@ if "3/4수송" in selected_group:
                                                 width=1, color="#0f172a"
                                             ),
                                         ),
-                                        hovertemplate=(
+                                            hovertemplate=(
                                             f"<b>항공사: {al_code}</b><br>출발시간:"
-                                            " %{x}<br>공급량
+                                            f" %{{x}}<br>공급량:"
+                                            f" %{{customdata:,.0f}} ({metric_mode})<extra></extra>"
+                                        ),
                    
     # 대리점/RBD 탭
     with tab_34_3:
