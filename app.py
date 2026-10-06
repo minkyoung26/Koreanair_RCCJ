@@ -37,11 +37,6 @@ EXCEL_KE_ROUTES_MASTER = [
     "P/NGO", "I/KIJ", "I/KMQ", "I/OKA", "I/CTS", "I/AOJ"
 ]
 KOREA_APO_MAP = {'I': 'ICN', 'G': 'GMP', 'P': 'PUS', 'C': 'CJU', 'T': 'TAE', 'W': 'MWX', 'Y': 'YNY', 'K': 'CJJ'}
-AIRLINE_WEIGHT_MULTIPLIERS = {
-    'KE': 1.0, 'OZ': 1.0, '7C': 4.75884657, 'LJ': 4.387110992, 'TW': 4.413912854,
-    'BX': 1.865842867, 'RS': 1.758028702, 'JL': 1.0, 'NH': 1.0, 'ET': 1.0,
-    'YP': 5.92588446, 'ZE': 3.783327953, 'WE': 1.0
-}
 
 MONTH_MAP = {
     'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
@@ -294,7 +289,7 @@ def get_dynamic_date_ranges_34(df_iss):
     return iss_str, dep_str
 
 # ==========================================
-# GROUP 1: ✈️️ 3/4수송 대시보드
+# GROUP 1: ✈ 3/4수송 대시보드
 # ==========================================
 if "3/4수송" in selected_group:
     dynamic_iss_str_34, dynamic_dep_str_34 = get_dynamic_date_ranges_34(df_iss_merged)
@@ -397,7 +392,6 @@ if "3/4수송" in selected_group:
         filtered_df['Value'] = pd.to_numeric(filtered_df[val_col_raw].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if val_col_raw in filtered_df.columns else 0.0
 
         if apply_weight_toggle:
-            # 파케 파일에 batch_processor가 이미 연산해둔 노선별 가중치 컬럼을 그대로 사용
             if 'Calc_Weighted_Value' in filtered_df.columns:
                 val_col = 'Calc_Weighted_Value'
             elif 'Weighted_Value' in filtered_df.columns:
@@ -406,16 +400,12 @@ if "3/4수송" in selected_group:
                 val_col = 'Value'
         else:
             val_col = 'Value'
-            al_wt_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
-            total_pax = al_wt_sum.sum()
-            ke_pax = al_wt_sum.get('KE', 0)
-            ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
-            al_ms_normalized = (al_wt_sum / total_pax * 100) if total_pax > 0 else pd.Series(0.0, index=al_wt_sum.index)
-        else:
-            val_col = 'Value'
-            total_pax = filtered_df[val_col].sum()
-            ke_pax = filtered_df[filtered_df['AL_clean'] == 'KE'][val_col].sum() if not filtered_df.empty else 0
-            ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
+
+        al_wt_sum = filtered_df.groupby('AL_clean', observed=False)[val_col].sum()
+        total_pax = al_wt_sum.sum()
+        ke_pax = al_wt_sum.get('KE', 0)
+        ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
+        al_ms_normalized = (al_wt_sum / total_pax * 100) if total_pax > 0 else pd.Series(0.0, index=al_wt_sum.index)
 
         top_al, top_ms = "-", 0.0
         if not filtered_df.empty and total_pax > 0:
@@ -630,7 +620,7 @@ if "3/4수송" in selected_group:
             else: st.info("ℹ️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # ------------------------------------------
-    # 2. ✈️ 공급 M/S 탭
+    # 2. ✈ 공급 M/S 탭
     # ------------------------------------------
     with tab_34_2:
         df_sup = df_sup_raw.copy() if df_sup_raw is not None else None
@@ -1466,7 +1456,7 @@ elif "6수송" in selected_group:
                         od_matrix_html += get_yoy_td_html(r["mkt_yoy"], bg_color="#ffffff")
                         od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important; padding:6px 2px; white-space:nowrap;">{r["sel_cy"]:,.0f}</td>'
                         od_matrix_html += get_yoy_td_html(r["sel_yoy"], bg_color="#ffffff")
-                        od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important; padding:grand_ke_ms_cyAIRLINE_WEIGHT_MULTIPLIERS =6px 2px; white-space:nowrap;">{r["sel_ms_cy"]:.1f}%</td>'
+                        od_matrix_html += f'<td style="font-weight:700; background-color:#ffffff !important; padding:6px 2px; white-space:nowrap;">{r["sel_ms_cy"]:.1f}%</td>'
                         od_matrix_html += get_yoy_td_html(r["sel_ms_yoy"], True, bg_color="#ffffff")
                         
                         od_matrix_html += f'<td style="background-color:#ffffff !important; text-align:center !important; padding:6px 2px; white-space:nowrap;"><span class="txt-ke-bold">{r["ke_cy"]:,.0f}</span></td>'
