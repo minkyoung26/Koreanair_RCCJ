@@ -391,7 +391,7 @@ if "3/4수송" in selected_group:
             sel_al_list = render_multiselect_box(f_col8, "8. 항공사", opts_al, "slicer_al_multi")
             if sel_al_list: temp_df_34 = temp_df_34[temp_df_34['AL_clean'].isin(sel_al_list)]
 
-        filtered_df = temp_df_34.copy()
+    filtered_df = temp_df_34.copy()
 
         val_col_raw = find_column_by_candidates(filtered_df.columns, ['value', 'pax', '수송량', '발매량', '실적']) or 'Value'
         filtered_df['Value'] = pd.to_numeric(filtered_df[val_col_raw].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0) if val_col_raw in filtered_df.columns else 0.0
