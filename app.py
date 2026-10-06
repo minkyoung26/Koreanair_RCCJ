@@ -342,8 +342,6 @@ if "3/4수송" in selected_group:
 
         merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target and al_col_target in merged_df.columns else 'OTHER'
 
-        merged_df['AL_clean'] = merged_df[al_col_target].astype(str).str.strip().str.upper() if al_col_target else ''
-
         region_col = find_column_by_candidates(merged_df.columns, ['일본권역', '권역', 'japanregion', 'region'])
         bound_raw_col = find_column_by_candidates(merged_df.columns, ['bound', '방향', '바운드'])
         week_col = find_column_by_candidates(merged_df.columns, ['발매주차', 'issueweek', 'purchaseweek'])
