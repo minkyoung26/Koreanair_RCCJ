@@ -872,11 +872,11 @@ for col in temp_ag.columns:
         break
 
 if not al_col_ag and 'dominantmarketingairline' in temp_ag.columns:
-al_col_ag = 'dominantmarketingairline'
-                opts_al_ag = sorted([str(x) for x in temp_ag[al_col_ag].dropna().unique()]) if al_col_ag and al_col_ag in temp_ag.columns else []
-                opts_al_ag = ['KE'] + [x for x in opts_al_ag if x != 'KE'] if 'KE' in opts_al_ag else opts_al_ag
-                sel_al_ag_list = render_multiselect_box(ac5, "5. 항공사", opts_al_ag, "slicer_al_ag_multi")
-                if sel_al_ag_list and al_col_ag: temp_ag = temp_ag[temp_ag[al_col_ag].astype(str).isin(sel_al_ag_list)]
+    al_col_ag = 'dominantmarketingairline'
+opts_al_ag = sorted([str(x) for x in temp_ag[al_col_ag].dropna().unique()]) if al_col_ag and al_col_ag in temp_ag.columns else []
+opts_al_ag = ['KE'] + [x for x in opts_al_ag if x != 'KE'] if 'KE' in opts_al_ag else opts_al_ag
+sel_al_ag_list = render_multiselect_box(ac5, "5. 항공사", opts_al_ag, "slicer_al_ag_multi")
+if sel_al_ag_list and al_col_ag: temp_ag = temp_ag[temp_ag[al_col_ag].astype(str).isin(sel_al_ag_list)]
 
             df_ag_filtered = temp_ag
             open_attr = "open" if st.toggle("📂 전체 항목 펼쳐보기", value=True, key="expand_toggle_all_key_fixed") else ""
