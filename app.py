@@ -896,7 +896,7 @@ if "3/4수송" in selected_group:
                                     st.markdown(g_html, unsafe_allow_html=True)
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (완전 경량화 최적화판)
+# GROUP 2: 🌐 6수송 대시보드 (메모리 캐싱 최적화판)
 # ==========================================
 elif "6수송" in selected_group:
     df_6th_raw = load_6th_data_aggregated()
@@ -945,6 +945,41 @@ elif "6수송" in selected_group:
     df_6['Pur_M_Norm'] = df_6[col_pur_m_disp].apply(extract_pure_month) if col_pur_m_disp in df_6.columns else ""
     df_6['Trip_M_Norm'] = df_6[col_trip_m_disp].apply(extract_pure_month) if col_trip_m_disp in df_6.columns else ""
 
+    # 💡 [핵심 최적화] 10개 슬라이서의 옵션 리스트를 매번 생성하지 않고 캐싱
+    @st.cache_data
+    def extract_slicer_options_cached(_df):
+        cy_pur = _df[_df[col_pur_year_type].astype(str).str.contains('금년', na=False)] if col_pur_year_type in _df.columns else _df
+        if cy_pur.empty: cy_pur = _df
+
+        cy_trip = _df[_df[col_trip_year_type].astype(str).str.contains('금년', na=False)] if col_trip_year_type in _df.columns else _df
+        if cy_trip.empty: cy_trip = _df
+
+        raw_pur_m = [str(x).strip() for x in cy_pur[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']] if col_pur_m_disp in cy_pur.columns else []
+        raw_trip_m = [str(x).strip() for x in cy_trip[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']] if col_trip_m_disp in cy_trip.columns else []
+
+        if col_al_6 in cy_pur.columns:
+            al_val = cy_pur[cy_pur['Val_CY_num'] > 0].groupby(col_al_6, observed=True)['Val_CY_num'].sum().sort_values(ascending=False)
+            al_sorted = [str(x).strip() for x in al_val.index if str(x).strip() != 'nan']
+            opts_al = ['KE'] + [x for x in al_sorted if x != 'KE'] if 'KE' in al_sorted else al_sorted
+        else:
+            opts_al = []
+
+        return {
+            'pur_m': sort_month_options(raw_pur_m, reverse=True),
+            'trip_m': sort_month_options(raw_trip_m, reverse=True),
+            'rgn': sorted([str(x).strip() for x in cy_pur[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in cy_pur.columns else [],
+            'dir': sorted([str(x).strip() for x in cy_pur[col_dir].dropna().unique() if str(x).strip() != 'nan']) if col_dir in cy_pur.columns else [],
+            'direct': sorted([str(x).strip() for x in cy_pur[col_direct_transit].dropna().unique() if str(x).strip() != 'nan']) if col_direct_transit in cy_pur.columns else [],
+            'al': opts_al,
+            'od': sorted([str(x).strip() for x in cy_pur[col_od_simple].dropna().unique() if str(x).strip() != 'nan']) if col_od_simple in cy_pur.columns else [],
+            'orig_c': sorted([str(x).strip() for x in cy_pur[col_orig_c].dropna().unique() if str(x).strip() != 'nan']) if col_orig_c in cy_pur.columns else [],
+            'dest_c': sorted([str(x).strip() for x in cy_pur[col_dest_c].dropna().unique() if str(x).strip() != 'nan']) if col_dest_c in cy_pur.columns else [],
+            'jp_apo': sorted([str(x).strip() for x in cy_pur[col_jp_apo].dropna().unique() if str(x).strip() != 'nan']) if col_jp_apo in cy_pur.columns else [],
+            'ov_apo': sorted([str(x).strip() for x in cy_pur[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in cy_pur.columns else []
+        }
+
+    slicers = extract_slicer_options_cached(df_6)
+
     last_updated_str = get_6th_last_updated_date()
 
     st.markdown('<div class="unified-sub-header">✈ 6수송 발매 M/S 현황</div>', unsafe_allow_html=True)
@@ -962,58 +997,23 @@ elif "6수송" in selected_group:
     with col_left_filter:
         st.markdown('<div style="font-size:15px; font-weight:800; color:#0f172a; border-bottom:2px solid #cbd5e1; padding-bottom:8px; margin-bottom:15px;">🔍 대시보드 슬라이서</div>', unsafe_allow_html=True)
         
-        # 💡 [핵심] 필터 변경 시 매번 원본 스캔하는 연산 배제
-        df_cy_pur_only = df_6[df_6[col_pur_year_type].astype(str).str.contains('금년', na=False)] if col_pur_year_type in df_6.columns else df_6
-        if df_cy_pur_only.empty: df_cy_pur_only = df_6
+        pur_range_label = get_dynamic_range_label_6th(slicers['pur_m'])
+        sel_pur_m_disp = render_panel_multiselect(st, f"발매월{pur_range_label}", slicers['pur_m'], "slicer6_pur_m_disp_safe")
 
-        df_cy_trip_only = df_6[df_6[col_trip_year_type].astype(str).str.contains('금년', na=False)] if col_trip_year_type in df_6.columns else df_6
-        if df_cy_trip_only.empty: df_cy_trip_only = df_6
+        trip_range_label = get_dynamic_range_label_6th(slicers['trip_m'])
+        sel_trip_m_disp = render_panel_multiselect(st, f"출발월{trip_range_label}", slicers['trip_m'], "slicer6_trip_m_disp_safe")
 
-        raw_pur_m_cy = [str(x).strip() for x in df_cy_pur_only[col_pur_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']] if col_pur_m_disp in df_cy_pur_only.columns else []
-        opts_pur_m_cy = sort_month_options(raw_pur_m_cy, reverse=True)
-        pur_range_label = get_dynamic_range_label_6th(opts_pur_m_cy)
-        
-        sel_pur_m_disp = render_panel_multiselect(st, f"발매월{pur_range_label}", opts_pur_m_cy, "slicer6_pur_m_disp_safe")
+        sel_rgn = render_panel_multiselect(st, "OD Region", slicers['rgn'], "slicer6_rgn_safe")
+        sel_dir = render_panel_multiselect(st, "Direction (일본발/행)", slicers['dir'], "slicer6_dir_safe")
+        sel_direct = render_panel_multiselect(st, "직항/경유", slicers['direct'], "slicer6_direct_safe")
+        sel_al_list = render_panel_multiselect(st, "항공사 (Carrier)", slicers['al'], "slicer6_al_multi_safe")
+        sel_od_simple = render_panel_multiselect(st, "Trip O&D", slicers['od'], "slicer6_od_safe")
+        sel_orig_c = render_panel_multiselect(st, "출발 국가 (Origin)", slicers['orig_c'], "slicer6_orig_c_safe")
+        sel_dest_c = render_panel_multiselect(st, "도착 국가 (Destination)", slicers['dest_c'], "slicer6_dest_c_safe")
+        sel_jp_apo = render_panel_multiselect(st, "일본 APO", slicers['jp_apo'], "slicer6_jp_apo_safe")
+        sel_ov_apo = render_panel_multiselect(st, "해외 APO", slicers['ov_apo'], "slicer6_ov_apo_safe")
 
-        raw_trip_m_cy = [str(x).strip() for x in df_cy_trip_only[col_trip_m_disp].dropna().unique() if str(x).strip() not in ['', 'nan', 'none']] if col_trip_m_disp in df_cy_trip_only.columns else []
-        opts_trip_m_cy = sort_month_options(raw_trip_m_cy, reverse=True)
-        trip_range_label = get_dynamic_range_label_6th(opts_trip_m_cy)
-        
-        sel_trip_m_disp = render_panel_multiselect(st, f"출발월{trip_range_label}", opts_trip_m_cy, "slicer6_trip_m_disp_safe")
-
-        opts_rgn = sorted([str(x).strip() for x in df_cy_pur_only[col_rgn].dropna().unique() if str(x).strip() != 'nan']) if col_rgn in df_cy_pur_only.columns else []
-        sel_rgn = render_panel_multiselect(st, "OD Region", opts_rgn, "slicer6_rgn_safe")
-
-        opts_dir = sorted([str(x).strip() for x in df_cy_pur_only[col_dir].dropna().unique() if str(x).strip() != 'nan']) if col_dir in df_cy_pur_only.columns else []
-        sel_dir = render_panel_multiselect(st, "Direction (일본발/행)", opts_dir, "slicer6_dir_safe")
-
-        opts_direct = sorted([str(x).strip() for x in df_cy_pur_only[col_direct_transit].dropna().unique() if str(x).strip() != 'nan']) if col_direct_transit in df_cy_pur_only.columns else []
-        sel_direct = render_panel_multiselect(st, "직항/경유", opts_direct, "slicer6_direct_safe")
-
-        if col_al_6 in df_cy_pur_only.columns:
-            al_val_series = df_cy_pur_only[df_cy_pur_only['Val_CY_num'] > 0].groupby(col_al_6, observed=True)['Val_CY_num'].sum().sort_values(ascending=False)
-            al_sorted = [str(x).strip() for x in al_val_series.index if str(x).strip() != 'nan']
-            opts_al = ['KE'] + [x for x in al_sorted if x != 'KE'] if 'KE' in al_sorted else al_sorted
-        else:
-            opts_al = []
-        sel_al_list = render_panel_multiselect(st, "항공사 (Carrier)", opts_al, "slicer6_al_multi_safe")
-
-        opts_od = sorted([str(x).strip() for x in df_cy_pur_only[col_od_simple].dropna().unique() if str(x).strip() != 'nan']) if col_od_simple in df_cy_pur_only.columns else []
-        sel_od_simple = render_panel_multiselect(st, "Trip O&D", opts_od, "slicer6_od_simple_safe")
-
-        opts_orig_c = sorted([str(x).strip() for x in df_cy_pur_only[col_orig_c].dropna().unique() if str(x).strip() != 'nan']) if col_orig_c in df_cy_pur_only.columns else []
-        sel_orig_c = render_panel_multiselect(st, "출발 국가 (Origin)", opts_orig_c, "slicer6_orig_c_safe")
-
-        opts_dest_c = sorted([str(x).strip() for x in df_cy_pur_only[col_dest_c].dropna().unique() if str(x).strip() != 'nan']) if col_dest_c in df_cy_pur_only.columns else []
-        sel_dest_c = render_panel_multiselect(st, "도착 국가 (Destination)", opts_dest_c, "slicer6_dest_c_safe")
-
-        opts_jp_apo = sorted([str(x).strip() for x in df_cy_pur_only[col_jp_apo].dropna().unique() if str(x).strip() != 'nan']) if col_jp_apo in df_cy_pur_only.columns else []
-        sel_jp_apo = render_panel_multiselect(st, "일본 APO", opts_jp_apo, "slicer6_jp_apo_safe")
-
-        opts_ov_apo = sorted([str(x).strip() for x in df_cy_pur_only[col_ov_apo].dropna().unique() if str(x).strip() != 'nan']) if col_ov_apo in df_cy_pur_only.columns else []
-        sel_ov_apo = render_panel_multiselect(st, "해외 APO", opts_ov_apo, "slicer6_ov_apo_safe")
-
-        # 💡 [핵심] 한 번에 인덱스 마스크(Mask) 필터링 처리 (메모리 스파이크 차단)
+        # 💡 [핵심 최적화] 단 1회의 마스크 계산으로 데이터 필터링
         mask = np.ones(len(df_6), dtype=bool)
 
         if sel_pur_m_disp:
@@ -1059,7 +1059,7 @@ elif "6수송" in selected_group:
 
     with col_right_data:
         if filtered_6th.empty:
-            st.warning("⚠️ 선택하신 필터 조합에 해당하는 6수송 실적 데이터가 없습니다. 필터 조건을 변경해 주세요.")
+            st.warning("⚠️️ 선택하신 필터 조합에 해당하는 6수송 실적 데이터가 없습니다. 필터 조건을 변경해 주세요.")
         else:
             tabs = st.tabs(["📊 종합 M/S 분석 및 Carrier 상세 비교", "📋 6수송 Raw Data View"])
 
