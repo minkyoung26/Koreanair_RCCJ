@@ -988,20 +988,39 @@ elif "6수송" in selected_group:
                 return sorted([str(x).strip() for x in df_6[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
             return []
 
-        opts_pur_m = [
-            x
-            for x in sort_month_options(
-                get_clean_opts(col_pur_m_disp), reverse=True
-            )
-            if "27" in str(x) or "2027" in str(x)
-        ]
-        opts_trip_m = [
-            x
-            for x in sort_month_options(
-                get_clean_opts(col_trip_m_disp), reverse=True
-            )
-            if "27" in str(x) or "2027" in str(x)
-        ]
+# 🟢 '발매_연도구분' == '금년 발매', '출발_연도구분' == '금년 출발' 행만 필터링
+        df_pur_cy = (
+            df_6[df_6["발매_연도구분"] == "금년 발매"]
+            if "발매_연도구분" in df_6.columns
+            else df_6
+        )
+        df_trip_cy = (
+            df_6[df_6["출발_연도구분"] == "금년 출발"]
+            if "출발_연도구분" in df_6.columns
+            else df_6
+        )
+
+        # 금년 필터링된 데이터프레임에서 유일값 추출 및 정렬
+        raw_pur = (
+            df_pur_cy[col_pur_m_disp].dropna().astype(str).unique().tolist()
+            if col_pur_m_disp in df_pur_cy.columns
+            else []
+        )
+        raw_trip = (
+            df_trip_cy[col_trip_m_disp].dropna().astype(str).unique().tolist()
+            if col_trip_m_disp in df_trip_cy.columns
+            else []
+        )
+
+        # 빈 값 제거 및 월 정렬
+        opts_pur_m = sort_month_options(
+            [x for x in raw_pur if str(x).strip() not in ["", "nan"]],
+            reverse=True,
+        )
+        opts_trip_m = sort_month_options(
+            [x for x in raw_trip if str(x).strip() not in ["", "nan"]],
+            reverse=True,
+        )
         opts_rgn = get_clean_opts(col_rgn)
         opts_dir = get_clean_opts(col_dir)
         opts_direct = get_clean_opts(col_direct_transit)
