@@ -1089,7 +1089,7 @@ elif "6수송" in selected_group:
             key="m_ov_6th_safe",
         )
 
-        # 메모리 최적화 필터링
+     # 메모리 최적화 필터링
         mask = pd.Series(True, index=df_6.index)
 
         if "sel_pur_m_disp" in locals() and sel_pur_m_disp:
@@ -1115,7 +1115,8 @@ elif "6수송" in selected_group:
         if "sel_ov_apo" in locals() and sel_ov_apo:
             mask &= df_6[col_ov_apo].isin(sel_ov_apo)
 
-        df_filtered = df_6[mask]
+        # 🟢 변수명을 filtered_6th로 연결
+        filtered_6th = df_6[mask]
 
     with col_right_data:
         if filtered_6th.empty:
