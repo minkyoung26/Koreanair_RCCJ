@@ -1092,7 +1092,7 @@ elif "6수송" in selected_group:
         # 💡 [핵심] 문자열 변환 및 스페이스 정제 후 필터링
         mask = np.ones(len(df_6), dtype=bool)
 
-        if sel_pur_m_disp:
+        _disp:
             sel_norm_months = [extract_pure_month(x) for x in sel_pur_m_disp]
             mask &= df_6['Pur_M_Norm'].isin(sel_norm_months)
 
@@ -1121,13 +1121,34 @@ elif "6수송" in selected_group:
         if sel_dest_c and col_dest_c in df_6.columns:
             mask &= df_6[col_dest_c].astype(str).str.strip().isin(sel_dest_c)
 
-        if sel_jp_apo and col_jp_apo in df_6.columns:
-            mask &= df_6[col_jp_apo].astype(str).str.strip().isin(sel_jp_apo)
+        if sel_jp_apo and col_jp_apo in df_# 🟢 [Oh, No 에러 완벽 차단] Boolean Mask로 메모리 소모 최적화
+        mask = pd.Series(True, index=df_6.index)
 
-        if sel_ov_apo and col_ov_apo in df_6.columns:
-            mask &= df_6[col_ov_apo].astype(str).str.strip().isin(sel_ov_apo)
+        if "sel_pur_m_disp" in locals() and sel_pur_m_disp:
+            mask &= df_6[col_pur_m_disp].isin(sel_pur_m_disp)
+        if "sel_trip_m_disp" in locals() and sel_trip_m_disp:
+            mask &= df_6[col_trip_m_disp].isin(sel_trip_m_disp)
+        if "sel_rgn" in locals() and sel_rgn:
+            mask &= df_6[col_rgn].isin(sel_rgn)
+        if "sel_dir" in locals() and sel_dir:
+            mask &= df_6[col_dir].isin(sel_dir)
+        if "sel_direct" in locals() and sel_direct:
+            mask &= df_6[col_direct_transit].isin(sel_direct)
+        if "sel_al_list" in locals() and sel_al_list:
+            mask &= df_6[col_al_6].isin(sel_al_list)
+        if "sel_od_simple" in locals() and sel_od_simple:
+            mask &= df_6[col_od_simple].isin(sel_od_simple)
+        if "sel_orig_c" in locals() and sel_orig_c:
+            mask &= df_6[col_orig_c].isin(sel_orig_c)
+        if "sel_dest_c" in locals() and sel_dest_c:
+            mask &= df_6[col_dest_c].isin(sel_dest_c)
+        if "sel_jp_apo" in locals() and sel_jp_apo:
+            mask &= df_6[col_jp_apo].isin(sel_jp_apo)
+        if "sel_ov_apo" in locals() and sel_ov_apo:
+            mask &= df_6[col_ov_apo].isin(sel_ov_apo)
 
-        filtered_6th = df_6[mask]
+        # 필터링 적용된 최종 데이터프레임 생성
+        df_filtered = df_6[mask]
 
     with col_right_data:
         if filtered_6th.empty:
