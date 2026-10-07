@@ -1052,35 +1052,23 @@ elif "6수송" in selected_group:
                 ])
             return []
 
-        # 1. 드롭다운 필터 옵션 생성 (NameError 차단 및 금년 월만 추출)
+        # 1. 드롭다운 필터 옵션 생성 (컬럼명 완벽 매칭 및 금년 전용 옵션 추출)
         raw_pur = get_clean_opts(col_pur_m_disp)
         raw_trip = get_clean_opts(col_trip_m_disp)
 
-        if "발매_연도구분" in df_6.columns:
-            cy_pur_m = (
-                df_6[df_6["발매_연도구분"] == "금년 발매"][col_pur_m_disp]
-                .dropna()
-                .unique()
-            )
-            filtered_pur = [
-                x
-                for x in raw_pur
-                if x in cy_pur_m or str(x) in cy_pur_m.astype(str)
-            ]
+        # 발매월 금년 옵션 필터링 (컬럼 존재 여부 정밀 감지)
+        if col_pur_year_type and col_pur_year_type in df_6.columns:
+            cy_mask_pur = df_6[col_pur_year_type].astype(str).str.contains("금년", na=False)
+            cy_pur_m = df_6[cy_mask_pur][col_pur_m_disp].dropna().unique()
+            filtered_pur = [x for x in raw_pur if x in cy_pur_m or str(x) in cy_pur_m.astype(str)]
             if filtered_pur:
                 raw_pur = filtered_pur
 
-        if "출발_연도구분" in df_6.columns:
-            cy_trip_m = (
-                df_6[df_6["출발_연도구분"] == "금년 출발"][col_trip_m_disp]
-                .dropna()
-                .unique()
-            )
-            filtered_trip = [
-                x
-                for x in raw_trip
-                if x in cy_trip_m or str(x) in cy_trip_m.astype(str)
-            ]
+        # 출발월 금년 옵션 필터링
+        if col_trip_year_type and col_trip_year_type in df_6.columns:
+            cy_mask_trip = df_6[col_trip_year_type].astype(str).str.contains("금년", na=False)
+            cy_trip_m = df_6[cy_mask_trip][col_trip_m_disp].dropna().unique()
+            filtered_trip = [x for x in raw_trip if x in cy_trip_m or str(x) in cy_trip_m.astype(str)]
             if filtered_trip:
                 raw_trip = filtered_trip
 
@@ -1099,52 +1087,33 @@ elif "6수송" in selected_group:
         opts_ov_apo = get_clean_opts(col_ov_apo)
 
         # 2. UI 화면 슬라이서
-        sel_pur_m_disp = st.multiselect(
-            "발매월", opts_pur_m, key="sl_pur_m_6"
-        )
-        sel_trip_m_disp = st.multiselect(
-            "출발월", opts_trip_m, key="sl_trip_m_6"
-        )
+        sel_pur_m_disp = st.multiselect("발매월", opts_pur_m, key="sl_pur_m_6")
+        sel_trip_m_disp = st.multiselect("출발월", opts_trip_m, key="sl_trip_m_6")
         sel_rgn = st.multiselect("OD Region", opts_rgn, key="sl_rgn_6")
-        sel_dir = st.multiselect(
-            "Direction (일본발/행)", opts_dir, key="sl_dir_6"
-        )
-        sel_direct = st.multiselect(
-            "직항/경유", opts_direct, key="sl_dt_6"
-        )
-        sel_al_list = st.multiselect(
-            "항공사 (Carrier)", opts_al, key="sl_al_6"
-        )
+        sel_dir = st.multiselect("Direction (일본발/행)", opts_dir, key="sl_dir_6")
+        sel_direct = st.multiselect("직항/경유", opts_direct, key="sl_dt_6")
+        sel_al_list = st.multiselect("항공사 (Carrier)", opts_al, key="sl_al_6")
         sel_od_simple = st.multiselect("Trip O&D", opts_od, key="sl_od_6")
-        sel_orig_c = st.multiselect(
-            "출발 국가 (Origin)", opts_orig_c, key="sl_orig_c_6"
-        )
-        sel_dest_c = st.multiselect(
-            "도착 국가 (Destination)", opts_dest_c, key="sl_dest_c_6"
-        )
+        sel_orig_c = st.multiselect("출발 국가 (Origin)", opts_orig_c, key="sl_orig_c_6")
+        sel_dest_c = st.multiselect("도착 국가 (Destination)", opts_dest_c, key="sl_dest_c_6")
         sel_jp_apo = st.multiselect("일본 APO", opts_jp_apo, key="sl_jp_apo_6")
         sel_ov_apo = st.multiselect("해외 APO", opts_ov_apo, key="sl_ov_apo_6")
 
-# 3. YOY 정상 계산을 지원하는 메모리 최적화 필터링 (메모리 폭발 방지 초고속 매칭)
+        # 3. YOY 계산용 필터링 (연도 관계없이 동일 '월' 조합 매칭)
         mask = pd.Series(True, index=df_6.index)
 
         if sel_pur_m_disp:
-            pur_months = [
-                str(m).replace("25-", "").replace("26-", "").replace("27-", "").replace("-25", "").replace("-26", "").replace("-27", "").strip()
-                for m in sel_pur_m_disp
-            ]
-            pattern_pur = "|".join([p for p in pur_months if p])
-            if pattern_pur:
-                mask &= df_6[col_pur_m_disp].astype(str).str.contains(pattern_pur, regex=True, na=False)
+            # 선택된 값(예: '2027-11' 또는 '11')에서 월 단위 정규화 추출
+            pur_m_keys = [str(x).split("-")[-1].zfill(2) for x in sel_pur_m_disp]
+            mask &= df_6[col_pur_m_disp].astype(str).apply(
+                lambda val: any(k in val for k in pur_m_keys)
+            )
 
         if sel_trip_m_disp:
-            trip_months = [
-                str(m).replace("25-", "").replace("26-", "").replace("27-", "").replace("-25", "").replace("-26", "").replace("-27", "").strip()
-                for m in sel_trip_m_disp
-            ]
-            pattern_trip = "|".join([p for p in trip_months if p])
-            if pattern_trip:
-                mask &= df_6[col_trip_m_disp].astype(str).str.contains(pattern_trip, regex=True, na=False)
+            trip_m_keys = [str(x).split("-")[-1].zfill(2) for x in sel_trip_m_disp]
+            mask &= df_6[col_trip_m_disp].astype(str).apply(
+                lambda val: any(k in val for k in trip_m_keys)
+            )
 
         if sel_rgn:
             mask &= df_6[col_rgn].isin(sel_rgn)
@@ -1166,7 +1135,6 @@ elif "6수송" in selected_group:
             mask &= df_6[col_ov_apo].isin(sel_ov_apo)
 
         filtered_6th = df_6[mask]
-
     with col_right_data:
         if filtered_6th.empty:
             st.warning(
