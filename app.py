@@ -988,25 +988,20 @@ elif "6수송" in selected_group:
                 return sorted([str(x).strip() for x in df_6[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
             return []
 
-        # 🟢 Parquet 데이터에서 '금년'(CY) 조건만 필터링하여 옵션 생성
-        cy_mask = (
-            df_6th_raw["연도구분"].astype(str).str.contains("금년|CY|2027|27")
-            if "연도구분" in df_6th_raw.columns
-            else (
-                df_6th_raw["구분"].astype(str).str.contains("금년|CY")
-                if "구분" in df_6th_raw.columns
-                else pd.Series(True, index=df_6th_raw.index)
+        opts_pur_m = [
+            x
+            for x in sort_month_options(
+                get_clean_opts(col_pur_m_disp), reverse=True
             )
-        )
-        df_cy_only = df_6th_raw[cy_mask]
-
-        # 금년 데이터프레임 기반으로 드롭다운 옵션 추출
-        opts_pur_m = sort_month_options(
-            get_clean_opts(df_cy_only[col_pur_m_disp]), reverse=True
-        )
-        opts_trip_m = sort_month_options(
-            get_clean_opts(df_cy_only[col_trip_m_disp]), reverse=True
-        )
+            if "27" in str(x) or "2027" in str(x)
+        ]
+        opts_trip_m = [
+            x
+            for x in sort_month_options(
+                get_clean_opts(col_trip_m_disp), reverse=True
+            )
+            if "27" in str(x) or "2027" in str(x)
+        ]
         opts_rgn = get_clean_opts(col_rgn)
         opts_dir = get_clean_opts(col_dir)
         opts_direct = get_clean_opts(col_direct_transit)
