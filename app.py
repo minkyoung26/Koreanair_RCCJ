@@ -1089,37 +1089,7 @@ elif "6수송" in selected_group:
             key="m_ov_6th_safe",
         )
 
-        # 💡 [핵심] 문자열 변환 및 스페이스 정제 후 필터링
-        mask = np.ones(len(df_6), dtype=bool)
-
-        if "sel_pur_m_disp" in locals() and sel_pur_m_disp:
-            mask &= df_6[col_pur_m_disp].isin(sel_pur_m_disp)
-        if sel_trip_m_disp:
-            sel_norm_trip_months = [extract_pure_month(x) for x in sel_trip_m_disp]
-            mask &= df_6['Trip_M_Norm'].isin(sel_norm_trip_months)
-
-        if sel_rgn and col_rgn in df_6.columns:
-            mask &= df_6[col_rgn].astype(str).str.strip().isin(sel_rgn)
-
-        if sel_dir and col_dir in df_6.columns:
-            mask &= df_6[col_dir].astype(str).str.strip().isin(sel_dir)
-
-        if sel_direct and col_direct_transit in df_6.columns:
-            mask &= df_6[col_direct_transit].astype(str).str.strip().isin(sel_direct)
-
-        if sel_al_list and col_al_6 in df_6.columns:
-            mask &= df_6[col_al_6].astype(str).str.strip().isin(sel_al_list)
-
-        if sel_od_simple and col_od_simple in df_6.columns:
-            mask &= df_6[col_od_simple].astype(str).str.strip().isin(sel_od_simple)
-
-        if sel_orig_c and col_orig_c in df_6.columns:
-            mask &= df_6[col_orig_c].astype(str).str.strip().isin(sel_orig_c)
-
-        if sel_dest_c and col_dest_c in df_6.columns:
-            mask &= df_6[col_dest_c].astype(str).str.strip().isin(sel_dest_c)
-
-        if sel_jp_apo and col_jp_apo in df_# 🟢 [Oh, No 에러 완벽 차단] Boolean Mask로 메모리 소모 최적화
+        # 메모리 최적화 필터링
         mask = pd.Series(True, index=df_6.index)
 
         if "sel_pur_m_disp" in locals() and sel_pur_m_disp:
@@ -1145,7 +1115,6 @@ elif "6수송" in selected_group:
         if "sel_ov_apo" in locals() and sel_ov_apo:
             mask &= df_6[col_ov_apo].isin(sel_ov_apo)
 
-        # 필터링 적용된 최종 데이터프레임 생성
         df_filtered = df_6[mask]
 
     with col_right_data:
