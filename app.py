@@ -988,30 +988,54 @@ elif "6수송" in selected_group:
                 return sorted([str(x).strip() for x in df_6[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
             return []
 
-# 🟢 드롭다운 선택지에는 '금년' 월만 보여주되, 원본 데이터셋(df_6)은 유지하여 YOY 계산 가능하게 수정
-        if "발매_연도구분" in df_6.columns:
-            cy_pur_m = df_6[df_6["발매_연도구분"] == "금년 발매"][
-                col_pur_m_disp
-            ].dropna().unique()
-            raw_pur = [
-                x
-                for x in get_clean_opts(col_pur_m_disp)
-                if x in cy_pur_m or str(x) in cy_pur_m.astype(str)
-            ]
-        else:
-            raw_pur = get_clean_opts(col_pur_m_disp)
+# 🟢 [YOY 정상 계산] 선택한 월의 금년/전년 표기를 모두 포함하여 마스크 생성
+        mask = pd.Series(True, index=df_6.index)
 
-        if "출발_연도구분" in df_6.columns:
-            cy_trip_m = df_6[df_6["출발_연도구분"] == "금년 출발"][
-                col_trip_m_disp
-            ].dropna().unique()
-            raw_trip = [
-                x
-                for x in get_clean_opts(col_trip_m_disp)
-                if x in cy_trip_m or str(x) in cy_trip_m.astype(str)
+        if "sel_pur_m_disp" in locals() and sel_pur_m_disp:
+            # 선택된 월(예: 27-Mar)의 숫자/월명(Mar) 패턴을 추출하여 전년도(26-Mar 등) 행도 함께 필터링
+            pur_patterns = [
+                str(m).replace("27-", "").replace("-27", "").strip()
+                for m in sel_pur_m_disp
             ]
-        else:
-            raw_trip = get_clean_opts(col_trip_m_disp)
+            mask &= (
+                df_6[col_pur_m_disp].isin(sel_pur_m_disp)
+                | df_6[col_pur_m_disp].astype(str).apply(
+                    lambda x: any(p in x for p in pur_patterns if p)
+                )
+            )
+
+        if "sel_trip_m_disp" in locals() and sel_trip_m_disp:
+            trip_patterns = [
+                str(m).replace("27-", "").replace("-27", "").strip()
+                for m in sel_trip_m_disp
+            ]
+            mask &= (
+                df_6[col_trip_m_disp].isin(sel_trip_m_disp)
+                | df_6[col_trip_m_disp].astype(str).apply(
+                    lambda x: any(p in x for p in trip_patterns if p)
+                )
+            )
+
+        if "sel_rgn" in locals() and sel_rgn:
+            mask &= df_6[col_rgn].isin(sel_rgn)
+        if "sel_dir" in locals() and sel_dir:
+            mask &= df_6[col_dir].isin(sel_dir)
+        if "sel_direct" in locals() and sel_direct:
+            mask &= df_6[col_direct_transit].isin(sel_direct)
+        if "sel_al_list" in locals() and sel_al_list:
+            mask &= df_6[col_al_6].isin(sel_al_list)
+        if "sel_od_simple" in locals() and sel_od_simple:
+            mask &= df_6[col_od_simple].isin(sel_od_simple)
+        if "sel_orig_c" in locals() and sel_orig_c:
+            mask &= df_6[col_orig_c].isin(sel_orig_c)
+        if "sel_dest_c" in locals() and sel_dest_c:
+            mask &= df_6[col_dest_c].isin(sel_dest_c)
+        if "sel_jp_apo" in locals() and sel_jp_apo:
+            mask &= df_6[col_jp_apo].isin(sel_jp_apo)
+        if "sel_ov_apo" in locals() and sel_ov_apo:
+            mask &= df_6[col_ov_apo].isin(sel_ov_apo)
+
+        filtered_6th = df_6[mask]
 
         opts_pur_m = sort_month_options(raw_pur, reverse=True)
         opts_trip_m = sort_month_options(raw_trip, reverse=True)
