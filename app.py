@@ -1069,18 +1069,26 @@ elif "6수송" in selected_group:
         sel_jp_apo = st.multiselect("일본 APO", opts_jp_apo, key="sl_jp_apo_6")
         sel_ov_apo = st.multiselect("해외 APO", opts_ov_apo, key="sl_ov_apo_6")
 
-        # 🟢 초고속 벡터화 필터링 (메모리 폭발 원천 차단)
+ # 🟢 초고속 벡터화 필터링 (출발월/발매월 정확한 월 매칭 보정)
         mask = pd.Series(True, index=df_6.index)
 
         if sel_pur_m_disp:
-            pur_m_keys = [str(x).split("-")[-1].zfill(2) for x in sel_pur_m_disp]
-            pat_pur = "|".join(pur_m_keys)
+            # 'Nov-26' -> 'Nov', '2026-11' -> '11' 형태로 순수 월 키워드 추출
+            pur_m_keys = [
+                str(x).split("-")[0].strip() if not str(x).split("-")[0].isdigit() else str(x).split("-")[-1].zfill(2)
+                for x in sel_pur_m_disp
+            ]
+            pat_pur = "|".join([k for k in pur_m_keys if k])
             if pat_pur:
                 mask &= df_6[col_pur_m_disp].astype(str).str.contains(pat_pur, regex=True, na=False)
 
         if sel_trip_m_disp:
-            trip_m_keys = [str(x).split("-")[-1].zfill(2) for x in sel_trip_m_disp]
-            pat_trip = "|".join(trip_m_keys)
+            # 'Nov-26' -> 'Nov', '2026-11' -> '11' 형태로 순수 월 키워드 추출
+            trip_m_keys = [
+                str(x).split("-")[0].strip() if not str(x).split("-")[0].isdigit() else str(x).split("-")[-1].zfill(2)
+                for x in sel_trip_m_disp
+            ]
+            pat_trip = "|".join([k for k in trip_m_keys if k])
             if pat_trip:
                 mask &= df_6[col_trip_m_disp].astype(str).str.contains(pat_trip, regex=True, na=False)
 
