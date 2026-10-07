@@ -1125,31 +1125,26 @@ elif "6수송" in selected_group:
         sel_jp_apo = st.multiselect("일본 APO", opts_jp_apo, key="sl_jp_apo_6")
         sel_ov_apo = st.multiselect("해외 APO", opts_ov_apo, key="sl_ov_apo_6")
 
-        # 3. YOY 정상 계산을 지원하는 메모리 최적화 필터링
+        # 3. YOY 정상 계산을 지원하는 메모리 최적화 필터링 (순수 월 매칭 보정판)
         mask = pd.Series(True, index=df_6.index)
 
         if sel_pur_m_disp:
-            pur_patterns = [
-                str(m).replace("27-", "").replace("-27", "").strip()
+            # 연도 수치(25-, 26-, -26 등) 제거 후 순수 월 표기(Sep, Oct, Mar 등)만 추출하여 매칭
+            pur_months = [
+                str(m).replace("25-", "").replace("26-", "").replace("27-", "").replace("-25", "").replace("-26", "").replace("-27", "").strip()
                 for m in sel_pur_m_disp
             ]
-            mask &= (
-                df_6[col_pur_m_disp].isin(sel_pur_m_disp)
-                | df_6[col_pur_m_disp].astype(str).apply(
-                    lambda x: any(p in x for p in pur_patterns if p)
-                )
+            mask &= df_6[col_pur_m_disp].astype(str).apply(
+                lambda x: any(pm in x for pm in pur_months if pm)
             )
 
         if sel_trip_m_disp:
-            trip_patterns = [
-                str(m).replace("27-", "").replace("-27", "").strip()
+            trip_months = [
+                str(m).replace("25-", "").replace("26-", "").replace("27-", "").replace("-25", "").replace("-26", "").replace("-27", "").strip()
                 for m in sel_trip_m_disp
             ]
-            mask &= (
-                df_6[col_trip_m_disp].isin(sel_trip_m_disp)
-                | df_6[col_trip_m_disp].astype(str).apply(
-                    lambda x: any(p in x for p in trip_patterns if p)
-                )
+            mask &= df_6[col_trip_m_disp].astype(str).apply(
+                lambda x: any(tm in x for tm in trip_months if tm)
             )
 
         if sel_rgn:
