@@ -1092,10 +1092,8 @@ elif "6수송" in selected_group:
         # 💡 [핵심] 문자열 변환 및 스페이스 정제 후 필터링
         mask = np.ones(len(df_6), dtype=bool)
 
-        _disp:
-            sel_norm_months = [extract_pure_month(x) for x in sel_pur_m_disp]
-            mask &= df_6['Pur_M_Norm'].isin(sel_norm_months)
-
+        if "sel_pur_m_disp" in locals() and sel_pur_m_disp:
+            mask &= df_6[col_pur_m_disp].isin(sel_pur_m_disp)
         if sel_trip_m_disp:
             sel_norm_trip_months = [extract_pure_month(x) for x in sel_trip_m_disp]
             mask &= df_6['Trip_M_Norm'].isin(sel_norm_trip_months)
