@@ -103,14 +103,7 @@ def clean_transport_column(df):
     if b_col: df['수송'] = df[b_col].astype(str).str.strip()
     return df
 
-def load_fast_parquet_data_file():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(base_dir, 'cache_34_data.parquet'),
-        'cache_34_data.parquet',
-        os.path.join(os.getcwd(), 'cache_34_data.parquet')
-    ]
-@st.cache_data(ttl=3600)  # 1시간 동안 메모리에 캐시 유지
+@st.cache_data(ttl=3600)
 def load_fast_parquet_data_file():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
@@ -123,16 +116,13 @@ def load_fast_parquet_data_file():
         if os.path.exists(target_path):
             try:
                 df = pd.read_parquet(target_path, engine="pyarrow")
-                # 🟢 메모리 사용량을 절반 이하로 줄여 OOM(Health Check) 에러 방지
                 for col in df.select_dtypes(include=["float64"]).columns:
                     df[col] = df[col].astype("float32")
                 for col in df.select_dtypes(include=["int64"]).columns:
                     df[col] = df[col].astype("int32")
                 if df is not None and not df.empty:
-                    # 🟢 Category 타입을 일반 문자열로 변환하여 메모리 폭증 차단
                     for col in df.select_dtypes(include=["category"]).columns:
                         df[col] = df[col].astype(str)
-
                     return clean_transport_column(df)
             except Exception:
                 pass
@@ -155,7 +145,9 @@ def load_aux_files():
                 if df is not None and not df.empty: return df
             except: pass
     return None
-@st.cache_data(ttl=600)  # 👈 이 줄을 바로 위에 새로 추가해 주세요!
+
+# 🟢 6수송 캐시 데이터 고속 로드 (정확한 메모리 최적화 데코레이터 단일 적용)
+@st.cache_data(ttl=3600)
 def load_6th_data_aggregated():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     candidates = [
@@ -168,21 +160,12 @@ def load_6th_data_aggregated():
             try:
                 df = pd.read_parquet(target_path, engine='pyarrow')
                 if df is not None and not df.empty:
-                    return df
-            except Exception: pass
-    return None
-def load_6th_data_aggregated():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(base_dir, 'cache_6th_data.parquet'),
-        'cache_6th_data.parquet',
-        os.path.join(os.getcwd(), 'cache_6th_data.parquet')
-    ]
-    for target_path in candidates:
-        if os.path.exists(target_path):
-            try:
-                df = pd.read_parquet(target_path, engine='pyarrow')
-                if df is not None and not df.empty:
+                    for col in df.select_dtypes(include=["float64"]).columns:
+                        df[col] = df[col].astype("float32")
+                    for col in df.select_dtypes(include=["int64"]).columns:
+                        df[col] = df[col].astype("int32")
+                    for col in df.select_dtypes(include=["category"]).columns:
+                        df[col] = df[col].astype(str)
                     return df
             except Exception: pass
     return None
@@ -599,7 +582,7 @@ if "3/4수송" in selected_group:
                 csv_data = filtered_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button("📥 필터링된 발매 Raw Data (CSV) 전체 다운로드", data=csv_data, file_name=f"Ticketing_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv", mime="text/csv")
                 st.dataframe(filtered_df.head(100), width="stretch")
-            else: st.info("ℹ️️ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
+            else: st.info("ℹ 관리자 비밀번호 입력 시 이용할 수 있습니다.")
 
     # 공급 M/S 탭
     with tab_34_2:
@@ -915,7 +898,7 @@ if "3/4수송" in selected_group:
                                     st.markdown(g_html, unsafe_allow_html=True)
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (데이터 타입/필터 완벽 동기화판)
+# GROUP 2: 🌐 6수송 대시보드 (고속 연산 및 OOM 방지 보정판)
 # ==========================================
 elif "6수송" in selected_group:
     df_6th_raw = load_6th_data_aggregated()
@@ -927,7 +910,7 @@ elif "6수송" in selected_group:
         )
         st.stop()
 
-    df_6 = df_6th_raw.copy()
+    df_6 = df_6th_raw
     df_6.columns = [str(c).strip() for c in df_6.columns]
     lower_col_map = {
         c.lower().replace(" ", "").replace("_", "").replace(".", ""): c
@@ -976,47 +959,36 @@ elif "6수송" in selected_group:
     col_pur_year_type = get_actual_col("발매_연도구분") or "발매_연도구분"
     col_trip_year_type = get_actual_col("출발_연도구분") or "출발_연도구분"
 
-    # 값 정제
-    if col_val_6 in df_6.columns:
-        df_6["Val_num"] = (
-            pd.to_numeric(
-                df_6[col_val_6]
-                .astype(str)
-                .str.replace(",", "")
-                .str.strip(),
-                errors="coerce",
+    # 수치형 정제
+    if 'Val_num' not in df_6.columns:
+        if col_val_6 in df_6.columns:
+            df_6["Val_num"] = (
+                pd.to_numeric(
+                    df_6[col_val_6]
+                    .astype(str)
+                    .str.replace(",", "")
+                    .str.strip(),
+                    errors="coerce",
+                )
+                .fillna(0)
             )
-            .fillna(0)
-        )
-    else:
-        df_6["Val_num"] = 0.0
+        else:
+            df_6["Val_num"] = 0.0
 
-    if col_year_type in df_6.columns:
-        df_6["Val_CY_num"] = np.where(
-            df_6[col_year_type].astype(str).str.contains("금년|CY", na=False),
-            df_6["Val_num"],
-            0.0,
-        )
-        df_6["Val_PY_num"] = np.where(
-            df_6[col_year_type].astype(str).str.contains("전년|PY", na=False),
-            df_6["Val_num"],
-            0.0,
-        )
-    else:
-        df_6["Val_CY_num"] = df_6["Val_num"]
-        df_6["Val_PY_num"] = 0.0
-
-    # 월 추출 (문자열 규격 통일)
-    df_6["Pur_M_Norm"] = (
-        df_6[col_pur_m_disp].astype(str).apply(extract_pure_month)
-        if col_pur_m_disp in df_6.columns
-        else ""
-    )
-    df_6["Trip_M_Norm"] = (
-        df_6[col_trip_m_disp].astype(str).apply(extract_pure_month)
-        if col_trip_m_disp in df_6.columns
-        else ""
-    )
+        if col_year_type in df_6.columns:
+            df_6["Val_CY_num"] = np.where(
+                df_6[col_year_type].astype(str).str.contains("금년|CY", na=False),
+                df_6["Val_num"],
+                0.0,
+            )
+            df_6["Val_PY_num"] = np.where(
+                df_6[col_year_type].astype(str).str.contains("전년|PY", na=False),
+                df_6["Val_num"],
+                0.0,
+            )
+        else:
+            df_6["Val_CY_num"] = df_6["Val_num"]
+            df_6["Val_PY_num"] = 0.0
 
     last_updated_str = get_6th_last_updated_date()
 
@@ -1052,11 +1024,10 @@ elif "6수송" in selected_group:
                 ])
             return []
 
-        # 1. 드롭다운 필터 옵션 생성 (컬럼명 완벽 매칭 및 금년 전용 옵션 추출)
         raw_pur = get_clean_opts(col_pur_m_disp)
         raw_trip = get_clean_opts(col_trip_m_disp)
 
-        # 발매월 금년 옵션 필터링 (컬럼 존재 여부 정밀 감지)
+        # 금년 발매월 추출
         if col_pur_year_type and col_pur_year_type in df_6.columns:
             cy_mask_pur = df_6[col_pur_year_type].astype(str).str.contains("금년", na=False)
             cy_pur_m = df_6[cy_mask_pur][col_pur_m_disp].dropna().unique()
@@ -1064,7 +1035,7 @@ elif "6수송" in selected_group:
             if filtered_pur:
                 raw_pur = filtered_pur
 
-        # 출발월 금년 옵션 필터링
+        # 금년 출발월 추출
         if col_trip_year_type and col_trip_year_type in df_6.columns:
             cy_mask_trip = df_6[col_trip_year_type].astype(str).str.contains("금년", na=False)
             cy_trip_m = df_6[cy_mask_trip][col_trip_m_disp].dropna().unique()
@@ -1086,7 +1057,6 @@ elif "6수송" in selected_group:
         opts_jp_apo = get_clean_opts(col_jp_apo)
         opts_ov_apo = get_clean_opts(col_ov_apo)
 
-        # 2. UI 화면 슬라이서
         sel_pur_m_disp = st.multiselect("발매월", opts_pur_m, key="sl_pur_m_6")
         sel_trip_m_disp = st.multiselect("출발월", opts_trip_m, key="sl_trip_m_6")
         sel_rgn = st.multiselect("OD Region", opts_rgn, key="sl_rgn_6")
@@ -1099,21 +1069,20 @@ elif "6수송" in selected_group:
         sel_jp_apo = st.multiselect("일본 APO", opts_jp_apo, key="sl_jp_apo_6")
         sel_ov_apo = st.multiselect("해외 APO", opts_ov_apo, key="sl_ov_apo_6")
 
-        # 3. YOY 계산용 필터링 (연도 관계없이 동일 '월' 조합 매칭)
+        # 🟢 초고속 벡터화 필터링 (메모리 폭발 원천 차단)
         mask = pd.Series(True, index=df_6.index)
 
         if sel_pur_m_disp:
-            # 선택된 값(예: '2027-11' 또는 '11')에서 월 단위 정규화 추출
             pur_m_keys = [str(x).split("-")[-1].zfill(2) for x in sel_pur_m_disp]
-            mask &= df_6[col_pur_m_disp].astype(str).apply(
-                lambda val: any(k in val for k in pur_m_keys)
-            )
+            pat_pur = "|".join(pur_m_keys)
+            if pat_pur:
+                mask &= df_6[col_pur_m_disp].astype(str).str.contains(pat_pur, regex=True, na=False)
 
         if sel_trip_m_disp:
             trip_m_keys = [str(x).split("-")[-1].zfill(2) for x in sel_trip_m_disp]
-            mask &= df_6[col_trip_m_disp].astype(str).apply(
-                lambda val: any(k in val for k in trip_m_keys)
-            )
+            pat_trip = "|".join(trip_m_keys)
+            if pat_trip:
+                mask &= df_6[col_trip_m_disp].astype(str).str.contains(pat_trip, regex=True, na=False)
 
         if sel_rgn:
             mask &= df_6[col_rgn].isin(sel_rgn)
@@ -1135,6 +1104,7 @@ elif "6수송" in selected_group:
             mask &= df_6[col_ov_apo].isin(sel_ov_apo)
 
         filtered_6th = df_6[mask]
+
     with col_right_data:
         if filtered_6th.empty:
             st.warning(
@@ -1148,7 +1118,6 @@ elif "6수송" in selected_group:
             ])
 
             with tabs[0]:
-                # 1. Carrier별 순위 M/S 요약 표
                 try:
                     if col_al_6 in filtered_6th.columns:
                         al_agg = (
@@ -1312,7 +1281,6 @@ elif "6수송" in selected_group:
 
                 st.markdown("---")
 
-                # 2. OD Region별 발매 및 M/S 현황
                 try:
                     if (
                         col_rgn in filtered_6th.columns
@@ -1539,7 +1507,6 @@ elif "6수송" in selected_group:
 
                 st.markdown("---")
 
-                # 3. Carrier별 M/S (TOP 20 Trip O&D 및 전체 총계)
                 try:
                     if (
                         col_od_simple in filtered_6th.columns
@@ -2094,7 +2061,7 @@ elif "6수송" in selected_group:
                     st.info(
                         "💡 조회 및 다운로드할 6수송 데이터가 없습니다."
                     )
-                    
+
 # ==========================================
 # GROUP 3: 🔗 W26 연결 네트워크
 # ==========================================
