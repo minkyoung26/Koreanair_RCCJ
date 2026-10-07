@@ -988,54 +988,21 @@ elif "6수송" in selected_group:
                 return sorted([str(x).strip() for x in df_6[col_name].dropna().unique() if str(x).strip() not in ['', 'nan', 'none', 'null']])
             return []
 
-# 🟢 [YOY 정상 계산] 선택한 월의 금년/전년 표기를 모두 포함하여 마스크 생성
-        mask = pd.Series(True, index=df_6.index)
+# 1. 드롭다운 필터 옵션 생성 (금년 월만 추출)
+        raw_pur = get_clean_opts(col_pur_m_disp)
+        raw_trip = get_clean_opts(col_trip_m_disp)
 
-        if "sel_pur_m_disp" in locals() and sel_pur_m_disp:
-            # 선택된 월(예: 27-Mar)의 숫자/월명(Mar) 패턴을 추출하여 전년도(26-Mar 등) 행도 함께 필터링
-            pur_patterns = [
-                str(m).replace("27-", "").replace("-27", "").strip()
-                for m in sel_pur_m_disp
-            ]
-            mask &= (
-                df_6[col_pur_m_disp].isin(sel_pur_m_disp)
-                | df_6[col_pur_m_disp].astype(str).apply(
-                    lambda x: any(p in x for p in pur_patterns if p)
-                )
-            )
+        if "발매_연도구분" in df_6.columns:
+            cy_pur_m = df_6[df_6["발매_연도구분"] == "금년 발매"][col_pur_m_disp].dropna().unique()
+            filtered_pur = [x for x in raw_pur if x in cy_pur_m or str(x) in cy_pur_m.astype(str)]
+            if filtered_pur:
+                raw_pur = filtered_pur
 
-        if "sel_trip_m_disp" in locals() and sel_trip_m_disp:
-            trip_patterns = [
-                str(m).replace("27-", "").replace("-27", "").strip()
-                for m in sel_trip_m_disp
-            ]
-            mask &= (
-                df_6[col_trip_m_disp].isin(sel_trip_m_disp)
-                | df_6[col_trip_m_disp].astype(str).apply(
-                    lambda x: any(p in x for p in trip_patterns if p)
-                )
-            )
-
-        if "sel_rgn" in locals() and sel_rgn:
-            mask &= df_6[col_rgn].isin(sel_rgn)
-        if "sel_dir" in locals() and sel_dir:
-            mask &= df_6[col_dir].isin(sel_dir)
-        if "sel_direct" in locals() and sel_direct:
-            mask &= df_6[col_direct_transit].isin(sel_direct)
-        if "sel_al_list" in locals() and sel_al_list:
-            mask &= df_6[col_al_6].isin(sel_al_list)
-        if "sel_od_simple" in locals() and sel_od_simple:
-            mask &= df_6[col_od_simple].isin(sel_od_simple)
-        if "sel_orig_c" in locals() and sel_orig_c:
-            mask &= df_6[col_orig_c].isin(sel_orig_c)
-        if "sel_dest_c" in locals() and sel_dest_c:
-            mask &= df_6[col_dest_c].isin(sel_dest_c)
-        if "sel_jp_apo" in locals() and sel_jp_apo:
-            mask &= df_6[col_jp_apo].isin(sel_jp_apo)
-        if "sel_ov_apo" in locals() and sel_ov_apo:
-            mask &= df_6[col_ov_apo].isin(sel_ov_apo)
-
-        filtered_6th = df_6[mask]
+        if "출발_연도구분" in df_6.columns:
+            cy_trip_m = df_6[df_6["출발_연도구분"] == "금년 출발"][col_trip_m_disp].dropna().unique()
+            filtered_trip = [x for x in raw_trip if x in cy_trip_m or str(x) in cy_trip_m.astype(str)]
+            if filtered_trip:
+                raw_trip = filtered_trip
 
         opts_pur_m = sort_month_options(raw_pur, reverse=True)
         opts_trip_m = sort_month_options(raw_trip, reverse=True)
@@ -1043,97 +1010,62 @@ elif "6수송" in selected_group:
         opts_dir = get_clean_opts(col_dir)
         opts_direct = get_clean_opts(col_direct_transit)
         opts_al = get_clean_opts(col_al_6)
-        if 'KE' in opts_al: opts_al = ['KE'] + [x for x in opts_al if x != 'KE']
+        if 'KE' in opts_al: 
+            opts_al = ['KE'] + [x for x in opts_al if x != 'KE']
         opts_od = get_clean_opts(col_od_simple)
         opts_orig_c = get_clean_opts(col_orig_c)
         opts_dest_c = get_clean_opts(col_dest_c)
         opts_jp_apo = get_clean_opts(col_jp_apo)
         opts_ov_apo = get_clean_opts(col_ov_apo)
 
-# 🟢 [안전 교체] 6수송 멀티필터 (세션 Crash 및 메모리 폭발 원천 차단)
-        sel_pur_m_disp = st.multiselect(
-            "발매월",
-            options=opts_pur_m,
-            key="m_pur_6th_safe",
-        )
-        sel_trip_m_disp = st.multiselect(
-            "출발월",
-            options=opts_trip_m,
-            key="m_trip_6th_safe",
-        )
-        sel_rgn = st.multiselect(
-            "OD Region",
-            options=opts_rgn,
-            key="m_rgn_6th_safe",
-        )
-        sel_dir = st.multiselect(
-            "Direction (일본발/행)",
-            options=opts_dir,
-            key="m_dir_6th_safe",
-        )
-        sel_direct = st.multiselect(
-            "직항/경유",
-            options=opts_direct,
-            key="m_direct_6th_safe",
-        )
-        sel_al_list = st.multiselect(
-            "항공사 (Carrier)",
-            options=opts_al,
-            key="m_al_6th_safe",
-        )
-        sel_od_simple = st.multiselect(
-            "Trip O&D",
-            options=opts_od,
-            key="m_od_6th_safe",
-        )
-        sel_orig_c = st.multiselect(
-            "출발 국가 (Origin)",
-            options=opts_orig_c,
-            key="m_orig_6th_safe",
-        )
-        sel_dest_c = st.multiselect(
-            "도착 국가 (Destination)",
-            options=opts_dest_c,
-            key="m_dest_6th_safe",
-        )
-        sel_jp_apo = st.multiselect(
-            "일본 APO",
-            options=opts_jp_apo,
-            key="m_jp_6th_safe",
-        )
-        sel_ov_apo = st.multiselect(
-            "해외 APO",
-            options=opts_ov_apo,
-            key="m_ov_6th_safe",
-        )
+        # 2. UI 화면 슬라이서 (한 번만 선언)
+        with col_left_slicer:
+            st.markdown("##### 🔍 대시보드 슬라이서")
+            st.markdown("---")
+            sel_pur_m_disp = st.multiselect("발매월", opts_pur_m, key="sl_pur_m_6")
+            sel_trip_m_disp = st.multiselect("출발월", opts_trip_m, key="sl_trip_m_6")
+            sel_rgn = st.multiselect("OD Region", opts_rgn, key="sl_rgn_6")
+            sel_dir = st.multiselect("Direction (일본발/행)", opts_dir, key="sl_dir_6")
+            sel_direct = st.multiselect("직항/경유", opts_direct, key="sl_dt_6")
+            sel_al_list = st.multiselect("항공사 (Carrier)", opts_al, key="sl_al_6")
+            sel_od_simple = st.multiselect("Trip O&D", opts_od, key="sl_od_6")
+            sel_orig_c = st.multiselect("출발 국가 (Origin)", opts_orig_c, key="sl_orig_c_6")
+            sel_dest_c = st.multiselect("도착 국가 (Destination)", opts_dest_c, key="sl_dest_c_6")
+            sel_jp_apo = st.multiselect("일본 APO", opts_jp_apo, key="sl_jp_apo_6")
+            sel_ov_apo = st.multiselect("해외 APO", opts_ov_apo, key="sl_ov_apo_6")
 
-     # 메모리 최적화 필터링
+        # 3. YOY 수치 정상 계산을 지원하는 메모리 최적화 필터링
         mask = pd.Series(True, index=df_6.index)
 
-        if "sel_pur_m_disp" in locals() and sel_pur_m_disp:
-            mask &= df_6[col_pur_m_disp].isin(sel_pur_m_disp)
-        if "sel_trip_m_disp" in locals() and sel_trip_m_disp:
-            mask &= df_6[col_trip_m_disp].isin(sel_trip_m_disp)
-        if "sel_rgn" in locals() and sel_rgn:
+        if sel_pur_m_disp:
+            pur_patterns = [str(m).replace("27-", "").replace("-27", "").strip() for m in sel_pur_m_disp]
+            mask &= (df_6[col_pur_m_disp].isin(sel_pur_m_disp) | 
+                     df_6[col_pur_m_disp].astype(str).apply(lambda x: any(p in x for p in pur_patterns if p)))
+
+        if sel_trip_m_disp:
+            trip_patterns = [str(m).replace("27-", "").replace("-27", "").strip() for m in sel_trip_m_disp]
+            mask &= (df_6[col_trip_m_disp].isin(sel_trip_m_disp) | 
+                     df_6[col_trip_m_disp].astype(str).apply(lambda x: any(p in x for p in trip_patterns if p)))
+
+        if sel_rgn:
             mask &= df_6[col_rgn].isin(sel_rgn)
-        if "sel_dir" in locals() and sel_dir:
+        if sel_dir:
             mask &= df_6[col_dir].isin(sel_dir)
-        if "sel_direct" in locals() and sel_direct:
+        if sel_direct:
             mask &= df_6[col_direct_transit].isin(sel_direct)
-        if "sel_al_list" in locals() and sel_al_list:
+        if sel_al_list:
             mask &= df_6[col_al_6].isin(sel_al_list)
-        if "sel_od_simple" in locals() and sel_od_simple:
+        if sel_od_simple:
             mask &= df_6[col_od_simple].isin(sel_od_simple)
-        if "sel_orig_c" in locals() and sel_orig_c:
+        if sel_orig_c:
             mask &= df_6[col_orig_c].isin(sel_orig_c)
-        if "sel_dest_c" in locals() and sel_dest_c:
+        if sel_dest_c:
             mask &= df_6[col_dest_c].isin(sel_dest_c)
-        if "sel_jp_apo" in locals() and sel_jp_apo:
+        if sel_jp_apo:
             mask &= df_6[col_jp_apo].isin(sel_jp_apo)
-        if "sel_ov_apo" in locals() and sel_ov_apo:
+        if sel_ov_apo:
             mask &= df_6[col_ov_apo].isin(sel_ov_apo)
 
-        # 🟢 변수명을 filtered_6th로 연결
         filtered_6th = df_6[mask]
 
     with col_right_data:
